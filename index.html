@@ -2,17 +2,17 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <!-- Mantener la pantalla "quieta" (sin zoom) -->
+  <!-- evitar zoom (pedido del usuario) -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart</title>
 
-  <!-- Tailwind (prototype) -->
+  <!-- Tailwind (rápido para prototipo) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- OpenCV.js (WASM) - opcional -->
+  <!-- OpenCV.js (opcional, mejora preprocesado si está disponible) -->
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
-  <!-- Quagga fallback -->
+  <!-- Quagga (fallback scanner) -->
   <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
 
   <!-- Chart.js -->
@@ -25,15 +25,15 @@
   <style>
     :root { --bg:#f8fafc; --card:#fff; --muted:#6b7280; }
     [data-theme="dark"]{ --bg:#071029; --card:#0f1724; --muted:#9ca3af; color-scheme:dark; }
-    html,body{ height:100%; touch-action: manipulation; -ms-touch-action: manipulation; -webkit-user-select:none; -ms-user-select:none; user-select:none; }
+    html,body{ height:100%; touch-action: manipulation; -webkit-user-select:none; -ms-user-select:none; user-select:none; }
     body{ background:var(--bg); font-family:Inter,system-ui,Segoe UI,Roboto,Arial; margin:0; color:#0b1220; -webkit-tap-highlight-color: transparent; }
     .app{ max-width:920px; margin:0 auto; padding-bottom:120px; }
-    #global-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.45); backdrop-filter:blur(2px); z-index:40; display:none; opacity:0; transition:opacity .18s; }
+    #global-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:40; display:none; opacity:0; transition:opacity .18s; }
     #global-backdrop.visible{ display:block; opacity:1; }
 
     .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:50; padding:1rem; overflow:auto; -webkit-overflow-scrolling:touch; }
     .modal.visible{ display:flex; }
-    .modal .modal-content{ width:100%; max-width:760px; border-radius:12px; box-shadow:0 12px 40px rgba(2,6,23,0.25); padding:1rem; background:var(--card); color:inherit; }
+    .modal .modal-content{ width:100%; max-width:760px; border-radius:12px; background:var(--card); color:inherit; padding:1rem; box-shadow:0 12px 40px rgba(2,6,23,0.12); }
     @media(max-width:640px){ .modal .modal-content{ width:100%; height:100%; border-radius:0; padding:0; display:flex; flex-direction:column; } }
 
     #overlay-canvas{ position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:20; }
@@ -43,7 +43,13 @@
     .inv-card{ background:var(--card); border-radius:12px; padding:12px; box-shadow:0 6px 18px rgba(2,6,23,0.06); display:flex; justify-content:space-between; align-items:center; gap:8px; }
     .print-table th{ background:#f3f4f6; padding:8px; text-align:left; }
     .print-table td{ padding:8px; border-bottom:1px solid #e5e7eb; vertical-align:top; }
-    input, select, button, textarea { -webkit-touch-callout: none; -webkit-user-select: none; user-select:none; }
+    input, select, button, textarea { -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+    /* impresión (estilo limpio) */
+    @media print{
+      body *{ visibility: hidden; }
+      .print-area, .print-area *{ visibility: visible; }
+      .print-area{ position: absolute; left: 0; top: 0; width: 100%; }
+    }
   </style>
 </head>
 <body data-theme="light">
@@ -68,7 +74,7 @@
       </div>
     </div>
 
-    <!-- Responsible -->
+    <!-- responsable -->
     <div class="mb-3 p-3 rounded shadow-sm bg-white flex items-center justify-between">
       <div>
         <div class="text-xs text-gray-600">Encargado del día</div>
@@ -100,11 +106,8 @@
     <button id="open-clients" class="flex-1 px-4 py-3 rounded-lg bg-indigo-600 text-white font-semibold">Clientes</button>
   </div>
 
-  <!-- MODALES (idénticos a versiones anteriores, omitido aquí por brevedad en comentario) -->
-  <!-- Product, Scanner, Quick Sale, Income, Sale, Clients, Reports, Login -->
-  <!-- (El código real a continuación incluye todos esos modales tal como necesitas) -->
-
-  <!-- Product modal -->
+  <!-- ---------- MODALES (producto, scanner, quick sale, income, sale, clients, reports, login) ---------- -->
+  <!-- PRODUCT -->
   <div id="modal-product" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -130,7 +133,7 @@
     </div>
   </div>
 
-  <!-- Scanner modal -->
+  <!-- SCANNER -->
   <div id="modal-scan" class="modal scanner-modal" role="dialog" aria-hidden="true">
     <div class="modal-content">
       <div class="flex justify-between items-center px-3 py-2">
@@ -156,7 +159,7 @@
     </div>
   </div>
 
-  <!-- Quick sale -->
+  <!-- QUICK SALE -->
   <div id="modal-quick-sale" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -193,7 +196,7 @@
     </div>
   </div>
 
-  <!-- Income -->
+  <!-- INCOME -->
   <div id="modal-income" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -211,7 +214,7 @@
     </div>
   </div>
 
-  <!-- Sale (detailed) -->
+  <!-- SALE (detailed) -->
   <div id="modal-sale" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -240,7 +243,7 @@
     </div>
   </div>
 
-  <!-- Clients -->
+  <!-- CLIENTS -->
   <div id="modal-clients" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -257,7 +260,7 @@
     </div>
   </div>
 
-  <!-- Reports -->
+  <!-- REPORTS -->
   <div id="modal-reports" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -271,6 +274,7 @@
           <button id="tab-inventory" class="px-3 py-2 border rounded">Inventario</button>
         </div>
 
+        <!-- Sales by range -->
         <div id="tab-content-sales-range" class="tab-content">
           <div class="grid grid-cols-2 gap-2 mb-3">
             <div><label class="text-xs">Desde</label><input id="report-from" type="date" class="w-full px-2 py-2 border rounded"></div>
@@ -279,27 +283,31 @@
           <div class="flex gap-2 mb-3 justify-end">
             <button id="btn-generate-range" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar vista</button>
             <button id="btn-pdf-range" class="px-3 py-2 bg-gray-800 text-white rounded">Generar PDF (A4)</button>
+            <button id="btn-print-range" class="px-3 py-2 border rounded">Imprimir</button>
           </div>
           <div id="report-preview-range" class="max-h-80 overflow-auto text-sm bg-white p-2 rounded"></div>
         </div>
 
+        <!-- Sales by day (single date) -->
         <div id="tab-content-sales-day" class="tab-content hidden">
           <div class="grid grid-cols-2 gap-2 mb-3">
-            <div><label class="text-xs">Desde</label><input id="day-from" type="date" class="w-full px-2 py-2 border rounded"></div>
-            <div><label class="text-xs">Hasta</label><input id="day-to" type="date" class="w-full px-2 py-2 border rounded"></div>
+            <div><label class="text-xs">Fecha</label><input id="day-single" type="date" class="w-full px-2 py-2 border rounded"></div>
+            <div class="flex items-end gap-2">
+              <button id="btn-generate-day-single" class="px-3 py-2 bg-indigo-600 text-white rounded">Ver día</button>
+              <button id="btn-pdf-day-single" class="px-3 py-2 bg-gray-800 text-white rounded">Generar PDF (Reporte del dia)</button>
+              <button id="btn-print-day-single" class="px-3 py-2 border rounded">Imprimir</button>
+            </div>
           </div>
-          <div class="flex gap-2 mb-3 justify-end">
-            <button id="btn-generate-day" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar resumen</button>
-            <button id="btn-pdf-day" class="px-3 py-2 bg-gray-800 text-white rounded">Generar PDF (A4)</button>
-          </div>
-          <div id="report-preview-day" class="max-h-80 overflow-auto text-sm bg-white p-2 rounded"></div>
+          <div id="report-preview-day-single" class="max-h-80 overflow-auto text-sm bg-white p-2 rounded"></div>
           <div class="mt-3 bg-white rounded p-2 shadow"><canvas id="chart-daily-sales" height="120"></canvas></div>
         </div>
 
+        <!-- Inventory -->
         <div id="tab-content-inventory" class="tab-content hidden">
           <div class="flex gap-2 mb-3 justify-end">
             <button id="btn-generate-inv" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar inventario</button>
             <button id="btn-pdf-inv" class="px-3 py-2 bg-gray-800 text-white rounded">Generar PDF (A4)</button>
+            <button id="btn-print-inv" class="px-3 py-2 border rounded">Imprimir</button>
           </div>
           <div id="report-preview-inv" class="max-h-80 overflow-auto text-sm bg-white p-2 rounded"></div>
         </div>
@@ -325,47 +333,45 @@
     </div>
   </div>
 
-  <!-- SCRIPT -->
+  <!-- ---------- SCRIPT: lógica central y mejoras PDF A4 ---------- -->
   <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    // helpers
+  (function(){
+    // Short helpers
     const $ = s => document.querySelector(s);
     const $$ = s => Array.from(document.querySelectorAll(s));
     const uid = () => 'id-' + Math.random().toString(36).slice(2,9);
     const money = v => Number(v||0).toFixed(2);
     const todayYMD = ()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-    const localYMDFromISO = iso => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-    function debounce(fn, wait=200){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), wait); }; }
+    function debounce(fn, t=200){ let to; return (...a)=>{ clearTimeout(to); to=setTimeout(()=>fn(...a), t); }; }
 
-    // IndexedDB simple wrapper
-    const DB_NAME='TiendaSmartDB', DB_VERSION=9;
+    // IndexedDB wrapper
+    const DB_NAME='TiendaSmartDB', DB_VERSION=10;
     let db;
-    function openDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open(DB_NAME, DB_VERSION); r.onupgradeneeded = e=>{ const idb=e.target.result; if(!idb.objectStoreNames.contains('products')) idb.createObjectStore('products',{keyPath:'id'}); if(!idb.objectStoreNames.contains('sales')) idb.createObjectStore('sales',{keyPath:'id'}); if(!idb.objectStoreNames.contains('movements')) idb.createObjectStore('movements',{keyPath:'id'}); if(!idb.objectStoreNames.contains('customers')) idb.createObjectStore('customers',{keyPath:'name'}); if(!idb.objectStoreNames.contains('responsibles')) idb.createObjectStore('responsibles',{keyPath:'date'}); }; r.onsuccess=e=>{ db=e.target.result; res(db); }; r.onerror=e=>rej(e); }); }
-    const store = (name,mode='readonly') => db.transaction(name, mode).objectStore(name);
-    const put = (name,item) => new Promise((res,rej)=>{ const rq = store(name,'readwrite').put(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
-    const add = (name,item) => new Promise((res,rej)=>{ const rq = store(name,'readwrite').add(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
-    const all = (name) => new Promise((res,rej)=>{ const rq = store(name,'readonly').getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=e=>rej(e); });
-    const get = (name,key) => new Promise((res,rej)=>{ const rq = store(name,'readonly').get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=e=>rej(e); });
+    function openDB(){ return new Promise((res,rej)=>{ const req = indexedDB.open(DB_NAME, DB_VERSION); req.onupgradeneeded = e => { const idb = e.target.result; if(!idb.objectStoreNames.contains('products')) idb.createObjectStore('products',{keyPath:'id'}); if(!idb.objectStoreNames.contains('sales')) idb.createObjectStore('sales',{keyPath:'id'}); if(!idb.objectStoreNames.contains('movements')) idb.createObjectStore('movements',{keyPath:'id'}); if(!idb.objectStoreNames.contains('customers')) idb.createObjectStore('customers',{keyPath:'name'}); if(!idb.objectStoreNames.contains('responsibles')) idb.createObjectStore('responsibles',{keyPath:'date'}); }; req.onsuccess = e => { db = e.target.result; res(db); }; req.onerror = e => rej(e); }); }
+    const store = (name, mode='readonly') => db.transaction(name, mode).objectStore(name);
+    const put = (name, item) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').put(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
+    const add = (name, item) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').add(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
+    const all = (name) => new Promise((res,rej)=>{ const rq=store(name,'readonly').getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=e=>rej(e); });
+    const get = (name, key) => new Promise((res,rej)=>{ const rq=store(name,'readonly').get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=e=>rej(e); });
 
-    // Auth
+    // Simple auth
     const AUTH_USER='lis', AUTH_PASS='magaly', AUTH_KEY='ts_user';
     function isAuthenticated(){ return !!localStorage.getItem(AUTH_KEY); }
-    function setAuthenticated(name){ localStorage.setItem(AUTH_KEY, name); $('#current-user').textContent = name; $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); }
+    function setAuthenticated(u){ localStorage.setItem(AUTH_KEY, u); $('#current-user').textContent = u; $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); }
     function clearAuth(){ localStorage.removeItem(AUTH_KEY); $('#current-user').classList.add('hidden'); $('#btn-logout').classList.add('hidden'); }
 
     $('#form-login').addEventListener('submit', e => {
       e.preventDefault();
-      const u = $('#login-user').value.trim(); const p = $('#login-pass').value;
-      if(u === AUTH_USER && p === AUTH_PASS){ setAuthenticated(u); closeLogin(); initApp(); } else { alert('Credenciales inválidas'); }
+      const u = $('#login-user').value.trim(), p = $('#login-pass').value;
+      if(u === AUTH_USER && p === AUTH_PASS){ setAuthenticated(u); closeLogin(); initApp(); } else alert('Credenciales inválidas');
     });
     $('#login-guest').addEventListener('click', ()=>{ setAuthenticated('GUEST'); closeLogin(); initApp(); });
-    $('#btn-logout').addEventListener('click', ()=>{ if(confirm('Cerrar sesión?')) { clearAuth(); location.reload(); } });
+    $('#btn-logout').addEventListener('click', ()=>{ if(confirm('Cerrar sesión?')){ clearAuth(); location.reload(); }});
     function closeLogin(){ const m=$('#modal-login'); m.classList.remove('visible'); m.setAttribute('aria-hidden','true'); }
 
-    // modal manager
-    const globalBackdrop = $('#global-backdrop');
-    let currentOpenModal = null;
-    async function _stopCameraSafe(){ try{ if(typeof stopCamera === 'function') await stopCamera(); }catch(e){ console.warn('stopCamera', e); } }
+    // modal manager (detiene cámara si scanner cerrado)
+    const globalBackdrop = $('#global-backdrop'); let currentOpenModal = null;
+    async function _stopCameraSafe(){ try{ if(typeof stopCamera === 'function') await stopCamera(); }catch(e){ console.warn(e); } }
     function showModal(id, { focusSelector } = {}){
       if(!isAuthenticated() && id !== 'modal-login') return showLogin();
       if(currentOpenModal && currentOpenModal !== id) closeModal(currentOpenModal);
@@ -378,19 +384,18 @@
     }
     async function closeModal(id){
       const modal = document.getElementById(id);
-      if(!modal){ globalBackdrop.classList.remove('visible'); document.documentElement.style.overflow=''; document.body.style.overflow=''; currentOpenModal = null; return; }
+      if(!modal){ globalBackdrop.classList.remove('visible'); document.documentElement.style.overflow=''; document.body.style.overflow=''; currentOpenModal=null; return; }
       if(modal.classList.contains('scanner-modal')) await _stopCameraSafe();
       modal.classList.remove('visible'); modal.setAttribute('aria-hidden','true');
       setTimeout(()=>{ const any = Array.from(document.querySelectorAll('.modal')).some(m=>m.classList.contains('visible')); if(!any){ globalBackdrop.classList.remove('visible'); globalBackdrop.setAttribute('aria-hidden','true'); document.documentElement.style.overflow=''; document.body.style.overflow=''; currentOpenModal=null; } else { const rem = document.querySelector('.modal.visible'); if(rem) currentOpenModal = rem.id; } }, 120);
     }
     globalBackdrop.addEventListener('click', async ()=>{ if(!currentOpenModal) return; await closeModal(currentOpenModal); });
-    document.addEventListener('keydown', async e=>{ if(e.key==='Escape' && currentOpenModal) await closeModal(currentOpenModal); });
+    document.addEventListener('keydown', async e=>{ if(e.key === 'Escape' && currentOpenModal) await closeModal(currentOpenModal); });
     document.addEventListener('click', e=>{ const btn = e.target.closest('[data-close-modal]'); if(!btn) return; const modal = btn.closest('.modal'); if(!modal) return; closeModal(modal.id); });
     function showLogin(){ const m = $('#modal-login'); m.classList.add('visible'); m.setAttribute('aria-hidden','false'); }
 
-    // state
+    // app state and refresh
     const state = { products:[], sales:[], customers:[], responsibles:[] };
-
     async function refreshAll(){
       state.products = await all('products');
       state.sales = await all('sales');
@@ -404,13 +409,15 @@
       updateResponsibleBanner();
     }
 
-    // Inventory UI
+    /* -----------------------
+       INVENTORY UI (mobile)
+       ----------------------- */
     const inventoryList = $('#inventory-list');
     function renderInventoryMobile(filter=''){
       const q = (filter||'').trim().toLowerCase();
       inventoryList.innerHTML = '';
       state.products.forEach(p=>{
-        if(q && !(p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q) || (p.barcode||'').replace(/\D/g,'').includes(q.replace(/\D/g,'')))) return;
+        if(q && !(p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q))) return;
         const low = (p.stock||0) <= 5;
         const div = document.createElement('div'); div.className='inv-card';
         div.innerHTML = `
@@ -431,11 +438,13 @@
       $$('.edit-btn').forEach(b=> b.onclick = ()=> openProductModal(state.products.find(x=>x.id===b.dataset.id)));
     }
 
-    // Product modal logic
+    /* -----------------------
+       PRODUCT
+       ----------------------- */
     $('#open-add-product').addEventListener('click', ()=> openProductModal());
     function openProductModal(product){
       if(!isAuthenticated()) return showLogin();
-      $('#form-product').reset(); $('#product-id').value = '';
+      $('#form-product').reset(); $('#product-id').value='';
       if(product){ $('#product-id').value = product.id; $('#product-name').value = product.name; $('#product-category').value = product.category||''; $('#product-price').value = product.price||0; $('#product-barcode').value = product.barcode||''; $('#product-stock').value = product.stock||0; }
       showModal('modal-product', { focusSelector:'#product-name' });
     }
@@ -448,12 +457,17 @@
       closeModal('modal-product');
     });
 
-    // Income
+    /* -----------------------
+       INCOME
+       ----------------------- */
     function renderIncomeSelects(){ const sel = $('#income-product'); if(!sel) return; sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} — Stock: ${p.stock||0}`; sel.appendChild(o); }); }
     function openIncomeFor(productId){ renderIncomeSelects(); $('#income-product').value = productId; showModal('modal-income'); }
     $('#form-income').addEventListener('submit', async e => { e.preventDefault(); const pid = $('#income-product').value; const qty = Number($('#income-qty').value)||0; const p = state.products.find(x=>x.id===pid); p.stock = (p.stock||0) + qty; await put('products', p); await add('movements', { id:uid(), type:'income', productId:pid, qty, date:new Date().toISOString() }); await refreshAll(); closeModal('modal-income'); });
 
-    // Sale (detailed)
+    /* -----------------------
+       SALES (detailed + quick)
+       ----------------------- */
+    // Sale form helpers
     function addSaleItemRow(productId=''){ const row=document.createElement('div'); row.className='grid grid-cols-12 gap-2 items-center'; row.innerHTML = `<select class="col-span-6 px-2 py-1 border sale-product"></select><input type="number" class="col-span-2 px-2 py-1 border sale-qty" value="1" min="1"><input type="number" step="0.01" class="col-span-2 px-2 py-1 border sale-price" placeholder="Precio"><button type="button" class="col-span-2 px-2 py-1 border sale-remove">Quitar</button>`; $('#sale-items').appendChild(row); fillSaleRow(row, productId); }
     function fillSaleRow(row, productId){ const sel = row.querySelector('.sale-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); }); if(productId) sel.value = productId; const price = row.querySelector('.sale-price'); const qty = row.querySelector('.sale-qty'); sel.onchange = ()=>{ const p = state.products.find(x=>x.id===sel.value); price.value = p ? p.price : ''; updateSaleTotal(); }; price.oninput = updateSaleTotal; qty.oninput = updateSaleTotal; row.querySelector('.sale-remove').onclick = ()=>{ row.remove(); updateSaleTotal(); }; }
     $('#add-sale-item').addEventListener('click', ()=> addSaleItemRow());
@@ -485,16 +499,40 @@
     function renderQuickCart(){ const el = $('#quick-cart'); el.innerHTML=''; quickCart.forEach((it,idx)=>{ const p = state.products.find(x=>x.id===it.productId); const d=document.createElement('div'); d.className='flex justify-between items-center'; d.innerHTML = `<div>${p.name} x ${it.qty}</div><div>${money(it.qty*it.price)} <button data-idx="${idx}" class="ml-2 text-sm text-red-600 btn-remove-quick">Quitar</button></div>`; el.appendChild(d); }); $$('.btn-remove-quick').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); }); }
     $('#form-quick-sale').addEventListener('submit', async function(e){ e.preventDefault(); if(quickCart.length===0) return alert('Agregar productos'); const customer = $('#quick-customer').value.trim(); const payment = $('#quick-payment').value; for(const it of quickCart){ const p = state.products.find(x=>x.id===it.productId); p.stock = (p.stock||0) - it.qty; await put('products', p); await add('movements', { id:uid(), type:'sale', productId: it.productId, qty: it.qty, date:new Date().toISOString() }); } const total = quickCart.reduce((s,i)=>s + i.qty*i.price,0); const date = new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); const sale = { id:uid(), items: quickCart.slice(), total, date, customerName: customer || null, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName }; await add('sales', sale); if(payment === 'A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customer, balance: prev + total, lastSale: date }); } quickCart.length=0; await refreshAll(); closeModal('modal-quick-sale'); });
 
-    // Clients
+    // quick sell in inventory
+    async function quickSellPrompt(productId){
+      const qtyStr = prompt('Cantidad a vender (rápido):','1'); if(!qtyStr) return;
+      const qty = Math.max(1, Number(qtyStr));
+      const payment = prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO','EFECTIVO') || 'EFECTIVO';
+      let customerName = null; if(payment.toUpperCase()==='A_CREDITO') customerName = prompt('Nombre del cliente:') || null;
+      const prod = state.products.find(p=>p.id===productId); if(!prod) return alert('Producto no encontrado');
+      prod.stock = (prod.stock||0) - qty; await put('products', prod);
+      await add('movements', { id:uid(), type:'sale', productId, qty, date:new Date().toISOString() });
+      const total = qty * prod.price; const date = new Date().toISOString();
+      const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD();
+      const responsibleObj = await get('responsibles', respDate).catch(()=>null);
+      const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||'');
+      await add('sales', { id:uid(), items:[{ productId, qty, price: prod.price }], total, date, customerName, paid: (payment.toUpperCase()!=='A_CREDITO'), paymentType: payment.toUpperCase(), responsible: responsibleName });
+      if(payment.toUpperCase()==='A_CREDITO' && customerName){ const existing = await get('customers', customerName).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customerName, balance: prev + total, lastSale: date }); }
+      await refreshAll();
+    }
+
+    /* -----------------------
+       CLIENTS
+       ----------------------- */
     $('#open-clients').addEventListener('click', ()=> showModal('modal-clients'));
     $('#add-client').addEventListener('click', async ()=> { const name = $('#client-name').value.trim(); if(!name) return alert('Ingresa nombre'); const existing = await get('customers', name).catch(()=>null); if(existing) return alert('Cliente ya existe'); await put('customers', { name, balance:0, createdAt:new Date().toISOString() }); $('#client-name').value=''; await refreshAll(); showModal('modal-clients'); });
     async function renderClients(){ const el = $('#clients-list'); el.innerHTML=''; const clients = state.customers || []; if(!clients.length) el.innerHTML = '<div class="text-sm text-gray-600">No hay clientes registrados.</div>'; for(const c of clients){ const d = document.createElement('div'); d.className='p-2 border rounded bg-white flex justify-between items-center'; d.innerHTML = `<div><div class="font-medium">${c.name}</div><div class="text-xs text-gray-500">Saldo: S/ ${money(c.balance||0)}</div></div><div class="flex gap-2"><button data-name="${c.name}" class="px-3 py-2 border rounded btn-abono">Abono</button><button data-name="${c.name}" class="px-3 py-2 bg-green-600 text-white rounded btn-saldar">Saldar</button></div>`; el.appendChild(d); } $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = await get('customers', name); const newBal = (c.balance||0) - amt; await put('customers', { name, balance: newBal < 0 ? 0 : newBal, lastPayment:new Date().toISOString() }); alert('Abono registrado'); await refreshAll(); }); $$('.btn-saldar').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; if(!confirm(`¿Saldar cuenta de ${name}? Esto pondrá su saldo a 0.`)) return; await put('customers',{ name, balance:0, lastPayment:new Date().toISOString() }); alert('Cuenta saldada'); await refreshAll(); }); }
 
-    // Responsible
+    /* -----------------------
+       RESPONSIBLE (uno por día)
+       ----------------------- */
     $('#save-responsible').addEventListener('click', async ()=> { const date = $('#responsible-date').value; const name = $('#responsible-name').value.trim(); if(!date) return alert('Selecciona fecha'); const existing = await get('responsibles', date).catch(()=>null); if(existing && existing.name && existing.name !== name){ if(!confirm(`Ya existe un responsable para ${date}: "${existing.name}". ¿Sobrescribir?`)) return; } await put('responsibles', { date, name }); alert('Responsable guardado'); await refreshAll(); });
     async function updateResponsibleBanner(){ const today = todayYMD(); $('#responsible-date').value = today; const r = await get('responsibles', today).catch(()=>null); if(r && r.name){ $('#responsible-display').textContent = `${r.name} (${today})`; $('#responsible-name').value = r.name; } else { $('#responsible-display').textContent = 'Sin encargado asignado para hoy'; $('#responsible-name').value = ''; } }
 
-    // Charts
+    /* -----------------------
+       CHARTS
+       ----------------------- */
     let chartSales, chartStock, chartDailySales;
     function updateCharts(){
       try{
@@ -507,186 +545,188 @@
       }catch(e){ console.warn('updateCharts', e); }
     }
 
-    // REPORTS: include Ventas por cobrar in range
-    async function generateSalesRange(from, to){
-      const salesAll = await all('sales');
-      const list = salesAll.filter(s=>{ const d = localYMDFromISO(s.date); return d >= from && d <= to; }).sort((a,b)=>a.date.localeCompare(b.date));
-      let total = 0; let rows='';
-      const creditRows = [];
-      for(const s of list){
-        const d = new Date(s.date).toLocaleString();
+    /* -----------------------
+       REPORTS & PDF (mejoras A4)
+       - función clave: generateDailyReportAndDownload(date)
+       ----------------------- */
+
+    // Genera HTML del reporte para una fecha única (día)
+    async function buildDailyReportHTML(date){
+      const allSales = await all('sales');
+      const daySales = allSales.filter(s => {
+        const d = new Date(s.date);
+        const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+        const iso = `${y}-${m}-${day}`; return iso === date;
+      }).sort((a,b)=>a.date.localeCompare(b.date));
+
+      // Ventas por cobrar (a crédito)
+      const creditSales = daySales.filter(s => s.paymentType === 'A_CREDITO' || !s.paid);
+
+      let rows = '';
+      let total = 0;
+      for(const s of daySales){
         total += Number(s.total||0);
-        const payment = s.paymentType || (s.paid? 'EFECTIVO':'A_CREDITO');
-        const items = s.items.map(it=>{ const p = state.products.find(x=>x.id===it.productId); return `${p? p.name : it.productId} (${it.qty} x ${money(it.price)})`; }).join('<br>');
-        rows += `<tr><td class="print-td">${d}</td><td class="print-td">${s.id}</td><td class="print-td">${s.customerName || '-'}</td><td class="print-td">${s.responsible || '-'}</td><td class="print-td">${payment}</td><td class="print-td">${items}</td><td class="print-td" style="text-align:right">${money(s.total)}</td></tr>`;
-        if((s.paymentType === 'A_CREDITO') || (!s.paid && s.paymentType !== 'EFECTIVO' && s.paymentType !== 'YAPE')) {
-          creditRows.push({ sale: s, d, items });
-        }
+        const d = new Date(s.date).toLocaleTimeString();
+        const payment = s.paymentType || (s.paid ? 'EFECTIVO' : 'A_CREDITO');
+        const items = s.items.map(it => {
+          const p = state.products.find(pp=>pp.id===it.productId);
+          return `${p ? p.name : it.productId} (${it.qty} x S/ ${money(it.price)})`;
+        }).join('<br>');
+        rows += `<tr><td style="padding:6px;border-bottom:1px solid #eee">${d}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.id}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.customerName || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.responsible || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${payment}</td><td style="padding:6px;border-bottom:1px solid #eee">${items}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(s.total)}</td></tr>`;
       }
 
-      // responsible today (or use first responsible in range)
-      const respObj = await get('responsibles', from).catch(()=>null);
-      const responsibleName = (respObj && respObj.name) ? respObj.name : (await get('responsibles', todayYMD()).catch(()=>null) || {}).name || '';
+      // responsable para ese día
+      const r = await get('responsibles', date).catch(()=>null);
+      const responsibleName = r && r.name ? r.name : '';
 
-      const creditHtml = creditRows.length ? creditRows.map(c=>`<tr><td class="print-td">${c.d}</td><td class="print-td">${c.sale.id}</td><td class="print-td">${c.sale.customerName || '-'}</td><td class="print-td">${c.sale.responsible || '-'}</td><td class="print-td">${c.sale.paymentType || 'A_CREDITO'}</td><td class="print-td">${c.items}</td><td class="print-td" style="text-align:right">${money(c.sale.total)}</td></tr>`).join('') : '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas por cobrar</td></tr>';
+      const creditRows = creditSales.map(s=>{
+        const d = new Date(s.date).toLocaleTimeString();
+        const items = s.items.map(it=>{ const p = state.products.find(pp=>pp.id===it.productId); return `${p? p.name:it.productId} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>');
+        return `<tr><td style="padding:6px;border-bottom:1px solid #eee">${d}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.id}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.customerName || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.responsible || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.paymentType || 'A_CREDITO'}</td><td style="padding:6px;border-bottom:1px solid #eee">${items}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(s.total)}</td></tr>`; }).join('');
 
       const html = `
-        <div class="report-wrapper" style="padding:6mm;font-family:Arial,Helvetica,sans-serif;color:#111">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-family:Arial,Helvetica,sans-serif;color:#111;padding:8mm;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
             <div>
-              <h2 style="margin:0">MINIMARKET LA ESQUINA DEL AHORRO</h2>
-              <div style="font-size:12px;margin-top:4px">Reporte de ventas</div>
+              <h1 style="margin:0;font-size:18px">MINIMARKET LA ESQUINA DEL AHORRO</h1>
+              <div style="font-size:12px;margin-top:4px">Reporte del dia: <strong>${date}</strong></div>
             </div>
             <div style="font-size:12px;text-align:right">
-              Periodo: ${from} → ${to}<br>
               Generado: ${new Date().toLocaleString()}<br>
               Encargado: ${responsibleName || '-'}
             </div>
           </div>
-          <hr style="margin:6px 0">
-          <h4 style="margin:6px 0">Ventas</h4>
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead>
-              <tr><th style="background:#f3f4f6;padding:6px;text-align:left">Fecha</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr>
-            </thead>
+          <hr style="margin:8px 0">
+          <h3 style="margin-bottom:6px">Ventas del día</h3>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
+            <thead><tr>
+              <th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th>
+              <th style="background:#f3f4f6;padding:6px;text-align:left">ID</th>
+              <th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th>
+              <th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th>
+              <th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th>
+              <th style="background:#f3f4f6;padding:6px;text-align:left">Items</th>
+              <th style="background:#f3f4f6;padding:6px;text-align:right">Total</th>
+            </tr></thead>
             <tbody>
-              ${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}
+              ${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas para esta fecha</td></tr>'}
             </tbody>
           </table>
-          <div style="text-align:right;font-weight:bold;margin-top:8px">Total período: S/ ${money(total)}</div>
+          <div style="text-align:right;font-weight:bold;margin-bottom:12px">Total (día): S/ ${money(state.sales.filter(s=> new Date(s.date).toISOString().slice(0,10)===date).reduce((a,b)=>a + Number(b.total||0), 0))}</div>
 
           <hr style="margin:8px 0">
-
-          <h4 style="margin:6px 0">Ventas por cobrar (A CREDITO)</h4>
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead>
-              <tr><th style="background:#f3f4f6;padding:6px;text-align:left">Fecha</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr>
-            </thead>
+          <h3 style="margin-bottom:6px">Ventas por cobrar (A CREDITO)</h3>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
+            <thead><tr>
+            <th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th>
+            </tr></thead>
             <tbody>
-              ${creditHtml}
+              ${creditRows.length ? creditRows : '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas por cobrar</td></tr>'}
             </tbody>
           </table>
-        </div>`;
-      return { html, list, total };
+
+          <div style="font-size:11px;color:#666;margin-top:10px">Reporte generado por TiendaSmart — MINIMARKET LA ESQUINA DEL AHORRO</div>
+        </div>
+      `;
+      return html;
     }
 
-    async function generateSalesByDay(from,to){
-      const salesAll = await all('sales');
-      const filtered = salesAll.filter(s=>{ const d = localYMDFromISO(s.date); return d>=from && d<=to; });
-      const map = {};
-      for(const s of filtered){ const day = localYMDFromISO(s.date); if(!map[day]) map[day] = { total:0, count:0 }; map[day].total += Number(s.total||0); map[day].count += 1; }
-      const days = Object.keys(map).sort();
-      let rows=''; let grand=0;
-      for(const d of days){ rows += `<tr><td class="print-td">${d}</td><td class="print-td">${map[d].count}</td><td class="print-td" style="text-align:right">${money(map[d].total)}</td></tr>`; grand += map[d].total; }
-      const html = `
-        <div style="padding:6mm;font-family:Arial,Helvetica,sans-serif;color:#111">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <div>
-              <h2 style="margin:0">MINIMARKET LA ESQUINA DEL AHORRO</h2>
-              <div style="font-size:12px;margin-top:4px">Ventas por día</div>
-            </div>
-            <div style="font-size:12px;text-align:right">
-              Periodo: ${from} → ${to}<br>
-              Generado: ${new Date().toLocaleString()}
-            </div>
-          </div>
-          <hr style="margin:6px 0">
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Fecha</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cantidad ventas</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total (S/)</th></tr></thead>
-            <tbody>${rows || '<tr><td colspan="3" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody>
-          </table>
-          <div style="text-align:right;font-weight:bold;margin-top:8px">Total período: S/ ${money(grand)}</div>
-        </div>`;
-      const chartData = { labels: days, values: days.map(d=>map[d].total) };
-      return { html, chartData, days };
-    }
+    // Genera PDF A4 con paginación automática y descarga con nombre "Reporte del dia YYYY-MM-DD.pdf"
+    async function generateDailyReportAndDownload(date){
+      if(!date) return alert('Selecciona una fecha');
+      const html = await buildDailyReportHTML(date);
+      // Convertir a elemento temporal
+      const wrapper = document.createElement('div');
+      // fijar ancho para buena calidad (A4 width ~ 210mm → elegir ancho px consistente)
+      // Usamos 1123px width (aprox A4 a 150 DPI) para buena resolución, y luego html2canvas escala.
+      wrapper.style.width = '1123px';
+      wrapper.style.background = '#ffffff';
+      wrapper.innerHTML = html;
+      document.body.appendChild(wrapper); // necesario para que fonts/resolución se apliquen
 
-    async function generateInventoryReport(){
-      const products = await all('products');
-      let rows=''; let lowCount=0;
-      products.sort((a,b)=>a.name.localeCompare(b.name));
-      for(const p of products){ const low = (p.stock||0) <= 5; if(low) lowCount++; rows += `<tr><td class="print-td">${p.name}</td><td class="print-td">${p.category||''}</td><td class="print-td">${p.barcode||''}</td><td class="print-td" style="text-align:right">${p.stock||0}</td><td class="print-td" style="text-align:right">${money(p.price)}</td></tr>`; }
-      const html = `
-        <div style="padding:6mm;font-family:Arial,Helvetica,sans-serif;color:#111">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-            <div>
-              <h2 style="margin:0">MINIMARKET LA ESQUINA DEL AHORRO</h2>
-              <div style="font-size:12px;margin-top:4px">Reporte de inventario</div>
-            </div>
-            <div style="font-size:12px;text-align:right">Generado: ${new Date().toLocaleString()}</div>
-          </div>
-          <hr style="margin:6px 0">
-          <div style="margin:8px 0">Productos: ${products.length} • Stocks bajos: ${lowCount}</div>
-          <table style="width:100%;border-collapse:collapse;font-size:12px">
-            <thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Nombre</th><th style="background:#f3f4f6;padding:6px;text-align:left">Categoría</th><th style="background:#f3f4f6;padding:6px;text-align:left">Código</th><th style="background:#f3f4f6;padding:6px;text-align:right">Stock</th><th style="background:#f3f4f6;padding:6px;text-align:right">Precio</th></tr></thead>
-            <tbody>${rows || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#666">No hay productos</td></tr>'}</tbody>
-          </table>
-        </div>`;
-      return { html, products };
-    }
+      try{
+        // escala alta para mejor nitidez
+        const scale = 3; // mayor -> mejor calidad, pero más memoria
+        const canvas = await html2canvas(wrapper, { scale: scale, useCORS:true, logging:false, windowWidth: wrapper.scrollWidth, windowHeight: wrapper.scrollHeight });
+        const imgData = canvas.toDataURL('image/png', 1.0);
 
-    // Convert HTML (element or html string) to A4 PDF with paging
-    async function generatePDFfromHTML(htmlContentOrElement, filename){
-      // Create an element wrapper if string provided
-      let element;
-      if(typeof htmlContentOrElement === 'string'){
-        element = document.createElement('div');
-        element.style.width = '800px'; // fixed width for consistent rendering
-        element.innerHTML = htmlContentOrElement;
-      } else {
-        element = htmlContentOrElement;
-      }
+        // preparar jsPDF
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p','mm','a4');
+        const pageWidthMM = 210;
+        const pageHeightMM = 297;
+        const marginMM = 10;
+        const usableWidthMM = pageWidthMM - marginMM*2;
 
-      // Render using html2canvas with high scale for quality
-      const scale = 2; // increase for sharper text
-      const canvas = await html2canvas(element, { scale: scale, useCORS: true, logging:false });
-      const imgData = canvas.toDataURL('image/png');
+        // relacion px -> mm
+        const imgWidthPx = canvas.width;
+        const pxToMm = usableWidthMM / imgWidthPx; // mm per px
+        const imgHeightMM = canvas.height * pxToMm;
 
-      // A4 dimensions in mm
-      const pdf = new jspdf.jsPDF('p','mm','a4');
-      const pageWidthMM = 210;
-      const pageHeightMM = 297;
-      const marginMM = 10;
-      const usableWidthMM = pageWidthMM - marginMM*2;
-
-      // compute image real height in mm
-      // image width in px = canvas.width
-      // ratio mm/px = usableWidthMM / canvas.width
-      const imgWidthMM = usableWidthMM;
-      const pxToMm = imgWidthMM / canvas.width;
-      const imgHeightMMTotal = canvas.height * pxToMm;
-
-      if(imgHeightMMTotal <= (pageHeightMM - marginMM*2)){
-        // single page
-        pdf.addImage(imgData, 'PNG', marginMM, marginMM, imgWidthMM, imgHeightMMTotal);
-        pdf.save(filename);
-      } else {
-        // multi-page: slice canvas vertically
-        const pxPerPage = Math.floor((pageHeightMM - marginMM*2) / pxToMm); // height in px per page
-        let remainingHeight = canvas.height;
-        let position = 0;
-        let page = 0;
-        while(remainingHeight > 0){
-          const sliceHeight = Math.min(pxPerPage, remainingHeight);
-          // create temp canvas for slice
-          const tmpCanvas = document.createElement('canvas');
-          tmpCanvas.width = canvas.width;
-          tmpCanvas.height = sliceHeight;
-          const tctx = tmpCanvas.getContext('2d');
-          tctx.drawImage(canvas, 0, position, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
-          const sliceData = tmpCanvas.toDataURL('image/png');
-          const sliceHeightMM = sliceHeight * pxToMm;
-          if(page > 0) pdf.addPage();
-          pdf.addImage(sliceData, 'PNG', marginMM, marginMM, imgWidthMM, sliceHeightMM);
-          remainingHeight -= sliceHeight;
-          position += sliceHeight;
-          page++;
+        // si cabe en una sola página:
+        if(imgHeightMM <= (pageHeightMM - marginMM*2)){
+          pdf.addImage(imgData, 'PNG', marginMM, marginMM, usableWidthMM, imgHeightMM);
+        } else {
+          // cortar en slices verticales (en px)
+          const pxPerPage = Math.floor((pageHeightMM - marginMM*2) / pxToMm);
+          let remainingHeight = canvas.height;
+          let position = 0;
+          let pageIdx = 0;
+          while(remainingHeight > 0){
+            const sliceHeight = Math.min(pxPerPage, remainingHeight);
+            const tmpCanvas = document.createElement('canvas');
+            tmpCanvas.width = canvas.width;
+            tmpCanvas.height = sliceHeight;
+            const tctx = tmpCanvas.getContext('2d');
+            tctx.fillStyle = '#fff';
+            tctx.fillRect(0,0,tmpCanvas.width,tmpCanvas.height);
+            tctx.drawImage(canvas, 0, position, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+            const sliceData = tmpCanvas.toDataURL('image/png');
+            const sliceHeightMM = sliceHeight * pxToMm;
+            if(pageIdx > 0) pdf.addPage();
+            pdf.addImage(sliceData, 'PNG', marginMM, marginMM, usableWidthMM, sliceHeightMM);
+            remainingHeight -= sliceHeight;
+            position += sliceHeight;
+            pageIdx++;
+          }
         }
+
+        const filename = `Reporte del dia ${date}.pdf`;
         pdf.save(filename);
+        // limpieza
+        canvas && canvas.remove && canvas.remove();
+      }catch(err){
+        console.error('Error generando PDF:', err);
+        alert('Error al generar PDF. Intenta imprimir desde la vista o reducir la escala.');
+      } finally {
+        // retirar wrapper temporal
+        wrapper.remove();
       }
     }
 
-    // UI: tabs
+    // Genera vista previa (HTML) para un día (útil en el modal)
+    async function showDailyPreview(date, targetSelector){
+      if(!date) return alert('Selecciona una fecha');
+      const html = await buildDailyReportHTML(date);
+      $(targetSelector).innerHTML = html;
+    }
+
+    // Imprimir en navegador (abre nueva ventana con contenido optimizado)
+    function printHTML(html, title = 'Reporte'){
+      const win = window.open('', '_blank', 'noopener,noreferrer');
+      if(!win) return alert('El navegador bloqueó la apertura de la ventana de impresión. Permite ventanas emergentes o usa Generar PDF.');
+      const doc = win.document;
+      doc.open();
+      doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:Arial,Helvetica,sans-serif;margin:10mm;} table{width:100%;border-collapse:collapse} th{background:#f3f4f6;padding:6px;text-align:left} td{padding:6px;border-bottom:1px solid #eee}</style></head><body>${html}</body></html>`);
+      doc.close();
+      // esperar a que la ventana cargue antes de lanzar print
+      win.focus();
+      setTimeout(()=>{ win.print(); }, 700);
+    }
+
+    /* -----------------------
+       REPORTS UI bindings
+       ----------------------- */
     $('#tab-sales-range').addEventListener('click', ()=> showTab('sales-range'));
     $('#tab-sales-day').addEventListener('click', ()=> showTab('sales-day'));
     $('#tab-inventory').addEventListener('click', ()=> showTab('inventory'));
@@ -700,48 +740,135 @@
       $('#tab-inventory').classList.toggle('bg-indigo-600', name==='inventory'); $('#tab-inventory').classList.toggle('text-white', name==='inventory');
     }
 
-    // Range generate & PDF
+    // Sales by range (existing feature kept)
     $('#btn-generate-range').addEventListener('click', async ()=> {
-      const from = $('#report-from').value; const to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango');
-      const { html } = await generateSalesRange(from,to);
+      const from = $('#report-from').value, to = $('#report-to').value;
+      if(!from || !to) return alert('Selecciona rango');
+      const html = await buildRangeReportHTML(from,to);
       $('#report-preview-range').innerHTML = html;
     });
     $('#btn-pdf-range').addEventListener('click', async ()=> {
-      const from = $('#report-from').value; const to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango');
-      const { html } = await generateSalesRange(from,to);
-      const wrapper = document.createElement('div'); wrapper.style.width='800px'; wrapper.innerHTML = html;
-      await generatePDFfromHTML(wrapper, `Reporte_Ventas_${from}_a_${to}.pdf`);
+      const from = $('#report-from').value, to = $('#report-to').value;
+      if(!from || !to) return alert('Selecciona rango');
+      const html = await buildRangeReportHTML(from,to);
+      // generar PDF (reutilizar generatePDF generic)
+      const wrapper = document.createElement('div'); wrapper.style.width='1123px'; wrapper.innerHTML = html; document.body.appendChild(wrapper);
+      await generatePDFfromWrapper(wrapper, `Reporte_Ventas_${from}_a_${to}.pdf`);
+      wrapper.remove();
+    });
+    $('#btn-print-range').addEventListener('click', async ()=> {
+      const from = $('#report-from').value, to = $('#report-to').value;
+      if(!from || !to) return alert('Selecciona rango');
+      const html = await buildRangeReportHTML(from,to);
+      printHTML(html, `Reporte ${from} a ${to}`);
     });
 
-    // Day generate & PDF
-    $('#btn-generate-day').addEventListener('click', async ()=> {
-      const from = $('#day-from').value; const to = $('#day-to').value; if(!from||!to) return alert('Selecciona rango');
-      const { html, chartData } = await generateSalesByDay(from,to);
-      $('#report-preview-day').innerHTML = html;
-      try{ const ctx = $('#chart-daily-sales').getContext('2d'); if(chartDailySales) chartDailySales.destroy(); chartDailySales = new Chart(ctx, { type:'line', data:{ labels: chartData.labels, datasets:[{ label:'Ventas por día', data: chartData.values, fill:true }]}, options:{ responsive:true } }); }catch(e){ console.warn('chart daily', e); }
+    // Sales by single day
+    $('#btn-generate-day-single').addEventListener('click', async ()=> {
+      const date = $('#day-single').value || todayYMD();
+      await showDailyPreview(date, '#report-preview-day-single');
     });
-    $('#btn-pdf-day').addEventListener('click', async ()=> {
-      const from = $('#day-from').value; const to = $('#day-to').value; if(!from||!to) return alert('Selecciona rango');
-      const { html } = await generateSalesByDay(from,to);
-      const wrapper = document.createElement('div'); wrapper.style.width='800px'; wrapper.innerHTML = html;
-      await generatePDFfromHTML(wrapper, `Reporte_VentasPorDia_${from}_a_${to}.pdf`);
+    $('#btn-pdf-day-single').addEventListener('click', async ()=> {
+      const date = $('#day-single').value || todayYMD();
+      await generateDailyReportAndDownload(date);
+    });
+    $('#btn-print-day-single').addEventListener('click', async ()=> {
+      const date = $('#day-single').value || todayYMD();
+      const html = await buildDailyReportHTML(date);
+      printHTML(html, `Reporte del dia ${date}`);
     });
 
-    // Inventory generate & PDF
-    $('#btn-generate-inv').addEventListener('click', async ()=> { const { html } = await generateInventoryReport(); $('#report-preview-inv').innerHTML = html; });
-    $('#btn-pdf-inv').addEventListener('click', async ()=> { const { html } = await generateInventoryReport(); const wrapper = document.createElement('div'); wrapper.style.width='800px'; wrapper.innerHTML = html; await generatePDFfromHTML(wrapper, `Reporte_Inventario_${new Date().toISOString().slice(0,10)}.pdf`); });
+    // Inventory report
+    $('#btn-generate-inv').addEventListener('click', async ()=> { const html = await buildInventoryReportHTML(); $('#report-preview-inv').innerHTML = html; });
+    $('#btn-pdf-inv').addEventListener('click', async ()=> { const html = await buildInventoryReportHTML(); const wrapper = document.createElement('div'); wrapper.style.width='1123px'; wrapper.innerHTML = html; document.body.appendChild(wrapper); await generatePDFfromWrapper(wrapper, `Reporte_Inventario_${new Date().toISOString().slice(0,10)}.pdf`); wrapper.remove(); });
+    $('#btn-print-inv').addEventListener('click', async ()=> { const html = await buildInventoryReportHTML(); printHTML(html, 'Reporte de Inventario'); });
 
     $('#btn-open-report').addEventListener('click', ()=> { showModal('modal-reports'); showTab('sales-range'); });
 
-    /* ===============
-       Scanner (OpenCV + BarcodeDetector + Quagga fallback)
-       =============== */
+    /* -----------------------
+       Rango: función auxiliar buildRangeReportHTML
+       ----------------------- */
+    async function buildRangeReportHTML(from,to){
+      const allSales = await all('sales');
+      const list = allSales.filter(s=>{
+        const d = new Date(s.date).toISOString().slice(0,10);
+        return d >= from && d <= to;
+      }).sort((a,b)=>a.date.localeCompare(b.date));
+      let rows='';
+      let total=0;
+      for(const s of list){
+        total += Number(s.total||0);
+        const d = new Date(s.date).toLocaleString();
+        const payment = s.paymentType || (s.paid ? 'EFECTIVO' : 'A_CREDITO');
+        const items = s.items.map(it=>{ const p = state.products.find(x=>x.id===it.productId); return `${p? p.name : it.productId} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>');
+        rows += `<tr><td style="padding:6px;border-bottom:1px solid #eee">${d}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.id}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.customerName || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.responsible || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${payment}</td><td style="padding:6px;border-bottom:1px solid #eee">${items}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(s.total)}</td></tr>`;
+      }
+      const html = `<div style="padding:8mm;font-family:Arial,Helvetica,sans-serif;color:#111"><div style="display:flex;justify-content:space-between"><div><h2 style="margin:0">MINIMARKET LA ESQUINA DEL AHORRO</h2><div style="font-size:12px">Reporte por rango</div></div><div style="text-align:right;font-size:12px">Periodo: ${from} → ${to}<br>Generado: ${new Date().toLocaleString()}</div></div><hr style="margin:8px 0"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Fecha</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody></table><div style="text-align:right;font-weight:bold;margin-top:8px">Total periodo: S/ ${money(total)}</div></div>`;
+      return html;
+    }
+
+    /* -----------------------
+       INVENTORY build HTML
+       ----------------------- */
+    async function buildInventoryReportHTML(){
+      const products = await all('products');
+      let rows = '', low=0;
+      products.sort((a,b)=>a.name.localeCompare(b.name));
+      for(const p of products){ if((p.stock||0)<=5) low++; rows += `<tr><td style="padding:6px;border-bottom:1px solid #eee">${p.name}</td><td style="padding:6px;border-bottom:1px solid #eee">${p.category||''}</td><td style="padding:6px;border-bottom:1px solid #eee">${p.barcode||''}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">${p.stock||0}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(p.price)}</td></tr>`; }
+      const html = `<div style="padding:8mm;font-family:Arial,Helvetica,sans-serif;color:#111"><div style="display:flex;justify-content:space-between"><div><h2 style="margin:0">MINIMARKET LA ESQUINA DEL AHORRO</h2><div style="font-size:12px">Reporte de inventario</div></div><div style="text-align:right;font-size:12px">Generado: ${new Date().toLocaleString()}</div></div><hr style="margin:8px 0"><div style="margin-bottom:8px">Productos: ${products.length} • Stocks bajos: ${low}</div><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Nombre</th><th style="background:#f3f4f6;padding:6px;text-align:left">Categoría</th><th style="background:#f3f4f6;padding:6px;text-align:left">Código</th><th style="background:#f3f4f6;padding:6px;text-align:right">Stock</th><th style="background:#f3f4f6;padding:6px;text-align:right">Precio</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#666">No hay productos</td></tr>'}</tbody></table></div>`;
+      return html;
+    }
+
+    /* -----------------------
+       PDF util para wrappers (reutilizable)
+       ----------------------- */
+    async function generatePDFfromWrapper(wrapperElement, filename){
+      try{
+        const scale = 3;
+        const canvas = await html2canvas(wrapperElement, { scale: scale, useCORS:true, logging:false, windowWidth: wrapperElement.scrollWidth, windowHeight: wrapperElement.scrollHeight });
+        const imgData = canvas.toDataURL('image/png', 1.0);
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p','mm','a4');
+        const pageWidthMM = 210, pageHeightMM = 297, marginMM = 10;
+        const usableWidthMM = pageWidthMM - marginMM*2;
+        const imgWidthPx = canvas.width;
+        const pxToMm = usableWidthMM / imgWidthPx; // mm per px
+        const imgHeightMM = canvas.height * pxToMm;
+        if(imgHeightMM <= (pageHeightMM - marginMM*2)){
+          pdf.addImage(imgData, 'PNG', marginMM, marginMM, usableWidthMM, imgHeightMM);
+        } else {
+          const pxPerPage = Math.floor((pageHeightMM - marginMM*2) / pxToMm);
+          let remainingHeight = canvas.height; let position = 0; let pageIdx = 0;
+          while(remainingHeight > 0){
+            const sliceHeight = Math.min(pxPerPage, remainingHeight);
+            const tmpCanvas = document.createElement('canvas');
+            tmpCanvas.width = canvas.width; tmpCanvas.height = sliceHeight;
+            const tctx = tmpCanvas.getContext('2d');
+            tctx.fillStyle = '#fff'; tctx.fillRect(0,0,tmpCanvas.width,tmpCanvas.height);
+            tctx.drawImage(canvas, 0, position, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+            const sliceData = tmpCanvas.toDataURL('image/png');
+            const sliceHeightMM = sliceHeight * pxToMm;
+            if(pageIdx > 0) pdf.addPage();
+            pdf.addImage(sliceData, 'PNG', marginMM, marginMM, usableWidthMM, sliceHeightMM);
+            remainingHeight -= sliceHeight; position += sliceHeight; pageIdx++;
+          }
+        }
+        pdf.save(filename);
+      }catch(err){
+        console.error('generatePDFfromWrapper error', err);
+        alert('Error al generar PDF. Intenta imprimir desde la vista.');
+      }
+    }
+
+    /* -----------------------
+       SCANNER (OpenCV + BarcodeDetector + Quagga fallback)
+       ----------------------- */
     let cvReady=false, awaitingCvInit=false;
-    if(window.cv && cv['onRuntimeInitialized']){ awaitingCvInit=true; cv['onRuntimeInitialized']=()=>{ cvReady=true; awaitingCvInit=false; console.info('OpenCV ready'); }; } else if(window.cv){ cvReady=true; }
+    if(window.cv && cv['onRuntimeInitialized']){ awaitingCvInit=true; cv['onRuntimeInitialized']=()=>{ cvReady=true; awaitingCvInit=false; console.info('OpenCV listo'); }; } else if(window.cv){ cvReady=true; }
     const video = $('#video'); let videoStream=null, currentVideoTrack=null;
     let detectionLoop=false, quaggaActive=false, readBuffer=[];
     const READ_CONFIRM=4, READ_WINDOW_MS=2200;
-    let overlayCanvas = $('#overlay-canvas'); let overlayCtx = overlayCanvas ? overlayCanvas.getContext('2d') : null;
+    let overlayCanvas = $('#overlay-canvas'), overlayCtx = overlayCanvas ? overlayCanvas.getContext('2d') : null;
     function resizeOverlay(){ overlayCanvas = $('#overlay-canvas'); if(!overlayCanvas) return; overlayCanvas.width = video.clientWidth; overlayCanvas.height = video.clientHeight; overlayCtx = overlayCanvas.getContext('2d'); }
     function clearOverlay(){ if(!overlayCtx) resizeOverlay(); overlayCtx && overlayCtx.clearRect(0,0,overlayCanvas.width, overlayCanvas.height); }
     function pushRead(code){ const now = Date.now(); readBuffer = readBuffer.filter(r=> now - r.t < READ_WINDOW_MS); readBuffer.push({ code, t: now }); const last = readBuffer.slice(-READ_CONFIRM); if(last.length >= READ_CONFIRM && last.every(x=> x.code === last[0].code)) return last[0].code; return null; }
@@ -851,39 +978,18 @@
 
     async function stopCamera(){ detectionLoop=false; if(quaggaActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} quaggaActive=false; } if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); video.srcObject = null; videoStream=null; currentVideoTrack=null; clearOverlay(); readBuffer=[]; }
 
-    // scanner buttons/events
+    // scanner buttons
     $('#open-scan').addEventListener('click', ()=> { if(!isAuthenticated()) return showLogin(); showModal('modal-scan'); startBarcodeDetection().catch(()=>{}); });
     $('#stop-camera').addEventListener('click', async ()=> stopCamera());
     $('#toggle-torch').addEventListener('click', async ()=> { if(!currentVideoTrack) return alert('Cámara no activada'); try{ const caps = currentVideoTrack.getCapabilities(); if(!caps.torch) return alert('Linterna no soportada'); await currentVideoTrack.applyConstraints({ advanced:[{ torch:true }] }); }catch(e){ console.warn('torch', e); alert('Linterna no soportada'); } });
     $('#fill-product').addEventListener('click', ()=> { const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado'); const p = findProductByCode(code); if(p) openProductModal(p); else { $('#product-barcode').value = code; openProductModal(); } });
     $('#quick-sell-detected').addEventListener('click', async ()=> { const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado'); const p = findProductByCode(code); if(!p){ if(!confirm('Producto no encontrado. ¿Crear nuevo?')) return; $('#product-barcode').value = code; openProductModal(); return; } const qty = Number(prompt('Cantidad a vender (rápido):','1'))||1; const payment = prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO','EFECTIVO') || 'EFECTIVO'; let customer=null; if(payment.toUpperCase()==='A_CREDITO') customer = prompt('Nombre del cliente:') || null; p.stock=(p.stock||0)-qty; await put('products', p); await add('movements', { id:uid(), type:'sale', productId:p.id, qty, date:new Date().toISOString() }); const total = qty * p.price; const date = new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); await add('sales', { id:uid(), items:[{ productId:p.id, qty, price:p.price }], total, date, customerName: customer, paid: (payment.toUpperCase()!=='A_CREDITO'), paymentType: payment.toUpperCase(), responsible: responsibleName }); if(payment.toUpperCase()==='A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customer, balance: prev + total, lastSale: date }); } alert('Venta rápida registrada'); await refreshAll(); });
 
-    function findProductByCode(code){
-      const norm = (code||'').replace(/\D/g,'');
-      let p = state.products.find(x => (x.barcode||'') === code || (x.barcode||'').replace(/\D/g,'') === norm);
-      if(!p && norm.length>6) p = state.products.find(x => (x.barcode||'').replace(/\D/g,'').endsWith(norm));
-      return p;
-    }
+    function findProductByCode(code){ const norm = (code||'').replace(/\D/g,''); let p = state.products.find(x => (x.barcode||'') === code || (x.barcode||'').replace(/\D/g,'') === norm); if(!p && norm.length>6) p = state.products.find(x => (x.barcode||'').replace(/\D/g,'').endsWith(norm)); return p; }
 
-    // Quick sell from inventory
-    async function quickSellPrompt(productId){
-      const qtyStr = prompt('Cantidad a vender (rápido):','1'); if(!qtyStr) return;
-      const qty = Math.max(1, Number(qtyStr));
-      const payment = prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO','EFECTIVO') || 'EFECTIVO';
-      let customerName = null; if(payment.toUpperCase()==='A_CREDITO') customerName = prompt('Nombre del cliente:') || null;
-      const prod = state.products.find(p=>p.id===productId); if(!prod) return alert('Producto no encontrado');
-      prod.stock = (prod.stock||0) - qty; await put('products', prod);
-      await add('movements', { id:uid(), type:'sale', productId, qty, date:new Date().toISOString() });
-      const total = qty * prod.price; const date = new Date().toISOString();
-      const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD();
-      const responsibleObj = await get('responsibles', respDate).catch(()=>null);
-      const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||'');
-      await add('sales', { id:uid(), items:[{ productId, qty, price: prod.price }], total, date, customerName, paid: (payment.toUpperCase()!=='A_CREDITO'), paymentType: payment.toUpperCase(), responsible: responsibleName });
-      if(payment.toUpperCase()==='A_CREDITO' && customerName){ const existing = await get('customers', customerName).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customerName, balance: prev + total, lastSale: date }); }
-      await refreshAll();
-    }
-
-    // Init app and seed
+    /* -----------------------
+       INIT & seed
+       ----------------------- */
     async function initApp(){
       await openDB();
       const products = await all('products');
@@ -903,9 +1009,54 @@
       window.addEventListener('resize', ()=>{ try{ resizeOverlay(); }catch(e){} });
     }
 
-    if(isAuthenticated()){ $('#current-user').textContent = localStorage.getItem(AUTH_KEY); $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); closeLogin(); initApp(); }
+    // Si ya autenticado previamente
+    if(isAuthenticated()){
+      $('#current-user').textContent = localStorage.getItem(AUTH_KEY); $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); closeLogin(); initApp();
+    }
 
-  }); // DOMContentLoaded
+    // Utility used by range PDF (reused earlier)
+    async function generatePDFfromWrapper(wrapperElement, filename){
+      return generatePDFfromWrapperInternal(wrapperElement, filename);
+    }
+    async function generatePDFfromWrapperInternal(wrapperElement, filename){
+      try{
+        const scale = 3;
+        const canvas = await html2canvas(wrapperElement, { scale: scale, useCORS:true, logging:false, windowWidth: wrapperElement.scrollWidth, windowHeight: wrapperElement.scrollHeight });
+        const imgData = canvas.toDataURL('image/png', 1.0);
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p','mm','a4');
+        const pageWidthMM = 210, pageHeightMM = 297, marginMM = 10;
+        const usableWidthMM = pageWidthMM - marginMM*2;
+        const imgWidthPx = canvas.width;
+        const pxToMm = usableWidthMM / imgWidthPx; // mm per px
+        const imgHeightMM = canvas.height * pxToMm;
+        if(imgHeightMM <= (pageHeightMM - marginMM*2)){
+          pdf.addImage(imgData, 'PNG', marginMM, marginMM, usableWidthMM, imgHeightMM);
+        } else {
+          const pxPerPage = Math.floor((pageHeightMM - marginMM*2) / pxToMm);
+          let remainingHeight = canvas.height; let position = 0; let pageIdx = 0;
+          while(remainingHeight > 0){
+            const sliceHeight = Math.min(pxPerPage, remainingHeight);
+            const tmpCanvas = document.createElement('canvas');
+            tmpCanvas.width = canvas.width; tmpCanvas.height = sliceHeight;
+            const tctx = tmpCanvas.getContext('2d');
+            tctx.fillStyle = '#fff'; tctx.fillRect(0,0,tmpCanvas.width,tmpCanvas.height);
+            tctx.drawImage(canvas, 0, position, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+            const sliceData = tmpCanvas.toDataURL('image/png');
+            const sliceHeightMM = sliceHeight * pxToMm;
+            if(pageIdx > 0) pdf.addPage();
+            pdf.addImage(sliceData, 'PNG', marginMM, marginMM, usableWidthMM, sliceHeightMM);
+            remainingHeight -= sliceHeight; position += sliceHeight; pageIdx++;
+          }
+        }
+        pdf.save(filename);
+      }catch(err){
+        console.error('generatePDFfromWrapperInternal error', err);
+        alert('Error al generar PDF. Intenta imprimir desde la vista.');
+      }
+    }
+
+  })();
   </script>
 </body>
 </html>
