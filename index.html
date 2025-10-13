@@ -1,42 +1,54 @@
-
-
 <!doctype html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart</title>
+  <!-- DISABLE ZOOM / KEEP SCREEN "QUIETA" -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart (Móvil)</title>
 
-  <!-- Tailwind (prototype) -->
+  <!-- Tailwind quick (prototype) -->
   <script src="https://cdn.tailwindcss.com"></script>
+
   <!-- OpenCV.js (WASM) -->
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
   <!-- Quagga fallback -->
   <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
+
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- html2canvas + jsPDF for PDF generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <style>
     :root { --bg:#f8fafc; --card:#fff; --muted:#6b7280; }
     [data-theme="dark"]{ --bg:#071029; --card:#0f1724; --muted:#9ca3af; color-scheme:dark; }
-    body{ background:var(--bg); font-family:Inter,system-ui,Segoe UI,Roboto,Arial; margin:0; color:#0b1220; }
-    .app{ max-width:920px; margin:0 auto; padding-bottom:110px; }
+    html,body{ height:100%; touch-action: manipulation; -ms-touch-action: manipulation; -webkit-user-select:none; -ms-user-select:none; user-select:none; }
+    body{ background:var(--bg); font-family:Inter,system-ui,Segoe UI,Roboto,Arial; margin:0; color:#0b1220; -webkit-tap-highlight-color: transparent; }
+    .app{ max-width:920px; margin:0 auto; padding-bottom:120px; }
     #global-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.45); backdrop-filter:blur(2px); z-index:40; display:none; opacity:0; transition:opacity .18s; }
     #global-backdrop.visible{ display:block; opacity:1; }
-    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:50; padding:1rem; overflow:auto; }
+
+    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:50; padding:1rem; overflow:auto; -webkit-overflow-scrolling:touch; }
     .modal.visible{ display:flex; }
     .modal .modal-content{ width:100%; max-width:760px; border-radius:12px; box-shadow:0 12px 40px rgba(2,6,23,0.25); padding:1rem; background:var(--card); color:inherit; }
     @media(max-width:640px){ .modal .modal-content{ width:100%; height:100%; border-radius:0; padding:0; display:flex; flex-direction:column; } }
+
     #overlay-canvas{ position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:20; }
     .scan-guide{ position:absolute; left:50%; top:50%; width:64%; height:28%; transform:translate(-50%,-50%); border:2px dashed rgba(255,255,255,0.6); border-radius:8px; pointer-events:none; z-index:30; }
-    .bottom-bar{ position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; gap:8px; padding:10px; background:linear-gradient(0deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85)); box-shadow:0 -6px 18px rgba(2,6,23,0.06); }
-    .inv-card{ background:var(--card); border-radius:12px; padding:12px; box-shadow:0 6px 18px rgba(2,6,23,0.06); display:flex; justify-content:space-between; }
+
+    .bottom-bar{ position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; gap:8px; padding:10px; background:linear-gradient(0deg, rgba(255,255,255,0.98), rgba(255,255,255,0.95)); box-shadow:0 -6px 18px rgba(2,6,23,0.06); }
+    .inv-card{ background:var(--card); border-radius:12px; padding:12px; box-shadow:0 6px 18px rgba(2,6,23,0.06); display:flex; justify-content:space-between; align-items:center; gap:8px; }
     .print-table th{ background:#f3f4f6; padding:8px; text-align:left; }
     .print-table td{ padding:8px; border-bottom:1px solid #e5e7eb; vertical-align:top; }
+    /* keep layout stable: prevent body scaling on focus */
+    input, select, button, textarea { -webkit-touch-callout: none; -webkit-user-select: none; user-select:none; }
   </style>
 </head>
 <body data-theme="light">
-  <!-- Global backdrop -->
+  <!-- BACKDROP -->
   <div id="global-backdrop" aria-hidden="true"></div>
 
   <div class="app px-4">
@@ -72,22 +84,22 @@
       </div>
     </div>
 
-    <!-- Search -->
+    <!-- SEARCH -->
     <div class="mb-3">
       <input id="search" type="search" placeholder="Buscar producto o código..." class="w-full px-4 py-3 rounded-lg shadow-sm border bg-white" />
     </div>
 
-    <!-- INVENTORY LIST -->
+    <!-- INVENTORY -->
     <div id="inventory-list" class="space-y-3 mb-28"></div>
 
-    <!-- CHARTS -->
+    <!-- SMALL CHARTS -->
     <div class="grid grid-cols-2 gap-3 mb-6">
       <div class="bg-white rounded-lg p-2 shadow"><canvas id="chart-sales" height="120"></canvas></div>
       <div class="bg-white rounded-lg p-2 shadow"><canvas id="chart-stock" height="120"></canvas></div>
     </div>
   </div>
 
-  <!-- BOTTOM ACTION BAR -->
+  <!-- BOTTOM BAR -->
   <div class="bottom-bar">
     <button id="open-add-product" class="flex-1 px-4 py-3 rounded-lg bg-green-500 text-white font-semibold">+ Producto</button>
     <button id="open-scan" class="flex-1 px-4 py-3 rounded-lg bg-yellow-500 text-white font-semibold">Escanear</button>
@@ -95,8 +107,12 @@
     <button id="open-clients" class="flex-1 px-4 py-3 rounded-lg bg-indigo-600 text-white font-semibold">Clientes</button>
   </div>
 
-  <!-- ====== MODALES ====== -->
-  <!-- Product -->
+  <!-- ====================================================
+       MODALES (igual estructura que antes — solo se actualizó
+       el comportamiento de impresión a PDF con jsPDF/html2canvas)
+       ==================================================== -->
+
+  <!-- Product modal -->
   <div id="modal-product" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -122,7 +138,7 @@
     </div>
   </div>
 
-  <!-- Scanner -->
+  <!-- Scanner modal -->
   <div id="modal-scan" class="modal scanner-modal" role="dialog" aria-hidden="true">
     <div class="modal-content">
       <div class="flex justify-between items-center px-3 py-2">
@@ -203,7 +219,7 @@
     </div>
   </div>
 
-  <!-- Sale (full) -->
+  <!-- Sale (detailed) -->
   <div id="modal-sale" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -263,7 +279,7 @@
           <button id="tab-inventory" class="px-3 py-2 border rounded">Inventario</button>
         </div>
 
-        <!-- Sales range -->
+        <!-- Sales by range -->
         <div id="tab-content-sales-range" class="tab-content">
           <div class="grid grid-cols-2 gap-2 mb-3">
             <div><label class="text-xs">Desde</label><input id="report-from" type="date" class="w-full px-2 py-2 border rounded"></div>
@@ -271,12 +287,12 @@
           </div>
           <div class="flex gap-2 mb-3 justify-end">
             <button id="btn-generate-range" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar vista</button>
-            <button id="btn-print-range" class="px-3 py-2 bg-gray-800 text-white rounded">Imprimir</button>
+            <button id="btn-pdf-range" class="px-3 py-2 bg-gray-800 text-white rounded">Generar PDF</button>
           </div>
-          <div id="report-preview-range" class="max-h-80 overflow-auto text-sm"></div>
+          <div id="report-preview-range" class="max-h-80 overflow-auto text-sm bg-white p-2 rounded"></div>
         </div>
 
-        <!-- Sales day -->
+        <!-- Sales by day -->
         <div id="tab-content-sales-day" class="tab-content hidden">
           <div class="grid grid-cols-2 gap-2 mb-3">
             <div><label class="text-xs">Desde</label><input id="day-from" type="date" class="w-full px-2 py-2 border rounded"></div>
@@ -284,9 +300,9 @@
           </div>
           <div class="flex gap-2 mb-3 justify-end">
             <button id="btn-generate-day" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar resumen</button>
-            <button id="btn-print-day" class="px-3 py-2 bg-gray-800 text-white rounded">Imprimir</button>
+            <button id="btn-pdf-day" class="px-3 py-2 bg-gray-800 text-white rounded">Generar PDF</button>
           </div>
-          <div id="report-preview-day" class="max-h-80 overflow-auto text-sm"></div>
+          <div id="report-preview-day" class="max-h-80 overflow-auto text-sm bg-white p-2 rounded"></div>
           <div class="mt-3 bg-white rounded p-2 shadow"><canvas id="chart-daily-sales" height="120"></canvas></div>
         </div>
 
@@ -294,9 +310,9 @@
         <div id="tab-content-inventory" class="tab-content hidden">
           <div class="flex gap-2 mb-3 justify-end">
             <button id="btn-generate-inv" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar inventario</button>
-            <button id="btn-print-inv" class="px-3 py-2 bg-gray-800 text-white rounded">Imprimir inventario</button>
+            <button id="btn-pdf-inv" class="px-3 py-2 bg-gray-800 text-white rounded">Generar PDF</button>
           </div>
-          <div id="report-preview-inv" class="max-h-80 overflow-auto text-sm"></div>
+          <div id="report-preview-inv" class="max-h-80 overflow-auto text-sm bg-white p-2 rounded"></div>
         </div>
       </div>
     </div>
@@ -307,7 +323,7 @@
     <div class="modal-content mx-3" style="max-width:480px;">
       <div class="p-4">
         <h2 class="text-xl font-semibold mb-2">Ingresar — TiendaSmart</h2>
-        <p class="text-sm text-gray-500 mb-4">Usuario: <strong>LISMAGALY</strong> — Contraseña: <strong>latiendadelahorro</strong></p>
+        <p class="text-sm text-gray-500 mb-4">Usuario: <strong>lis</strong> — Contraseña: <strong>magaly</strong></p>
         <form id="form-login" class="space-y-3">
           <input id="login-user" placeholder="Usuario" class="w-full px-3 py-3 rounded border" autofocus>
           <input id="login-pass" placeholder="Contraseña" type="password" class="w-full px-3 py-3 rounded border">
@@ -320,57 +336,55 @@
     </div>
   </div>
 
-  <!-- ============================
+  <!-- =========================
        SCRIPT: APP LOGIC
-       - All event binding is done on DOMContentLoaded
-     ============================ -->
+       ========================= -->
   <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    /***********************
-     Helpers & IndexedDB
-    ***********************/
+  (function(){
+    // small polyfill to prevent gesture zoom on iOS
+    document.addEventListener('gesturestart', e => e.preventDefault());
+
+    // helpers
     const $ = s => document.querySelector(s);
     const $$ = s => Array.from(document.querySelectorAll(s));
     const uid = () => 'id-' + Math.random().toString(36).slice(2,9);
     const money = v => Number(v||0).toFixed(2);
     const todayYMD = ()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-    const localYMDFromISO = iso => { const d=new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+    const localYMDFromISO = iso => { const d = new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
     function debounce(fn, wait=200){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), wait); }; }
 
-    const DB_NAME='TiendaSmartDB', DB_VERSION=7;
+    // IndexedDB wrapper
+    const DB_NAME='TiendaSmartDB', DB_VERSION=8;
     let db;
-    function openDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open(DB_NAME, DB_VERSION); r.onupgradeneeded = e=>{ const idb=e.target.result; if(!idb.objectStoreNames.contains('products')) idb.createObjectStore('products',{keyPath:'id'}); if(!idb.objectStoreNames.contains('sales')) idb.createObjectStore('sales',{keyPath:'id'}); if(!idb.objectStoreNames.contains('movements')) idb.createObjectStore('movements',{keyPath:'id'}); if(!idb.objectStoreNames.contains('customers')) idb.createObjectStore('customers',{keyPath:'name'}); if(!idb.objectStoreNames.contains('responsibles')) idb.createObjectStore('responsibles',{keyPath:'date'}); }; r.onsuccess=e=>{ db=e.target.result; res(db); }; r.onerror=e=>rej(e); }); }
-    const store = (name,mode='readonly') => db.transaction(name, mode).objectStore(name);
-    const put = (name,item) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').put(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
-    const add = (name,item) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').add(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
-    const all = (name) => new Promise((res,rej)=>{ const rq=store(name,'readonly').getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=e=>rej(e); });
-    const get = (name,key) => new Promise((res,rej)=>{ const rq=store(name,'readonly').get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=e=>rej(e); });
-    const remove = (name,key) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').delete(key); rq.onsuccess=()=>res(); rq.onerror=e=>rej(e); });
+    function openDB(){ return new Promise((res, rej)=>{ const r = indexedDB.open(DB_NAME, DB_VERSION); r.onupgradeneeded = e => { const idb = e.target.result; if(!idb.objectStoreNames.contains('products')) idb.createObjectStore('products',{keyPath:'id'}); if(!idb.objectStoreNames.contains('sales')) idb.createObjectStore('sales',{keyPath:'id'}); if(!idb.objectStoreNames.contains('movements')) idb.createObjectStore('movements',{keyPath:'id'}); if(!idb.objectStoreNames.contains('customers')) idb.createObjectStore('customers',{keyPath:'name'}); if(!idb.objectStoreNames.contains('responsibles')) idb.createObjectStore('responsibles',{keyPath:'date'}); }; r.onsuccess = e => { db = e.target.result; res(db); }; r.onerror = e => rej(e); }); }
+    const store = (name, mode='readonly') => db.transaction(name, mode).objectStore(name);
+    const put = (name, item) => new Promise((res, rej)=>{ const rq = store(name,'readwrite').put(item); rq.onsuccess = ()=>res(item); rq.onerror=e=>rej(e); });
+    const add = (name, item) => new Promise((res, rej)=>{ const rq = store(name,'readwrite').add(item); rq.onsuccess = ()=>res(item); rq.onerror=e=>rej(e); });
+    const all = (name) => new Promise((res, rej)=>{ const rq = store(name,'readonly').getAll(); rq.onsuccess = ()=>res(rq.result||[]); rq.onerror=e=>rej(e); });
+    const get = (name, key) => new Promise((res, rej)=>{ const rq = store(name,'readonly').get(key); rq.onsuccess = ()=>res(rq.result); rq.onerror=e=>rej(e); });
 
-    /***********************
-     Auth (client-only)
-    ***********************/
-    const AUTH_USER='LISMAGALY', AUTH_PASS='latiendadelahorro', AUTH_KEY='ts_user';
+    // auth (client-only credentials requested)
+    const AUTH_USER = 'lis';
+    const AUTH_PASS = 'magaly';
+    const AUTH_KEY = 'ts_user';
     function isAuthenticated(){ return !!localStorage.getItem(AUTH_KEY); }
-    function setAuthenticated(name){ localStorage.setItem(AUTH_KEY, name); $('#current-user').textContent = name; $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); }
+    function setAuthenticated(u){ localStorage.setItem(AUTH_KEY, u); $('#current-user').textContent = u; $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); }
     function clearAuth(){ localStorage.removeItem(AUTH_KEY); $('#current-user').classList.add('hidden'); $('#btn-logout').classList.add('hidden'); }
 
+    // login binding
     $('#form-login').addEventListener('submit', e => {
       e.preventDefault();
       const u = $('#login-user').value.trim(); const p = $('#login-pass').value;
       if(u === AUTH_USER && p === AUTH_PASS){ setAuthenticated(u); closeLogin(); initApp(); } else { alert('Credenciales inválidas'); }
     });
     $('#login-guest').addEventListener('click', ()=>{ setAuthenticated('GUEST'); closeLogin(); initApp(); });
-    $('#btn-logout').addEventListener('click', ()=>{ if(confirm('Cerrar sesión?')) { clearAuth(); location.reload(); } });
+    $('#btn-logout').addEventListener('click', ()=>{ if(confirm('Cerrar sesión?')){ clearAuth(); location.reload(); } });
+    function closeLogin(){ const m = $('#modal-login'); m.classList.remove('visible'); m.setAttribute('aria-hidden','true'); }
 
-    function closeLogin(){ const m=$('#modal-login'); m.classList.remove('visible'); m.setAttribute('aria-hidden','true'); }
-
-    /***********************
-     Modal manager
-    ***********************/
+    // modal manager
     const globalBackdrop = $('#global-backdrop');
     let currentOpenModal = null;
-    async function _stopCameraSafe(){ try{ if(typeof stopCamera === 'function') await stopCamera(); }catch(e){ console.warn('stopCamera', e); } }
+    async function _stopCameraSafe(){ try{ if(typeof stopCamera === 'function') await stopCamera(); }catch(e){ console.warn('stopCam', e); } }
     function showModal(id, { focusSelector } = {}){
       if(!isAuthenticated() && id !== 'modal-login') return showLogin();
       if(currentOpenModal && currentOpenModal !== id) closeModal(currentOpenModal);
@@ -383,20 +397,18 @@
     }
     async function closeModal(id){
       const modal = document.getElementById(id);
-      if(!modal){ globalBackdrop.classList.remove('visible'); document.documentElement.style.overflow=''; document.body.style.overflow=''; currentOpenModal = null; return; }
+      if(!modal){ globalBackdrop.classList.remove('visible'); document.documentElement.style.overflow=''; document.body.style.overflow=''; currentOpenModal=null; return; }
       if(modal.classList.contains('scanner-modal')) await _stopCameraSafe();
       modal.classList.remove('visible'); modal.setAttribute('aria-hidden','true');
       setTimeout(()=>{ const any = Array.from(document.querySelectorAll('.modal')).some(m=>m.classList.contains('visible')); if(!any){ globalBackdrop.classList.remove('visible'); globalBackdrop.setAttribute('aria-hidden','true'); document.documentElement.style.overflow=''; document.body.style.overflow=''; currentOpenModal=null; } else { const rem = document.querySelector('.modal.visible'); if(rem) currentOpenModal = rem.id; } }, 120);
     }
     globalBackdrop.addEventListener('click', async ()=>{ if(!currentOpenModal) return; await closeModal(currentOpenModal); });
-    document.addEventListener('keydown', async e=>{ if(e.key==='Escape' && currentOpenModal) await closeModal(currentOpenModal); });
+    document.addEventListener('keydown', async e=>{ if(e.key === 'Escape' && currentOpenModal) await closeModal(currentOpenModal); });
     document.addEventListener('click', e=>{ const btn = e.target.closest('[data-close-modal]'); if(!btn) return; const modal = btn.closest('.modal'); if(!modal) return; closeModal(modal.id); });
 
     function showLogin(){ const m = $('#modal-login'); m.classList.add('visible'); m.setAttribute('aria-hidden','false'); }
 
-    /***********************
-     App state & initializations
-    ***********************/
+    // app state
     const state = { products:[], sales:[], customers:[], responsibles:[] };
 
     async function refreshAll(){
@@ -412,9 +424,9 @@
       updateResponsibleBanner();
     }
 
-    /***********************
-     Inventory rendering (mobile)
-    ***********************/
+    /* ===============
+       INVENTORY UI
+       =============== */
     const inventoryList = $('#inventory-list');
     function renderInventoryMobile(filter=''){
       const q = (filter||'').trim().toLowerCase();
@@ -422,29 +434,30 @@
       state.products.forEach(p=>{
         if(q && !(p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q) || (p.barcode||'').replace(/\D/g,'').includes(q.replace(/\D/g,'')))) return;
         const low = (p.stock||0) <= 5;
-        const div = document.createElement('div'); div.className='inv-card';
+        const div = document.createElement('div');
+        div.className = 'inv-card';
         div.innerHTML = `
-          <div>
+          <div style="flex:1">
             <div class="font-medium">${p.name}${low? ' <span style="color:#b91c1c;font-weight:600"> • STOCK BAJO</span>':''}</div>
             <div class="text-xs text-gray-500">${p.category||''} • ${p.barcode||''}</div>
             <div class="text-sm text-gray-700 mt-1">S/ ${money(p.price)} · Stock: ${p.stock||0}</div>
           </div>
-          <div class="flex flex-col gap-2 items-end">
+          <div class="flex flex-col gap-2 items-end" style="min-width:110px">
             <button class="px-3 py-2 bg-red-500 text-white rounded sell-btn" data-id="${p.id}">Vender</button>
             <button class="px-3 py-2 border rounded income-btn" data-id="${p.id}">+Stock</button>
             <button class="px-3 py-2 border rounded edit-btn" data-id="${p.id}">Editar</button>
           </div>`;
         inventoryList.appendChild(div);
       });
-      // bind handlers
+      // bind
       $$('.sell-btn').forEach(b=> b.onclick = ()=> quickSellPrompt(b.dataset.id));
       $$('.income-btn').forEach(b=> b.onclick = ()=> openIncomeFor(b.dataset.id));
       $$('.edit-btn').forEach(b=> b.onclick = ()=> openProductModal(state.products.find(x=>x.id===b.dataset.id)));
     }
 
-    /***********************
-     Product modal logic
-    ***********************/
+    /* ===============
+       PRODUCT MODAL
+       =============== */
     $('#open-add-product').addEventListener('click', ()=> openProductModal());
     function openProductModal(product){
       if(!isAuthenticated()) return showLogin();
@@ -455,25 +468,20 @@
     $('#form-product').addEventListener('submit', async e => {
       e.preventDefault();
       const id = $('#product-id').value || uid();
-      const prod = { id, name: $('#product-name').value.trim(), category: $('#product-category').value.trim(), price: Number($('#product-price').value)||0, barcode: $('#product-barcode').value.trim(), stock: Number($('#product-stock').value)||0, createdAt: new Date().toISOString() };
-      await put('products', prod);
-      await refreshAll();
-      closeModal('modal-product');
+      const prod = { id, name: $('#product-name').value.trim(), category: $('#product-category').value.trim(), price: Number($('#product-price').value)||0, barcode: $('#product-barcode').value.trim(), stock: Number($('#product-stock').value)||0, createdAt:new Date().toISOString() };
+      await put('products', prod); await refreshAll(); closeModal('modal-product');
     });
 
-    /***********************
-     Income (stock)
-    ***********************/
-    $('#open-income')?.addEventListener('click', ()=> { renderIncomeSelects(); showModal('modal-income'); });
+    /* ===============
+       INCOME
+       =============== */
     function renderIncomeSelects(){ const sel = $('#income-product'); if(!sel) return; sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} — Stock: ${p.stock||0}`; sel.appendChild(o); }); }
     function openIncomeFor(productId){ renderIncomeSelects(); $('#income-product').value = productId; showModal('modal-income'); }
     $('#form-income').addEventListener('submit', async e => { e.preventDefault(); const pid = $('#income-product').value; const qty = Number($('#income-qty').value)||0; const p = state.products.find(x=>x.id===pid); p.stock = (p.stock||0) + qty; await put('products', p); await add('movements', { id:uid(), type:'income', productId:pid, qty, date:new Date().toISOString() }); await refreshAll(); closeModal('modal-income'); });
 
-    /***********************
-     Sale (detailed)
-    ***********************/
-    $('#open-sale')?.addEventListener('click', ()=> { showModal('modal-sale'); openSaleModal(); });
-    function openSaleModal(){ $('#sale-items').innerHTML=''; addSaleItemRow(); updateSaleTotal(); }
+    /* ===============
+       SALES (detailed & quick)
+       =============== */
     function addSaleItemRow(productId=''){ const row=document.createElement('div'); row.className='grid grid-cols-12 gap-2 items-center'; row.innerHTML = `<select class="col-span-6 px-2 py-1 border sale-product"></select><input type="number" class="col-span-2 px-2 py-1 border sale-qty" value="1" min="1"><input type="number" step="0.01" class="col-span-2 px-2 py-1 border sale-price" placeholder="Precio"><button type="button" class="col-span-2 px-2 py-1 border sale-remove">Quitar</button>`; $('#sale-items').appendChild(row); fillSaleRow(row, productId); }
     function fillSaleRow(row, productId){ const sel = row.querySelector('.sale-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); }); if(productId) sel.value = productId; const price = row.querySelector('.sale-price'); const qty = row.querySelector('.sale-qty'); sel.onchange = ()=>{ const p = state.products.find(x=>x.id===sel.value); price.value = p ? p.price : ''; updateSaleTotal(); }; price.oninput = updateSaleTotal; qty.oninput = updateSaleTotal; row.querySelector('.sale-remove').onclick = ()=>{ row.remove(); updateSaleTotal(); }; }
     $('#add-sale-item').addEventListener('click', ()=> addSaleItemRow());
@@ -494,9 +502,7 @@
       await refreshAll(); closeModal('modal-sale');
     });
 
-    /***********************
-     Quick sale
-    ***********************/
+    // QUICK SALE logic (same as previous)
     $('#open-quick-sale').addEventListener('click', ()=> { renderQuickSelect(); showModal('modal-quick-sale'); });
     function renderQuickSelect(){ const sel = $('#quick-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); }); updateQuickTotal(); }
     $('#quick-search').addEventListener('input', debounce(function(){ const v=this.value.trim().toLowerCase(); if(!v) return; const digits = v.replace(/\D/g,''); let found=null; if(digits.length>0) found = state.products.find(p => (p.barcode||'').replace(/\D/g,'').endsWith(digits) || (p.barcode||'')===v); if(!found) found = state.products.find(p => p.name.toLowerCase().includes(v)); if(found) $('#quick-product').value = found.id; updateQuickTotal(); },160));
@@ -505,24 +511,42 @@
     const quickCart = [];
     $('#quick-add-cart').addEventListener('click', function(){ const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||1; const p = state.products.find(x=>x.id===pid); if(!p) return alert('Selecciona un producto'); quickCart.push({ productId: pid, qty, price: p.price }); renderQuickCart(); });
     function renderQuickCart(){ const el = $('#quick-cart'); el.innerHTML=''; quickCart.forEach((it,idx)=>{ const p = state.products.find(x=>x.id===it.productId); const d=document.createElement('div'); d.className='flex justify-between items-center'; d.innerHTML = `<div>${p.name} x ${it.qty}</div><div>${money(it.qty*it.price)} <button data-idx="${idx}" class="ml-2 text-sm text-red-600 btn-remove-quick">Quitar</button></div>`; el.appendChild(d); }); $$('.btn-remove-quick').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); }); }
-    $('#form-quick-sale').addEventListener('submit', async function(e){ e.preventDefault(); if(quickCart.length===0) return alert('Agregar productos'); const customer = $('#quick-customer').value.trim(); const payment = $('#quick-payment').value; for(const it of quickCart){ const p = state.products.find(x=>x.id===it.productId); p.stock = (p.stock||0) - it.qty; await put('products', p); await add('movements', { id:uid(), type:'sale', productId: it.productId, qty: it.qty, date:new Date().toISOString() }); } const total = quickCart.reduce((s,i)=>s + i.qty*i.price,0); const date = new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); const sale = { id:uid(), items: quickCart.slice(), total, date, customerName: customer || null, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName }; await add('sales', sale); if(payment === 'A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers',{ name: customer, balance: prev + total, lastSale: date }); } quickCart.length=0; await refreshAll(); closeModal('modal-quick-sale'); });
+    $('#form-quick-sale').addEventListener('submit', async function(e){ e.preventDefault(); if(quickCart.length===0) return alert('Agregar productos'); const customer = $('#quick-customer').value.trim(); const payment = $('#quick-payment').value; for(const it of quickCart){ const p = state.products.find(x=>x.id===it.productId); p.stock = (p.stock||0) - it.qty; await put('products', p); await add('movements', { id:uid(), type:'sale', productId: it.productId, qty: it.qty, date:new Date().toISOString() }); } const total = quickCart.reduce((s,i)=>s + i.qty*i.price,0); const date = new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); const sale = { id:uid(), items: quickCart.slice(), total, date, customerName: customer || null, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName }; await add('sales', sale); if(payment === 'A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customer, balance: prev + total, lastSale: date }); } quickCart.length=0; await refreshAll(); closeModal('modal-quick-sale'); });
 
-    /***********************
-     Clients
-    ***********************/
+    // quick sell prompt used on inventory card
+    async function quickSellPrompt(productId){
+      const qtyStr = prompt('Cantidad a vender (rápido):','1'); if(!qtyStr) return;
+      const qty = Math.max(1, Number(qtyStr));
+      const payment = prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO','EFECTIVO') || 'EFECTIVO';
+      let customerName = null; if(payment.toUpperCase()==='A_CREDITO') customerName = prompt('Nombre del cliente:') || null;
+      const prod = state.products.find(p=>p.id===productId); if(!prod) return alert('Producto no encontrado');
+      prod.stock = (prod.stock||0) - qty; await put('products', prod);
+      await add('movements', { id:uid(), type:'sale', productId, qty, date:new Date().toISOString() });
+      const total = qty * prod.price; const date = new Date().toISOString();
+      const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD();
+      const responsibleObj = await get('responsibles', respDate).catch(()=>null);
+      const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||'');
+      await add('sales', { id:uid(), items:[{ productId, qty, price: prod.price }], total, date, customerName, paid: (payment.toUpperCase()!=='A_CREDITO'), paymentType: payment.toUpperCase(), responsible: responsibleName });
+      if(payment.toUpperCase()==='A_CREDITO' && customerName){ const existing = await get('customers', customerName).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customerName, balance: prev + total, lastSale: date }); }
+      await refreshAll();
+    }
+
+    /* ===============
+       CLIENTS
+       =============== */
     $('#open-clients').addEventListener('click', ()=> showModal('modal-clients'));
     $('#add-client').addEventListener('click', async ()=> { const name = $('#client-name').value.trim(); if(!name) return alert('Ingresa nombre'); const existing = await get('customers', name).catch(()=>null); if(existing) return alert('Cliente ya existe'); await put('customers', { name, balance:0, createdAt:new Date().toISOString() }); $('#client-name').value=''; await refreshAll(); showModal('modal-clients'); });
     async function renderClients(){ const el = $('#clients-list'); el.innerHTML=''; const clients = state.customers || []; if(!clients.length) el.innerHTML = '<div class="text-sm text-gray-600">No hay clientes registrados.</div>'; for(const c of clients){ const d = document.createElement('div'); d.className='p-2 border rounded bg-white flex justify-between items-center'; d.innerHTML = `<div><div class="font-medium">${c.name}</div><div class="text-xs text-gray-500">Saldo: S/ ${money(c.balance||0)}</div></div><div class="flex gap-2"><button data-name="${c.name}" class="px-3 py-2 border rounded btn-abono">Abono</button><button data-name="${c.name}" class="px-3 py-2 bg-green-600 text-white rounded btn-saldar">Saldar</button></div>`; el.appendChild(d); } $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = await get('customers', name); const newBal = (c.balance||0) - amt; await put('customers', { name, balance: newBal < 0 ? 0 : newBal, lastPayment:new Date().toISOString() }); alert('Abono registrado'); await refreshAll(); }); $$('.btn-saldar').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; if(!confirm(`¿Saldar cuenta de ${name}? Esto pondrá su saldo a 0.`)) return; await put('customers',{ name, balance:0, lastPayment:new Date().toISOString() }); alert('Cuenta saldada'); await refreshAll(); }); }
 
-    /***********************
-     Responsible
-    ***********************/
+    /* ===============
+       RESPONSIBLE
+       =============== */
     $('#save-responsible').addEventListener('click', async ()=> { const date = $('#responsible-date').value; const name = $('#responsible-name').value.trim(); if(!date) return alert('Selecciona fecha'); const existing = await get('responsibles', date).catch(()=>null); if(existing && existing.name && existing.name !== name){ if(!confirm(`Ya existe un responsable para ${date}: "${existing.name}". ¿Sobrescribir?`)) return; } await put('responsibles', { date, name }); alert('Responsable guardado'); await refreshAll(); });
     async function updateResponsibleBanner(){ const today = todayYMD(); $('#responsible-date').value = today; const r = await get('responsibles', today).catch(()=>null); if(r && r.name){ $('#responsible-display').textContent = `${r.name} (${today})`; $('#responsible-name').value = r.name; } else { $('#responsible-display').textContent = 'Sin encargado asignado para hoy'; $('#responsible-name').value = ''; } }
 
-    /***********************
-     Charts
-    ***********************/
+    /* ===============
+       CHARTS
+       =============== */
     let chartSales, chartStock, chartDailySales;
     function updateCharts(){
       try{
@@ -535,12 +559,12 @@
       }catch(e){ console.warn('updateCharts', e); }
     }
 
-    /***********************
-     Reports generation & printing
-    ***********************/
-    async function generateSalesRange(from,to){
+    /* ===============
+       REPORTS & PDF (jsPDF + html2canvas)
+       =============== */
+    async function generateSalesRange(from, to){
       const salesAll = await all('sales');
-      const list = salesAll.filter(s=>{ const d = localYMDFromISO(s.date); return d >= from && d <= to; }).sort((a,b)=>a.date.localeCompare(b.date));
+      const list = salesAll.filter(s=>{ const d = localYMDFromISO(s.date); return d>=from && d<=to; }).sort((a,b)=>a.date.localeCompare(b.date));
       let total = 0; let rows='';
       for(const s of list){
         const d = new Date(s.date).toLocaleString();
@@ -549,8 +573,8 @@
         const items = s.items.map(it=>{ const p = state.products.find(x=>x.id===it.productId); return `${p? p.name : it.productId} (${it.qty} x ${money(it.price)})`; }).join('<br>');
         rows += `<tr><td class="print-td">${d}</td><td class="print-td">${s.id}</td><td class="print-td">${s.customerName || '-'}</td><td class="print-td">${s.responsible || '-'}</td><td class="print-td">${payment}</td><td class="print-td">${items}</td><td class="print-td" style="text-align:right">${money(s.total)}</td></tr>`;
       }
-      const html = `<div><h2>MINIMARKET LA ESQUINA DEL AHORRO</h2><div>Reporte de ventas: ${from} → ${to}</div><table style="width:100%;border-collapse:collapse" class="print-table"><thead><tr><th>Fecha</th><th>ID</th><th>Cliente</th><th>Encargado</th><th>Pago</th><th>Items</th><th style="text-align:right">Total</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody></table><div style="text-align:right;font-weight:bold;margin-top:12px">Total período: S/ ${money(total)}</div></div>`;
-      return { html, total, list };
+      const html = `<div><div style="display:flex;justify-content:space-between;align-items:center"><div><h2>MINIMARKET LA ESQUINA DEL AHORRO</h2><div>Reporte de ventas</div></div><div style="text-align:right">Periodo: ${from} → ${to}<br>Generado: ${new Date().toLocaleString()}</div></div><hr style="margin:8px 0"><table style="width:100%;border-collapse:collapse" class="print-table"><thead><tr><th>Fecha</th><th>ID</th><th>Cliente</th><th>Encargado</th><th>Pago</th><th>Items</th><th style="text-align:right">Total</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody></table><div style="text-align:right;font-weight:bold;margin-top:12px">Total período: S/ ${money(total)}</div></div>`;
+      return { html, list, total };
     }
 
     async function generateSalesByDay(from,to){
@@ -561,7 +585,7 @@
       const days = Object.keys(map).sort();
       let rows=''; let grand=0;
       for(const d of days){ rows += `<tr><td class="print-td">${d}</td><td class="print-td">${map[d].count}</td><td class="print-td" style="text-align:right">${money(map[d].total)}</td></tr>`; grand += map[d].total; }
-      const html = `<div><h2>MINIMARKET LA ESQUINA DEL AHORRO</h2><div>Ventas por día: ${from} → ${to}</div><table style="width:100%;border-collapse:collapse" class="print-table"><thead><tr><th>Fecha</th><th>Cantidad ventas</th><th style="text-align:right">Total (S/)</th></tr></thead><tbody>${rows || '<tr><td colspan="3" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody></table><div style="text-align:right;font-weight:bold;margin-top:12px">Total período: S/ ${money(grand)}</div></div>`;
+      const html = `<div><div style="display:flex;justify-content:space-between;align-items:center"><div><h2>MINIMARKET LA ESQUINA DEL AHORRO</h2><div>Ventas por día</div></div><div style="text-align:right">Periodo: ${from} → ${to}<br>Generado: ${new Date().toLocaleString()}</div></div><hr style="margin:8px 0"><table style="width:100%;border-collapse:collapse" class="print-table"><thead><tr><th>Fecha</th><th>Cantidad ventas</th><th style="text-align:right">Total (S/)</th></tr></thead><tbody>${rows || '<tr><td colspan="3" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody></table><div style="text-align:right;font-weight:bold;margin-top:12px">Total período: S/ ${money(grand)}</div></div>`;
       const chartData = { labels: days, values: days.map(d=>map[d].total) };
       return { html, chartData, days };
     }
@@ -571,15 +595,30 @@
       let rows=''; let lowCount=0;
       products.sort((a,b)=>a.name.localeCompare(b.name));
       for(const p of products){ const low = (p.stock||0) <= 5; if(low) lowCount++; rows += `<tr><td class="print-td">${p.name}</td><td class="print-td">${p.category||''}</td><td class="print-td">${p.barcode||''}</td><td class="print-td" style="text-align:right">${p.stock||0}</td><td class="print-td" style="text-align:right">${money(p.price)}</td></tr>`; }
-      const html = `<div><h2>MINIMARKET LA ESQUINA DEL AHORRO</h2><div>Reporte de inventario</div><div style="margin:8px 0">Productos: ${products.length} • Stocks bajos: ${lowCount}</div><table style="width:100%;border-collapse:collapse" class="print-table"><thead><tr><th>Nombre</th><th>Categoría</th><th>Código</th><th style="text-align:right">Stock</th><th style="text-align:right">Precio</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#666">No hay productos</td></tr>'}</tbody></table></div>`;
+      const html = `<div><div style="display:flex;justify-content:space-between;align-items:center"><div><h2>MINIMARKET LA ESQUINA DEL AHORRO</h2><div>Reporte de inventario</div></div><div style="text-align:right">Generado: ${new Date().toLocaleString()}</div></div><hr style="margin:8px 0"><div style="margin:8px 0">Productos: ${products.length} • Stocks bajos: ${lowCount}</div><table style="width:100%;border-collapse:collapse" class="print-table"><thead><tr><th>Nombre</th><th>Categoría</th><th>Código</th><th style="text-align:right">Stock</th><th style="text-align:right">Precio</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#666">No hay productos</td></tr>'}</tbody></table></div>`;
       return { html, products };
     }
 
-    function openPrintWindow(html){
-      const w = window.open('', '_blank'); w.document.open(); w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Reporte</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111;margin:16px}table{width:100%;border-collapse:collapse}th{background:#f3f4f6;padding:8px;text-align:left}td{padding:8px;border-bottom:1px solid #ddd}</style></head><body>${html}</body></html>`); w.document.close(); setTimeout(()=> w.print(), 600);
+    // PDF export using jsPDF.html (relies on html2canvas already loaded)
+    async function exportElementToPDF(element, filename){
+      // ensure jsPDF available
+      try{
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF('p','mm','a4');
+        // Use promise with pdf.html
+        await pdf.html(element, {
+          callback: function(pdfInstance){ pdfInstance.save(filename); },
+          x: 8,
+          y: 8,
+          html2canvas: { scale: 2, useCORS: true }
+        });
+      }catch(err){
+        console.error('Export PDF error', err);
+        alert('Error al generar PDF. Intenta imprimir del navegador.');
+      }
     }
 
-    // tabs
+    // UI: tabs and buttons
     $('#tab-sales-range').addEventListener('click', ()=> showTab('sales-range'));
     $('#tab-sales-day').addEventListener('click', ()=> showTab('sales-day'));
     $('#tab-inventory').addEventListener('click', ()=> showTab('inventory'));
@@ -593,43 +632,57 @@
       $('#tab-inventory').classList.toggle('bg-indigo-600', name==='inventory'); $('#tab-inventory').classList.toggle('text-white', name==='inventory');
     }
 
-    // range
+    // Generate & PDF (range)
     $('#btn-generate-range').addEventListener('click', async ()=> {
       const from = $('#report-from').value; const to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango');
       const { html } = await generateSalesRange(from,to);
       $('#report-preview-range').innerHTML = html;
     });
-    $('#btn-print-range').addEventListener('click', async ()=> {
+    $('#btn-pdf-range').addEventListener('click', async ()=> {
       const from = $('#report-from').value; const to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango');
       const { html } = await generateSalesRange(from,to);
-      openPrintWindow(html);
+      // inject in temporary container to render consistent style
+      const wrapper = document.createElement('div'); wrapper.style.width='800px'; wrapper.innerHTML = html;
+      // use exportElementToPDF
+      await exportElementToPDF(wrapper, `Reporte_Ventas_${from}_a_${to}.pdf`);
     });
 
-    // day
+    // Generate & PDF (day)
     $('#btn-generate-day').addEventListener('click', async ()=> {
       const from = $('#day-from').value; const to = $('#day-to').value; if(!from||!to) return alert('Selecciona rango');
       const { html, chartData } = await generateSalesByDay(from,to);
       $('#report-preview-day').innerHTML = html;
       try{ const ctx = $('#chart-daily-sales').getContext('2d'); if(chartDailySales) chartDailySales.destroy(); chartDailySales = new Chart(ctx, { type:'line', data:{ labels: chartData.labels, datasets:[{ label:'Ventas por día', data: chartData.values, fill:true }]}, options:{ responsive:true } }); }catch(e){ console.warn('chart daily', e); }
     });
-    $('#btn-print-day').addEventListener('click', async ()=> {
+    $('#btn-pdf-day').addEventListener('click', async ()=> {
       const from = $('#day-from').value; const to = $('#day-to').value; if(!from||!to) return alert('Selecciona rango');
       const { html } = await generateSalesByDay(from,to);
-      openPrintWindow(html);
+      const wrapper = document.createElement('div'); wrapper.style.width='800px'; wrapper.innerHTML = html;
+      await exportElementToPDF(wrapper, `Reporte_VentasPorDia_${from}_a_${to}.pdf`);
     });
 
-    // inventory
+    // Inventory generate & PDF
     $('#btn-generate-inv').addEventListener('click', async ()=> { const { html } = await generateInventoryReport(); $('#report-preview-inv').innerHTML = html; });
-    $('#btn-print-inv').addEventListener('click', async ()=> { const { html } = await generateInventoryReport(); openPrintWindow(html); });
+    $('#btn-pdf-inv').addEventListener('click', async ()=> { const { html } = await generateInventoryReport(); const wrapper = document.createElement('div'); wrapper.style.width='800px'; wrapper.innerHTML = html; await exportElementToPDF(wrapper, `Reporte_Inventario_${new Date().toISOString().slice(0,10)}.pdf`); });
 
-    // open reports button (header)
+    // header open reports
     $('#btn-open-report').addEventListener('click', ()=> { showModal('modal-reports'); showTab('sales-range'); });
 
-    /***********************
-     Scanner (OpenCV + BarcodeDetector + Quagga fallback)
-    ***********************/
+    /* ===============
+       EXPORT / IMPORT (optional)
+       =============== */
+    // Buttons not displayed in UI by default but hooks kept in case you add them later
+    document.getElementById('btn-export')?.addEventListener('click', async ()=> {
+      const data = { products: await all('products'), sales: await all('sales'), movements: await all('movements'), customers: await all('customers'), responsibles: await all('responsibles') };
+      const blob = new Blob([JSON.stringify(data,null,2)], { type:'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'tienda-smart-export.json'; a.click(); URL.revokeObjectURL(url);
+    });
+
+    /* ===============
+       SCANNER (OpenCV + BarcodeDetector + Quagga fallback)
+       =============== */
     let cvReady=false, awaitingCvInit=false;
-    if(window.cv && cv['onRuntimeInitialized']){ awaitingCvInit=true; cv['onRuntimeInitialized']=()=>{ cvReady=true; awaitingCvInit=false; console.info('OpenCV ready'); }; } else if(window.cv){ cvReady=true; }
+    if(window.cv && cv['onRuntimeInitialized']){ awaitingCvInit=true; cv['onRuntimeInitialized'] = ()=>{ cvReady=true; awaitingCvInit=false; console.info('OpenCV ready'); }; } else if(window.cv){ cvReady=true; }
+
     const video = $('#video'); let videoStream=null, currentVideoTrack=null;
     let detectionLoop=false, quaggaActive=false, readBuffer=[];
     const READ_CONFIRM=4, READ_WINDOW_MS=2200;
@@ -711,11 +764,44 @@
     function drawROI(roi){ if(!overlayCtx) resizeOverlay(); const scaleX = overlayCanvas.width / (video.videoWidth || 1); const scaleY = overlayCanvas.height / (video.videoHeight || 1); overlayCtx.strokeStyle='rgba(0,255,100,0.9)'; overlayCtx.lineWidth=3; overlayCtx.strokeRect(roi.sx*scaleX, roi.sy*scaleY, roi.sw*scaleX, roi.sh*scaleY); }
     function showConfirmation(text){ if(!overlayCtx) resizeOverlay(); overlayCtx.font='20px monospace'; overlayCtx.fillStyle='rgba(0,0,0,0.6)'; const x=10, y=30; const w = overlayCtx.measureText(text).width + 20; overlayCtx.fillRect(x, y-22, w, 28); overlayCtx.fillStyle='white'; overlayCtx.fillText(text, x+8, y); }
 
-    function fallbackQuagga(){ startCameraHighRes().then(()=>{ if(!window.Quagga) return alert('Quagga fallback no disponible'); quaggaActive = true; Quagga.init({ inputStream:{ name:'Live', type:'LiveStream', target:'#video', constraints:{ facingMode:'environment', width:1280, height:720 } }, locator:{ patchSize:'large', halfSample:false }, decoder:{ readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader'] }, locate:true }, err=>{ if(err){ console.error('Quagga init', err); return; } Quagga.start(); }); Quagga.onProcessed(result=>{ clearOverlay(); if(!result) return; if(result.boxes) result.boxes.filter(b=>b!==result.box).forEach(b=> drawPath(b,'rgba(255,255,255,0.2)')); if(result.box) drawPath(result.box,'lime'); }); Quagga.onDetected(data=>{ const code = data && data.codeResult && data.codeResult.code; if(code){ const confirmed = pushRead(code); if(confirmed){ $('#scanned-code').value = confirmed; try{ Quagga.stop(); }catch(e){} } } }); function drawPath(path,color){ if(!overlayCtx) resizeOverlay(); overlayCtx.strokeStyle=color; overlayCtx.lineWidth=3; overlayCtx.beginPath(); overlayCtx.moveTo(path[0].x, path[0].y); for(let i=1;i<path.length;i++) overlayCtx.lineTo(path[i].x, path[i].y); overlayCtx.closePath(); overlayCtx.stroke(); } }).catch(e=>console.warn('fallbackQuagga camera fail', e)); }
+    function fallbackQuagga(){
+      startCameraHighRes().then(()=>{
+        if(!window.Quagga) return alert('Quagga fallback no disponible');
+        quaggaActive = true;
+        Quagga.init({
+          inputStream: { name:'Live', type:'LiveStream', target:'#video', constraints:{ facingMode:'environment', width:1280, height:720 } },
+          locator: { patchSize:'large', halfSample:false },
+          decoder: { readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader'] },
+          locate:true
+        }, err => { if(err){ console.error('Quagga init', err); return; } Quagga.start(); });
+
+        Quagga.onProcessed(result=>{
+          clearOverlay();
+          if(!result) return;
+          if(result.boxes) result.boxes.filter(b=>b!==result.box).forEach(b=> drawPath(b,'rgba(255,255,255,0.2)'));
+          if(result.box) drawPath(result.box,'lime');
+        });
+
+        Quagga.onDetected(data=>{
+          const code = data && data.codeResult && data.codeResult.code;
+          if(code){
+            const confirmed = pushRead(code);
+            if(confirmed){ $('#scanned-code').value = confirmed; try{ Quagga.stop(); }catch(e){} }
+          }
+        });
+
+        function drawPath(path, color){
+          if(!overlayCtx) resizeOverlay();
+          overlayCtx.strokeStyle = color; overlayCtx.lineWidth = 3; overlayCtx.beginPath(); overlayCtx.moveTo(path[0].x, path[0].y);
+          for(let i=1;i<path.length;i++) overlayCtx.lineTo(path[i].x, path[i].y);
+          overlayCtx.closePath(); overlayCtx.stroke();
+        }
+      }).catch(e=>console.warn('fallbackQuagga camera fail', e));
+    }
 
     async function stopCamera(){ detectionLoop=false; if(quaggaActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} quaggaActive=false; } if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); video.srcObject = null; videoStream=null; currentVideoTrack=null; clearOverlay(); readBuffer=[]; }
 
-    // scanner button events
+    // scanner buttons
     $('#open-scan').addEventListener('click', ()=> { if(!isAuthenticated()) return showLogin(); showModal('modal-scan'); startBarcodeDetection().catch(()=>{}); });
     $('#stop-camera').addEventListener('click', async ()=> stopCamera());
     $('#toggle-torch').addEventListener('click', async ()=> { if(!currentVideoTrack) return alert('Cámara no activada'); try{ const caps = currentVideoTrack.getCapabilities(); if(!caps.torch) return alert('Linterna no soportada'); await currentVideoTrack.applyConstraints({ advanced:[{ torch:true }] }); }catch(e){ console.warn('torch', e); alert('Linterna no soportada'); } });
@@ -729,23 +815,12 @@
       return p;
     }
 
-    /***********************
-     Export/Import
-    ***********************/
-    $('#btn-export')?.addEventListener('click', async ()=> {
-      const data = { products: await all('products'), sales: await all('sales'), movements: await all('movements'), customers: await all('customers'), responsibles: await all('responsibles') };
-      const blob = new Blob([JSON.stringify(data,null,2)], { type:'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'tienda-smart-export.json'; a.click(); URL.revokeObjectURL(url);
-    });
-    $('#btn-import')?.addEventListener('click', ()=> {
-      const inp = document.createElement('input'); inp.type='file'; inp.accept='application/json'; inp.onchange = async ()=>{ const f = inp.files[0]; if(!f) return; const txt = await f.text(); const obj = JSON.parse(txt); if(obj.products) for(const p of obj.products) await put('products', p); if(obj.sales) for(const s of obj.sales) await put('sales', s); if(obj.movements) for(const m of obj.movements) await put('movements', m); if(obj.customers) for(const c of obj.customers) await put('customers', c); if(obj.responsibles) for(const r of obj.responsibles) await put('responsibles', r); await refreshAll(); }; inp.click();
-    });
-
-    /***********************
-     Init app
-    ***********************/
+    /* ===============
+       Init and seed
+       =============== */
     async function initApp(){
       await openDB();
-      // seed products if none
+      // seed
       const products = await all('products');
       if(products.length===0){
         const seed = [
@@ -755,7 +830,6 @@
         for(const p of seed) await put('products', p);
       }
       await refreshAll();
-      // ask for responsible if not set
       const today = todayYMD(); const r = await get('responsibles', today).catch(()=>null);
       if(!r){ const name = prompt(`No hay encargado registrado para hoy (${today}). Ingresa su nombre (opcional):`); if(name !== null && name.trim() !== '') await put('responsibles', { date: today, name: name.trim() }); }
       updateResponsibleBanner();
@@ -764,16 +838,13 @@
       window.addEventListener('resize', ()=>{ try{ resizeOverlay(); }catch(e){} });
     }
 
-    // If already auth
-    if(isAuthenticated()){ $('#current-user').textContent = localStorage.getItem(AUTH_KEY); $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); closeLogin(); initApp(); }
+    // if already authenticated (page reload)
+    if(isAuthenticated()){
+      $('#current-user').textContent = localStorage.getItem(AUTH_KEY); $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden');
+      closeLogin(); initApp();
+    }
 
-    // Header reports open
-    $('#btn-open-report').addEventListener('click', ()=> { showModal('modal-reports'); showTab('sales-range'); });
-
-    // Theme toggle
-    $('#btn-theme').addEventListener('click', ()=>{ const cur = document.body.getAttribute('data-theme') || 'light'; document.body.setAttribute('data-theme', cur === 'light' ? 'dark' : 'light'); });
-
-  }); // DOMContentLoaded
+  })();
   </script>
 </body>
 </html>
