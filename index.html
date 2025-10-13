@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart (App móvil)</title>
+  <title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart (Móvil)</title>
 
-  <!-- Tailwind CDN (prototipo) -->
+  <!-- Tailwind simple CDN for quick prototyping -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- OpenCV.js (WASM) -->
@@ -18,57 +18,57 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    :root { --bg: #f8fafc; --card: #fff; --muted: #6b7280; }
-    [data-theme="dark"] { --bg:#0b1220; --card:#0f172a; --muted:#9ca3af; color-scheme: dark; }
-    body { background: var(--bg); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    :root { --bg:#0f172a; --card:#0f172a; --muted:#9ca3af; }
+    [data-theme="light"]{ --bg:#f8fafc; --card:#fff; --muted:#6b7280; color-scheme: light; }
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background: var(--bg); margin:0; color: #0b1220; }
+    /* App container */
+    .app { max-width:900px; margin:0 auto; padding-bottom:88px; }
     /* Global backdrop */
-    #global-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(2px); z-index: 40; display: none; opacity: 0; transition: opacity .18s ease; }
-    #global-backdrop.visible { display:block; opacity:1; }
-    /* Modal shell */
+    #global-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(3px); z-index: 40; display: none; opacity: 0; transition: opacity .18s; }
+    #global-backdrop.visible{ display:block; opacity:1; }
+    /* Modal */
     .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 50; padding: 1rem; overflow:auto; }
     .modal.visible { display:flex; }
-    .modal .modal-content { width:100%; max-width:860px; background: var(--card); color: inherit; border-radius: 12px; box-shadow: 0 12px 40px rgba(12,18,28,0.28); padding: 1rem; transform: translateY(0); transition: transform .16s ease, opacity .16s ease; }
-    .modal .modal-close { background:transparent; border:none; cursor:pointer; }
+    .modal .modal-content { width:100%; max-width:720px; border-radius:14px; box-shadow: 0 12px 40px rgba(2,6,23,0.4); padding:1rem; background:var(--card); color:inherit; }
+    /* On small screens make modals full screen to feel native */
+    @media (max-width:640px){
+      .modal .modal-content { width:100%; height:100%; border-radius:0; padding:1rem 0 80px 0; display:flex; flex-direction:column; }
+    }
     /* overlay canvas */
     #overlay-canvas { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:20; }
-    /* scan guide */
     .scan-guide { position:absolute; left:50%; top:50%; width:64%; height:28%; transform:translate(-50%,-50%); border:2px dashed rgba(255,255,255,0.6); border-radius:8px; pointer-events:none; z-index:30; }
-    /* small screens */
-    @media (max-width:640px){ .modal .modal-content { margin: 0 12px; max-width:calc(100% - 24px); } .controls { flex-direction:column; align-items:flex-end; } }
+    /* bottom bar */
+    .bottom-bar { position: fixed; left:0; right:0; bottom:0; z-index:60; display:flex; gap:8px; padding:10px; background:linear-gradient(0deg, rgba(0,0,0,0.06), transparent); justify-content:center; }
+    /* login overlay improvements */
+    .login-card { max-width:420px; width:100%; border-radius:12px; padding:16px; box-shadow: 0 12px 40px rgba(2,6,23,0.4); background:var(--card); }
+    /* header user */
+    .user-pill { background: linear-gradient(90deg,#06b6d4,#60a5fa); color:white; padding:6px 10px; border-radius:999px; font-weight:600; font-size:12px; }
   </style>
 </head>
-<body class="min-h-screen text-gray-800" data-theme="light">
-  <!-- Global Backdrop (single instance) -->
+<body data-theme="light">
+  <!-- backdrop -->
   <div id="global-backdrop" aria-hidden="true"></div>
 
-  <div class="max-w-6xl mx-auto p-4">
-    <!-- Header -->
-    <header class="flex items-start justify-between mb-4 gap-4">
+  <div class="app mx-auto px-4">
+    <!-- Top area: logo + user -->
+    <div class="flex items-center justify-between py-4">
       <div class="flex items-center gap-3">
-        <div class="w-12 h-12 bg-gradient-to-r from-green-400 to-blue-500 rounded-lg flex items-center justify-center shadow-lg">
+        <div class="w-12 h-12 rounded-lg bg-gradient-to-r from-green-400 to-blue-500 flex items-center justify-center shadow-lg">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-white" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h2l.4 2M7 13h10l-1.2 6H6L5 13z"/></svg>
         </div>
         <div>
-          <h1 class="text-xl font-semibold">MINIMARKET LA ESQUINA DEL AHORRO</h1>
-          <p class="text-sm text-gray-500">TiendaSmart — Offline (IndexedDB)</p>
+          <div class="text-sm font-semibold">MINIMARKET</div>
+          <div class="text-xs text-gray-500">La Esquina del Ahorro</div>
         </div>
       </div>
-
-      <div class="controls flex flex-col items-end gap-2">
-        <div class="flex items-center gap-2">
-          <input id="search" type="search" placeholder="Buscar por nombre o código..." class="px-3 py-2 rounded border bg-white">
-          <button id="btn-dark" class="px-3 py-2 rounded bg-gray-200">Modo</button>
-        </div>
-        <div class="flex gap-2">
-          <button id="open-add-product" class="px-4 py-2 bg-green-500 text-white rounded">+ Producto</button>
-          <button id="open-scan" class="px-4 py-2 bg-yellow-500 text-white rounded">📷 Escanear</button>
-          <button id="open-quick-sale" class="px-4 py-2 bg-red-500 text-white rounded">⚡ Venta rápida</button>
-          <button id="open-clients" class="px-4 py-2 bg-indigo-600 text-white rounded">Clientes</button>
-        </div>
+      <div class="flex items-center gap-3">
+        <div id="current-user" class="user-pill hidden"></div>
+        <button id="btn-logout" class="text-sm px-3 py-2 border rounded hidden">Salir</button>
+        <button id="btn-theme" class="text-sm px-3 py-2 border rounded">Modo</button>
       </div>
-    </header>
+    </div>
 
-    <!-- Responsible banner -->
+    <!-- Responsible small banner -->
     <div id="responsible-banner" class="mb-3 p-3 rounded shadow-sm bg-white flex items-center justify-between">
       <div>
         <div class="text-xs text-gray-600">Encargado del día</div>
@@ -76,138 +76,112 @@
       </div>
       <div class="flex gap-2 items-center">
         <input id="responsible-date" type="date" class="px-2 py-1 rounded border bg-white">
-        <input id="responsible-name" placeholder="Nombre encargado" class="px-2 py-1 rounded border w-44 bg-white">
+        <input id="responsible-name" placeholder="Nombre encargado" class="px-2 py-1 rounded border w-40 bg-white">
         <button id="save-responsible" class="px-3 py-1 bg-indigo-600 text-white rounded">Guardar</button>
       </div>
     </div>
 
-    <!-- Main -->
-    <main class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <section class="lg:col-span-2 bg-white rounded-lg p-4 shadow">
-        <div class="flex items-center justify-between mb-3">
-          <h2 class="text-lg font-medium">Inventario</h2>
-          <div class="flex gap-2">
-            <button id="btn-import" class="px-3 py-1 border rounded">Importar</button>
-            <button id="btn-export" class="px-3 py-1 border rounded">Exportar</button>
-          </div>
-        </div>
+    <!-- Search -->
+    <div class="mb-3">
+      <input id="search" type="search" placeholder="Buscar producto o código..." class="w-full px-4 py-3 rounded-lg shadow-sm border bg-white" />
+    </div>
 
-        <div class="overflow-x-auto">
-          <table class="w-full table-fixed text-sm">
-            <thead class="text-left text-gray-500 text-xs uppercase">
-              <tr>
-                <th class="w-1/12">#</th>
-                <th class="w-4/12">Nombre</th>
-                <th class="w-2/12">Categoría</th>
-                <th class="w-2/12">Código</th>
-                <th class="w-1/12">Stock</th>
-                <th class="w-1/12">Precio</th>
-                <th class="w-1/12">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="inventory-body"></tbody>
-          </table>
-        </div>
-      </section>
+    <!-- Inventory list (mobile-friendly rows) -->
+    <div id="inventory-list" class="space-y-2 mb-20">
+      <!-- dynamically populated -->
+    </div>
 
-      <aside class="bg-white rounded-lg p-4 shadow">
-        <h3 class="text-lg font-medium mb-2">Reportes rápidos</h3>
-        <div class="space-y-3">
-          <canvas id="chart-sales" height="120"></canvas>
-          <canvas id="chart-stock" height="120"></canvas>
-          <div class="flex gap-2">
-            <button id="open-income" class="flex-1 px-3 py-2 bg-blue-600 text-white rounded">+ Ingreso</button>
-            <button id="open-sale" class="flex-1 px-3 py-2 bg-red-600 text-white rounded">+ Venta</button>
-          </div>
-          <button id="open-report-modal" class="w-full px-3 py-2 bg-gray-800 text-white rounded">Imprimir ventas por fechas</button>
-        </div>
-      </aside>
-    </main>
+    <!-- Charts (small) -->
+    <div class="mb-4 grid grid-cols-2 gap-3">
+      <div class="bg-white rounded-lg p-2 shadow"><canvas id="chart-sales" height="120"></canvas></div>
+      <div class="bg-white rounded-lg p-2 shadow"><canvas id="chart-stock" height="120"></canvas></div>
+    </div>
 
-    <footer class="mt-6 text-xs text-gray-500">
-      <p>Abre en <strong>https</strong> o <strong>localhost</strong> para usar la cámara. Si OpenCV está cargando al abrir el escáner espera unos segundos.</p>
-    </footer>
   </div>
 
-  <!-- ===========================
-       MODALES (estructura unificada)
-       - cada modal usa class="modal" y su contenido class="modal-content"
-       - botones de cierre usan data-close-modal
-     =========================== -->
+  <!-- Bottom action bar (mobile) -->
+  <div class="bottom-bar">
+    <button id="open-add-product" class="flex-1 px-4 py-3 rounded-lg bg-green-500 text-white font-semibold">+ Producto</button>
+    <button id="open-scan" class="flex-1 px-4 py-3 rounded-lg bg-yellow-500 text-white font-semibold">Escanear</button>
+    <button id="open-quick-sale" class="flex-1 px-4 py-3 rounded-lg bg-red-600 text-white font-semibold">Venta</button>
+    <button id="open-clients" class="flex-1 px-4 py-3 rounded-lg bg-indigo-600 text-white font-semibold">Clientes</button>
+  </div>
 
-  <!-- Product Modal -->
+  <!-- ====== MODALES (reducidos en markup, modal-content adaptada para móvil) ====== -->
+
+  <!-- Product modal -->
   <div id="modal-product" class="modal" role="dialog" aria-hidden="true">
-    <div class="modal-content">
-      <div class="flex justify-between items-center mb-2">
-        <h4 class="text-lg font-semibold">Agregar / Editar Producto</h4>
-        <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
+    <div class="modal-content mx-3">
+      <div class="flex justify-between items-center px-3 py-2 border-b">
+        <h4 class="text-lg font-semibold">Producto</h4>
+        <button class="text-xl" data-close-modal>✕</button>
       </div>
-      <form id="form-product" class="space-y-3">
+      <form id="form-product" class="p-3 space-y-3 overflow-auto">
         <input type="hidden" id="product-id">
-        <input id="product-name" placeholder="Nombre" required class="w-full px-3 py-2 rounded border">
+        <input id="product-name" placeholder="Nombre" required class="w-full px-3 py-3 rounded border bg-white">
         <div class="flex gap-2">
-          <input id="product-category" placeholder="Categoría" class="flex-1 px-3 py-2 rounded border">
-          <input id="product-price" placeholder="Precio" type="number" step="0.01" class="w-28 px-3 py-2 rounded border">
+          <input id="product-category" placeholder="Categoría" class="flex-1 px-3 py-3 rounded border bg-white">
+          <input id="product-price" placeholder="Precio" type="number" step="0.01" class="w-28 px-3 py-3 rounded border bg-white">
         </div>
         <div class="flex gap-2">
-          <input id="product-barcode" placeholder="Código de barras" class="flex-1 px-3 py-2 rounded border">
-          <input id="product-stock" placeholder="Stock" type="number" class="w-24 px-3 py-2 rounded border">
+          <input id="product-barcode" placeholder="Código de barras" class="flex-1 px-3 py-3 rounded border bg-white">
+          <input id="product-stock" placeholder="Stock" type="number" class="w-24 px-3 py-3 rounded border bg-white">
         </div>
-        <div class="flex justify-end gap-2">
-          <button type="button" data-close-modal class="px-3 py-2 rounded border">Cancelar</button>
-          <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded">Guardar</button>
+        <div class="flex gap-2">
+          <button type="button" data-close-modal class="flex-1 px-4 py-3 border rounded">Cancelar</button>
+          <button type="submit" class="flex-1 px-4 py-3 bg-green-600 text-white rounded">Guardar</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Scanner Modal (scanner-modal class to signal camera) -->
+  <!-- Scanner modal -->
   <div id="modal-scan" class="modal scanner-modal" role="dialog" aria-hidden="true">
     <div class="modal-content">
-      <div class="flex justify-between items-center mb-2">
+      <div class="flex justify-between items-center px-3 py-2">
         <h4 class="text-lg font-semibold text-white">Escáner</h4>
         <div class="flex gap-2">
-          <button id="toggle-torch" class="px-2 py-1 border rounded hidden">🔦</button>
-          <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
+          <button id="toggle-torch" class="px-3 py-2 rounded hidden">🔦</button>
+          <button data-close-modal class="text-xl">✕</button>
         </div>
       </div>
-      <div id="video-wrap" class="relative bg-black rounded overflow-hidden">
-        <video id="video" autoplay muted playsinline class="w-full" style="height:360px;object-fit:cover"></video>
+      <div id="video-wrap" class="relative bg-black flex-1">
+        <video id="video" autoplay muted playsinline style="width:100%; height:60vh; object-fit:cover;"></video>
         <canvas id="overlay-canvas"></canvas>
         <div class="scan-guide"></div>
       </div>
-      <div class="mt-3 p-3 bg-white rounded">
-        <input id="scanned-code" class="w-full px-2 py-1 border rounded mb-2" placeholder="Código detectado">
+      <div class="p-3 bg-white">
+        <input id="scanned-code" class="w-full px-3 py-2 rounded border mb-2" placeholder="Código detectado">
         <div class="flex gap-2">
-          <button id="fill-product" class="flex-1 px-2 py-2 bg-indigo-600 text-white rounded">Buscar/Editar</button>
-          <button id="quick-sell-detected" class="flex-1 px-2 py-2 bg-red-600 text-white rounded">Vender</button>
-          <button id="stop-camera" class="px-3 py-2 border rounded">Detener</button>
+          <button id="fill-product" class="flex-1 px-3 py-3 bg-indigo-600 text-white rounded">Buscar/Editar</button>
+          <button id="quick-sell-detected" class="flex-1 px-3 py-3 bg-red-600 text-white rounded">Vender</button>
+          <button id="stop-camera" class="px-3 py-3 border rounded">Detener</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Quick Sale -->
+  <!-- Quick sale modal -->
   <div id="modal-quick-sale" class="modal" role="dialog" aria-hidden="true">
-    <div class="modal-content">
-      <div class="flex justify-between items-center mb-2">
+    <div class="modal-content mx-3">
+      <div class="flex justify-between items-center px-3 py-2 border-b">
         <h4 class="text-lg font-semibold">Venta rápida</h4>
-        <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
+        <button data-close-modal class="text-xl">✕</button>
       </div>
-      <form id="form-quick-sale" class="space-y-3">
-        <input id="quick-search" placeholder="Buscar o pegar código..." class="w-full px-3 py-2 border rounded">
+      <form id="form-quick-sale" class="p-3 space-y-3 overflow-auto">
+        <input id="quick-search" placeholder="Buscar o pegar código..." class="w-full px-3 py-3 rounded border bg-white" />
         <div class="flex gap-2">
-          <select id="quick-product" class="flex-1 px-3 py-2 border rounded"></select>
-          <input id="quick-qty" type="number" min="1" value="1" class="w-24 px-3 py-2 border rounded">
+          <select id="quick-product" class="flex-1 px-3 py-3 border rounded bg-white"></select>
+          <input id="quick-qty" type="number" min="1" value="1" class="w-24 px-3 py-3 border rounded bg-white">
         </div>
         <div class="flex gap-2 items-center">
-          <label>Pago</label>
-          <select id="quick-payment" class="px-2 py-1 rounded border">
+          <label class="text-sm">Pago</label>
+          <select id="quick-payment" class="px-3 py-2 rounded border">
             <option value="EFECTIVO">EFECTIVO</option>
             <option value="YAPE">YAPE</option>
             <option value="A_CREDITO">A CREDITO</option>
           </select>
-          <input id="quick-customer" placeholder="Nombre cliente (si A CREDITO)" class="flex-1 px-2 py-2 border rounded">
+          <input id="quick-customer" placeholder="Nombre cliente (si A CREDITO)" class="flex-1 px-3 py-2 border rounded bg-white">
         </div>
         <div class="flex justify-between items-center">
           <div>Total: <span id="quick-total">0.00</span></div>
@@ -216,98 +190,70 @@
             <button type="submit" class="px-3 py-2 bg-red-600 text-white rounded">Cobrar</button>
           </div>
         </div>
-      </form>
-      <div class="mt-3">
-        <h5 class="text-sm font-medium">Carrito</h5>
-        <div id="quick-cart" class="space-y-2 mt-2"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Income -->
-  <div id="modal-income" class="modal" role="dialog" aria-hidden="true">
-    <div class="modal-content">
-      <div class="flex justify-between items-center mb-2">
-        <h4 class="text-lg font-semibold">Registrar Ingreso (stock)</h4>
-        <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
-      </div>
-      <form id="form-income" class="space-y-3">
-        <select id="income-product" class="w-full px-3 py-2 border rounded"></select>
-        <input id="income-qty" type="number" min="1" value="1" class="w-full px-3 py-2 border rounded">
-        <div class="flex justify-end gap-2">
-          <button type="button" data-close-modal class="px-3 py-2 border rounded">Cancelar</button>
-          <button type="submit" class="px-3 py-2 bg-blue-600 text-white rounded">Guardar</button>
+        <div>
+          <h5 class="text-sm font-medium">Carrito</h5>
+          <div id="quick-cart" class="space-y-2 mt-2"></div>
         </div>
       </form>
-    </div>
-  </div>
-
-  <!-- Sale -->
-  <div id="modal-sale" class="modal" role="dialog" aria-hidden="true">
-    <div class="modal-content">
-      <div class="flex justify-between items-center mb-2">
-        <h4 class="text-lg font-semibold">Registrar Venta</h4>
-        <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
-      </div>
-      <form id="form-sale" class="space-y-3">
-        <div class="flex gap-2 items-center">
-          <input id="sale-customer" placeholder="Cliente (opcional)" class="px-2 py-2 border rounded flex-1">
-          <select id="sale-payment" class="px-2 py-2 border rounded">
-            <option value="EFECTIVO">EFECTIVO</option>
-            <option value="YAPE">YAPE</option>
-            <option value="A_CREDITO">A CREDITO</option>
-          </select>
-        </div>
-        <div id="sale-items" class="space-y-2"></div>
-        <div class="flex justify-between items-center">
-          <button id="add-sale-item" type="button" class="px-3 py-2 border rounded">Agregar producto</button>
-          <div>Total: <span id="sale-total">0.00</span></div>
-        </div>
-        <div class="flex justify-end gap-2">
-          <button type="button" data-close-modal class="px-3 py-2 border rounded">Cancelar</button>
-          <button type="submit" class="px-3 py-2 bg-red-600 text-white rounded">Vender</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Report -->
-  <div id="modal-report" class="modal" role="dialog" aria-hidden="true">
-    <div class="modal-content">
-      <div class="flex justify-between items-center mb-2">
-        <h4 class="text-lg font-semibold">Reporte de Ventas — Imprimir</h4>
-        <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
-      </div>
-      <div class="grid grid-cols-2 gap-2 mb-3">
-        <div><label class="text-xs">Desde</label><input id="report-from" type="date" class="w-full px-2 py-1 rounded border"></div>
-        <div><label class="text-xs">Hasta</label><input id="report-to" type="date" class="w-full px-2 py-1 rounded border"></div>
-      </div>
-      <div class="flex gap-2 justify-end mb-3">
-        <button id="btn-generate-report" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar vista</button>
-        <button id="btn-print-report" class="px-3 py-2 bg-gray-800 text-white rounded">Imprimir</button>
-      </div>
-      <div id="report-preview" class="max-h-64 overflow-auto text-sm"></div>
     </div>
   </div>
 
   <!-- Clients -->
   <div id="modal-clients" class="modal" role="dialog" aria-hidden="true">
-    <div class="modal-content">
-      <div class="flex justify-between items-center mb-2">
+    <div class="modal-content mx-3">
+      <div class="flex justify-between items-center px-3 py-2 border-b">
         <h4 class="text-lg font-semibold">Clientes (A CREDITO)</h4>
-        <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
+        <button data-close-modal class="text-xl">✕</button>
       </div>
-      <div class="flex gap-2 mb-2">
-        <input id="client-name" placeholder="Nuevo cliente (nombre)" class="flex-1 px-2 py-2 border rounded">
-        <button id="add-client" class="px-3 py-2 bg-green-600 text-white rounded">Agregar</button>
+      <div class="p-3 overflow-auto">
+        <div class="flex gap-2 mb-3">
+          <input id="client-name" placeholder="Nuevo cliente (nombre)" class="flex-1 px-3 py-2 border rounded bg-white">
+          <button id="add-client" class="px-3 py-2 bg-green-600 text-white rounded">Agregar</button>
+        </div>
+        <div id="clients-list" class="space-y-2"></div>
       </div>
-      <div id="clients-list" class="max-h-64 overflow-auto"></div>
     </div>
   </div>
 
-  <!-- ===========================
-       APP SCRIPT
-     =========================== -->
+  <!-- Report modal -->
+  <div id="modal-report" class="modal" role="dialog" aria-hidden="true">
+    <div class="modal-content mx-3">
+      <div class="flex justify-between items-center px-3 py-2 border-b">
+        <h4 class="text-lg font-semibold">Reporte — Imprimir</h4>
+        <button data-close-modal class="text-xl">✕</button>
+      </div>
+      <div class="p-3">
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <div><label class="text-xs">Desde</label><input id="report-from" type="date" class="w-full px-2 py-2 border rounded"></div>
+          <div><label class="text-xs">Hasta</label><input id="report-to" type="date" class="w-full px-2 py-2 border rounded"></div>
+        </div>
+        <div class="flex gap-2 justify-end mb-3">
+          <button id="btn-generate-report" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar vista</button>
+          <button id="btn-print-report" class="px-3 py-2 bg-gray-800 text-white rounded">Imprimir</button>
+        </div>
+        <div id="report-preview" class="max-h-64 overflow-auto text-sm"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== LOGIN overlay (mandatory at start if not logged) ====== -->
+  <div id="modal-login" class="modal visible" role="dialog" aria-hidden="false" style="background: linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.6));">
+    <div class="login-card mx-auto">
+      <h2 class="text-xl font-semibold mb-2">Ingresar — TiendaSmart</h2>
+      <p class="text-sm text-gray-400 mb-4">Ingresa credenciales para continuar en la app</p>
+      <form id="form-login" class="space-y-3">
+        <input id="login-user" placeholder="Usuario" class="w-full px-3 py-3 rounded border" autofocus>
+        <input id="login-pass" placeholder="Contraseña" type="password" class="w-full px-3 py-3 rounded border">
+        <div class="flex gap-2">
+          <button type="submit" class="flex-1 px-4 py-3 bg-blue-600 text-white rounded font-semibold">Entrar</button>
+          <button type="button" id="login-guest" class="flex-1 px-4 py-3 border rounded">Demo</button>
+        </div>
+        <p class="text-xs text-gray-500 mt-2">Usuario por defecto: <strong>LISMAGALY</strong> — Contraseña: <strong>latiendadelahorro</strong></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- ====== APP SCRIPT (complete) ====== -->
   <script>
   /* ---------------------------
      Helpers & IndexedDB wrapper
@@ -331,64 +277,161 @@
   const remove = (name,key) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').delete(key); rq.onsuccess=()=>res(); rq.onerror=e=>rej(e); });
 
   /* ---------------------------
-     App state & refresh
+     Authentication (client-only)
      --------------------------- */
-  const state = { products:[], sales:[], customers:[], responsibles:[] };
+  const AUTH_USER = 'LISMAGALY';
+  const AUTH_PASS = 'latiendadelahorro';
+  const AUTH_KEY = 'ts_user';
+
+  function showLogin(){ const modal = $('#modal-login'); modal.classList.add('visible'); modal.setAttribute('aria-hidden','false'); }
+  function hideLogin(){ const modal = $('#modal-login'); modal.classList.remove('visible'); modal.setAttribute('aria-hidden','true'); }
+  function isAuthenticated(){ return !!localStorage.getItem(AUTH_KEY); }
+  function setAuthenticated(username){ localStorage.setItem(AUTH_KEY, username); $('#current-user').textContent = username; $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); }
+  function clearAuth(){ localStorage.removeItem(AUTH_KEY); $('#current-user').classList.add('hidden'); $('#btn-logout').classList.add('hidden'); }
+
+  $('#form-login').onsubmit = (e) => {
+    e.preventDefault();
+    const u = $('#login-user').value.trim();
+    const p = $('#login-pass').value;
+    if (u === AUTH_USER && p === AUTH_PASS){
+      setAuthenticated(u); hideLogin(); startAppAfterAuth();
+    } else {
+      alert('Credenciales inválidas.');
+    }
+  };
+  $('#login-guest').onclick = ()=>{
+    // demo/guest quick access (not secure) - set a demo user
+    setAuthenticated('GUEST'); hideLogin(); startAppAfterAuth();
+  };
+
+  $('#btn-logout').onclick = ()=>{
+    if(!confirm('Cerrar sesión?')) return;
+    clearAuth();
+    location.reload();
+  };
+
+  /* If not authenticated, show login overlay */
+  if (!isAuthenticated()) {
+    showLogin();
+  } else {
+    // show user pill
+    $('#current-user').textContent = localStorage.getItem(AUTH_KEY);
+    $('#current-user').classList.remove('hidden');
+    $('#btn-logout').classList.remove('hidden');
+  }
+
+  /* ---------------------------
+     App code (only start after auth)
+     --------------------------- */
+  let appStarted = false;
+  async function startAppAfterAuth(){
+    if (appStarted) return;
+    appStarted = true;
+    try{
+      await openDB();
+      await ensureSeed();
+      await refreshAll();
+      // Prompt responsible for today if not set
+      const today = todayYMD(); const r = await get('responsibles', today).catch(()=>null);
+      if(!r){
+        const name = prompt(`No hay encargado registrado para hoy (${today}). Ingresa su nombre (opcional):`);
+        if(name !== null && name.trim() !== '') await put('responsibles', { date: today, name: name.trim() });
+      }
+    }catch(err){
+      console.error('startApp error', err);
+    }
+  }
+
+  async function ensureSeed(){
+    const products = await all('products');
+    if(products.length === 0){
+      const seed = [
+        { id: uid(), name:'Coca Cola 500ml', category:'Bebidas', price:10.99, barcode:'7758753103282', stock:48, createdAt: new Date().toISOString() },
+        { id: uid(), name:'Agua San Luis 625ml', category:'Bebidas', price:3.50, barcode:'7752482381011', stock:32, createdAt: new Date().toISOString() }
+      ];
+      for(const p of seed) await put('products', p);
+    }
+  }
+
+  /* ---------------------------
+     State & UI refresh functions
+     --------------------------- */
+  const state = { products: [], sales: [], customers: [], responsibles: [] };
+
   async function refreshAll(){
     state.products = await all('products');
     state.sales = await all('sales');
     state.customers = await all('customers');
     state.responsibles = await all('responsibles');
-    renderInventory(); renderIncomeSelects(); renderQuickSelect(); renderClients(); updateCharts(); updateResponsibleBanner();
+    renderInventoryMobile();
+    renderIncomeSelects();
+    renderQuickSelect();
+    renderClients();
+    updateCharts();
+    updateResponsibleBanner();
   }
 
   /* ---------------------------
-     Inventory render & delegation
+     Mobile Inventory rendering (card rows)
      --------------------------- */
-  const inventoryBody = $('#inventory-body');
-  function renderInventory(filter=''){
-    const q=(filter||'').trim().toLowerCase();
-    inventoryBody.innerHTML='';
-    state.products.forEach((p,i)=>{
-      const codeNorm = (p.barcode||'').replace(/\D/g,'');
-      if(q && !(p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q) || codeNorm.includes(q.replace(/\D/g,'')))) return;
-      const tr=document.createElement('tr'); tr.dataset.id=p.id;
-      tr.innerHTML = `<td class="py-2">${i+1}</td><td class="py-2">${p.name}</td><td class="py-2">${p.category||''}</td><td class="py-2">${p.barcode||''}</td><td class="py-2">${p.stock||0}</td><td class="py-2">${money(p.price)}</td><td class="py-2"><div class="flex gap-1"><button data-action="edit" class="px-2 py-1 border rounded">Editar</button><button data-action="income" class="px-2 py-1 border rounded">+Stock</button><button data-action="sale" class="px-2 py-1 border rounded">Vender</button><button data-action="quick" class="px-2 py-1 bg-red-500 text-white rounded">Venta rápida</button><button data-action="delete" class="px-2 py-1 border rounded text-red-600">Borrar</button></div></td>`;
-      inventoryBody.appendChild(tr);
+  const inventoryList = $('#inventory-list');
+  function renderInventoryMobile(filter=''){
+    const q = (filter||'').trim().toLowerCase();
+    inventoryList.innerHTML = '';
+    state.products.forEach((p, i) => {
+      if (q && !(p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q) || (p.barcode||'').replace(/\D/g,'').includes(q.replace(/\D/g,'')))) return;
+      const card = document.createElement('div');
+      card.className = 'bg-white rounded-lg p-3 shadow flex items-center justify-between';
+      card.innerHTML = `
+        <div>
+          <div class="font-medium">${p.name}</div>
+          <div class="text-xs text-gray-500">${p.category || ''} • ${p.barcode || ''}</div>
+          <div class="text-sm text-gray-700 mt-1">S/ ${money(p.price)} · Stock: ${p.stock || 0}</div>
+        </div>
+        <div class="flex flex-col items-end gap-2">
+          <div class="flex flex-col gap-2">
+            <button data-id="${p.id}" class="px-3 py-2 rounded bg-red-500 text-white sell-btn">Vender</button>
+            <button data-id="${p.id}" class="px-3 py-2 rounded border income-btn">+Stock</button>
+            <button data-id="${p.id}" class="px-3 py-2 rounded border edit-btn">Editar</button>
+          </div>
+        </div>
+      `;
+      inventoryList.appendChild(card);
     });
+
+    // attach listeners
+    $$('.sell-btn').forEach(b => b.onclick = (e) => quickSellPrompt(b.dataset.id));
+    $$('.income-btn').forEach(b => b.onclick = (e) => openIncomeFor(b.dataset.id));
+    $$('.edit-btn').forEach(b => b.onclick = (e) => openProductModal(state.products.find(x=>x.id===b.dataset.id)));
   }
-  inventoryBody.addEventListener('click', async e=>{
-    const btn = e.target.closest('button'); if(!btn) return;
-    const tr = btn.closest('tr'); const id = tr && tr.dataset.id; const action = btn.dataset.action; if(!id||!action) return;
-    if(action==='edit') openProductModal(state.products.find(x=>x.id===id));
-    if(action==='delete'){ if(!confirm('¿Borrar producto?')) return; await remove('products', id); await refreshAll(); }
-    if(action==='income') openIncomeFor(id);
-    if(action==='sale') addSaleItemFromProduct(id);
-    if(action==='quick') quickSellPrompt(id);
-  });
 
   /* ---------------------------
-     Modal manager (global backdrop)
+     Modal manager (global-backdrop)
      --------------------------- */
   const globalBackdrop = document.getElementById('global-backdrop');
   let currentOpenModal = null;
   async function _stopCameraSafe(){ try{ if(typeof stopCamera === 'function') await stopCamera(); }catch(e){ console.warn('stopCamera error', e); } }
-  function showModal(modalId, { focusSelector } = {}){ // opens modal
+
+  function showModal(modalId, { focusSelector } = {}) {
+    // avoid opening modals when login is visible
+    if (!isAuthenticated()) return;
     if (currentOpenModal && currentOpenModal !== modalId) closeModal(currentOpenModal);
     const modal = document.getElementById(modalId); if(!modal) return;
     globalBackdrop.classList.add('visible'); globalBackdrop.setAttribute('aria-hidden','false');
     modal.classList.add('visible'); modal.setAttribute('aria-hidden','false');
     document.documentElement.style.overflow='hidden'; document.body.style.overflow='hidden';
     currentOpenModal = modalId;
-    setTimeout(()=>{ if(focusSelector){ const el=modal.querySelector(focusSelector); if(el) el.focus(); return; } const first = modal.querySelector('[autofocus]') || modal.querySelector('input, button, select, textarea'); if(first) first.focus(); },120);
+    setTimeout(()=>{ if(focusSelector){ const el = modal.querySelector(focusSelector); if(el) el.focus(); return; } const first = modal.querySelector('input, button, select, textarea'); if(first) first.focus(); },120);
   }
-  async function closeModal(modalId){
+
+  async function closeModal(modalId) {
     const modal = document.getElementById(modalId);
-    if(!modal){ globalBackdrop.classList.remove('visible'); document.documentElement.style.overflow=''; document.body.style.overflow=''; currentOpenModal=null; return; }
-    if(modal.classList.contains('scanner-modal')) await _stopCameraSafe();
+    if (!modal) { globalBackdrop.classList.remove('visible'); document.documentElement.style.overflow=''; document.body.style.overflow=''; currentOpenModal = null; return; }
+    if (modal.classList.contains('scanner-modal')) await _stopCameraSafe();
     modal.classList.remove('visible'); modal.setAttribute('aria-hidden','true');
-    setTimeout(()=>{ const anyVisible = Array.from(document.querySelectorAll('.modal')).some(m => m.classList.contains('visible')); if(!anyVisible){ globalBackdrop.classList.remove('visible'); globalBackdrop.setAttribute('aria-hidden','true'); document.documentElement.style.overflow=''; document.body.style.overflow=''; currentOpenModal=null; } else { const remaining = document.querySelector('.modal.visible'); if(remaining) currentOpenModal = remaining.id; } },120);
+    setTimeout(()=>{ const anyVisible = Array.from(document.querySelectorAll('.modal')).some(m=>m.classList.contains('visible')); if(!anyVisible){ globalBackdrop.classList.remove('visible'); globalBackdrop.setAttribute('aria-hidden','true'); document.documentElement.style.overflow=''; document.body.style.overflow=''; currentOpenModal = null; } else { const remaining = document.querySelector('.modal.visible'); if(remaining) currentOpenModal = remaining.id; } },120);
   }
+
   globalBackdrop.addEventListener('click', async ()=>{ if(!currentOpenModal) return; await closeModal(currentOpenModal); });
   document.addEventListener('keydown', async e=>{ if(e.key==='Escape' && currentOpenModal) await closeModal(currentOpenModal); });
   document.addEventListener('click', e=>{ const btn = e.target.closest('[data-close-modal]'); if(!btn) return; const modal = btn.closest('.modal'); if(!modal) return; closeModal(modal.id); });
@@ -396,56 +439,58 @@
   /* ---------------------------
      Product modal logic
      --------------------------- */
-  const modalProduct = $('#modal-product');
   $('#open-add-product').addEventListener('click', ()=> openProductModal());
   function openProductModal(product){
+    if(!isAuthenticated()) return alert('Inicia sesión');
     $('#form-product').reset(); $('#product-id').value='';
     if(product){ $('#product-id').value = product.id; $('#product-name').value = product.name; $('#product-category').value = product.category||''; $('#product-price').value = product.price||0; $('#product-barcode').value = product.barcode||''; $('#product-stock').value = product.stock||0; }
     showModal('modal-product', { focusSelector:'#product-name' });
   }
-  $('#form-product').onsubmit = async e=>{ e.preventDefault(); const id = $('#product-id').value || uid(); const prod = { id, name: $('#product-name').value.trim(), category: $('#product-category').value.trim(), price: Number($('#product-price').value)||0, barcode: $('#product-barcode').value.trim(), stock: Number($('#product-stock').value)||0, createdAt:new Date().toISOString() }; await put('products', prod); closeModal('modal-product'); await refreshAll(); };
+  $('#form-product').onsubmit = async e => {
+    e.preventDefault();
+    const id = $('#product-id').value || uid();
+    const prod = {
+      id,
+      name: $('#product-name').value.trim(),
+      category: $('#product-category').value.trim(),
+      price: Number($('#product-price').value)||0,
+      barcode: $('#product-barcode').value.trim(),
+      stock: Number($('#product-stock').value)||0,
+      createdAt: new Date().toISOString()
+    };
+    await put('products', prod);
+    closeModal('modal-product'); await refreshAll();
+  };
 
   /* ---------------------------
-     Income logic
+     Income (stock)
      --------------------------- */
-  $('#open-income').onclick = ()=> openIncomeModal();
-  function renderIncomeSelects(){ const sel = $('#income-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} — Stock: ${p.stock||0}`; sel.appendChild(o); }); }
-  function openIncomeModal(){ renderIncomeSelects(); showModal('modal-income'); }
+  $('#open-income').onclick = ()=> { renderIncomeSelects(); showModal('modal-income'); };
+  function renderIncomeSelects(){ const sel = $('#income-product'); if(!sel) return; sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} — Stock: ${p.stock||0}`; sel.appendChild(o); }); }
   function openIncomeFor(productId){ renderIncomeSelects(); $('#income-product').value = productId; showModal('modal-income'); }
-  $('#form-income').onsubmit = async e=>{ e.preventDefault(); const pid = $('#income-product').value; const qty = Number($('#income-qty').value)||0; const p = state.products.find(x=>x.id===pid); p.stock = (p.stock||0) + qty; await put('products',p); await add('movements', { id:uid(), type:'income', productId: pid, qty, date: new Date().toISOString() }); closeModal('modal-income'); await refreshAll(); };
+  $('#form-income').onsubmit = async e=>{ e.preventDefault(); const pid = $('#income-product').value; const qty = Number($('#income-qty').value)||0; const p = state.products.find(x=>x.id===pid); p.stock = (p.stock||0) + qty; await put('products', p); await add('movements', { id:uid(), type:'income', productId:pid, qty, date: new Date().toISOString() }); closeModal('modal-income'); await refreshAll(); };
 
   /* ---------------------------
-     Sale (full)
-     --------------------------- */
-  $('#open-sale').onclick = ()=> { showModal('modal-sale'); openSaleModal(); };
-  function openSaleModal(){ $('#sale-items').innerHTML=''; addSaleItemRow(); updateSaleTotal(); }
-  function addSaleItemRow(productId=''){ const row=document.createElement('div'); row.className='grid grid-cols-12 gap-2 items-center'; row.innerHTML = `<select class="col-span-6 px-2 py-1 border sale-product"></select><input type="number" class="col-span-2 px-2 py-1 border sale-qty" value="1" min="1"><input type="number" step="0.01" class="col-span-2 px-2 py-1 border sale-price" placeholder="Precio"><button type="button" class="col-span-2 px-2 py-1 border sale-remove">Quitar</button>`; $('#sale-items').appendChild(row); fillSaleRow(row, productId); }
-  function fillSaleRow(row, productId){ const sel = row.querySelector('.sale-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); }); if(productId) sel.value = productId; const price = row.querySelector('.sale-price'); const qty = row.querySelector('.sale-qty'); sel.onchange = ()=>{ const p = state.products.find(x=>x.id===sel.value); price.value = p ? p.price : ''; updateSaleTotal(); }; price.oninput = updateSaleTotal; qty.oninput = updateSaleTotal; row.querySelector('.sale-remove').onclick = ()=>{ row.remove(); updateSaleTotal(); }; }
-  $('#add-sale-item').onclick = ()=> addSaleItemRow();
-  function updateSaleTotal(){ let t=0; document.querySelectorAll('#sale-items > div').forEach(r=>{ const q=Number(r.querySelector('.sale-qty').value)||0; const p=Number(r.querySelector('.sale-price').value)||0; t += q*p; }); $('#sale-total').textContent = money(t); }
-  $('#form-sale').onsubmit = async e=>{ e.preventDefault(); const customer = $('#sale-customer').value.trim(); const payment = $('#sale-payment').value; const items=[]; document.querySelectorAll('#sale-items > div').forEach(r=>{ const pid = r.querySelector('.sale-product').value; const qty = Number(r.querySelector('.sale-qty').value)||0; const price = Number(r.querySelector('.sale-price').value)||0; if(qty>0) items.push({ productId: pid, qty, price }); }); if(items.length===0) return alert('Agregar al menos un producto'); for(const it of items){ const p = state.products.find(x=>x.id===it.productId); p.stock = (p.stock||0) - it.qty; await put('products', p); await add('movements', { id:uid(), type:'sale', productId: it.productId, qty: it.qty, date: new Date().toISOString() }); } const total = items.reduce((s,i)=>s + i.qty*i.price,0); const date = new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); const sale = { id:uid(), items, total, date, customerName: customer || null, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName }; await add('sales', sale); if(payment === 'A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customer, balance: prev + total, lastSale: date }); } closeModal('modal-sale'); await refreshAll(); };
-
-  /* ---------------------------
-     Quick sale
+     Quick sale (modal)
      --------------------------- */
   $('#open-quick-sale').onclick = ()=> { renderQuickSelect(); showModal('modal-quick-sale'); };
-  function renderQuickSelect(){ const sel=$('#quick-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); }); updateQuickTotal(); }
+  function renderQuickSelect(){ const sel = $('#quick-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); }); updateQuickTotal(); }
   $('#quick-search').oninput = debounce(function(){ const v=this.value.trim().toLowerCase(); if(!v) return; const digits = v.replace(/\D/g,''); let found=null; if(digits.length>0) found = state.products.find(p => (p.barcode||'').replace(/\D/g,'').endsWith(digits) || (p.barcode||'')===v); if(!found) found = state.products.find(p => p.name.toLowerCase().includes(v)); if(found) $('#quick-product').value = found.id; updateQuickTotal(); },160);
-  function updateQuickTotal(){ const pid=$('#quick-product').value; const qty=Number($('#quick-qty').value)||0; const p = state.products.find(x=>x.id===pid); $('#quick-total').textContent = money(p ? p.price*qty : 0); }
+  function updateQuickTotal(){ const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||0; const p = state.products.find(x=>x.id===pid); $('#quick-total').textContent = money(p ? p.price * qty : 0); }
   $('#quick-product').onchange = updateQuickTotal; $('#quick-qty').oninput = updateQuickTotal;
   const quickCart = [];
-  $('#quick-add-cart').onclick = function(){ const pid=$('#quick-product').value; const qty=Number($('#quick-qty').value)||1; const p = state.products.find(x=>x.id===pid); if(!p) return alert('Selecciona un producto'); quickCart.push({ productId: pid, qty, price: p.price }); renderQuickCart(); };
-  function renderQuickCart(){ const el = $('#quick-cart'); el.innerHTML=''; quickCart.forEach((it,idx)=>{ const p = state.products.find(x=>x.id===it.productId); const d=document.createElement('div'); d.className='flex justify-between items-center'; d.innerHTML = `<div>${p.name} x ${it.qty}</div><div>${money(it.qty*it.price)} <button data-idx="${idx}" class="ml-2 text-sm text-red-600 btn-remove-quick">Quitar</button></div>`; el.appendChild(d); }); $$('.btn-remove-quick').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); }); }
-  $('#form-quick-sale').onsubmit = async function(e){ e.preventDefault(); if(quickCart.length===0) return alert('Agregar productos'); const customer=$('#quick-customer').value.trim(); const payment=$('#quick-payment').value; for(const it of quickCart){ const p = state.products.find(x=>x.id===it.productId); p.stock=(p.stock||0)-it.qty; await put('products',p); await add('movements',{ id:uid(), type:'sale', productId:it.productId, qty:it.qty, date:new Date().toISOString() }); } const total = quickCart.reduce((s,i)=>s+i.qty*i.price,0); const date=new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); const sale = { id:uid(), items: quickCart.slice(), total, date, customerName: customer || null, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName }; await add('sales', sale); if(payment === 'A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers',{ name: customer, balance: prev + total, lastSale: date }); } quickCart.length=0; closeModal('modal-quick-sale'); await refreshAll(); };
+  $('#quick-add-cart').onclick = function(){ const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||1; const p = state.products.find(x=>x.id===pid); if(!p) return alert('Selecciona un producto'); quickCart.push({ productId: pid, qty, price: p.price }); renderQuickCart(); };
+  function renderQuickCart(){ const el = $('#quick-cart'); el.innerHTML=''; quickCart.forEach((it, idx)=>{ const p = state.products.find(x=>x.id===it.productId); const d = document.createElement('div'); d.className = 'flex justify-between items-center'; d.innerHTML = `<div>${p.name} x ${it.qty}</div><div>${money(it.qty*it.price)} <button data-idx="${idx}" class="ml-2 text-sm text-red-600 btn-remove-quick">Quitar</button></div>`; el.appendChild(d); }); $$('.btn-remove-quick').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); }); }
+  $('#form-quick-sale').onsubmit = async function(e){ e.preventDefault(); if(quickCart.length===0) return alert('Agregar productos'); const customer = $('#quick-customer').value.trim(); const payment = $('#quick-payment').value; for(const it of quickCart){ const p = state.products.find(x=>x.id===it.productId); p.stock = (p.stock||0) - it.qty; await put('products', p); await add('movements', { id:uid(), type:'sale', productId: it.productId, qty: it.qty, date: new Date().toISOString() }); } const total = quickCart.reduce((s,i)=>s + i.qty*i.price,0); const date = new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); const sale = { id:uid(), items: quickCart.slice(), total, date, customerName: customer || null, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName }; await add('sales', sale); if(payment === 'A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customer, balance: prev + total, lastSale: date }); } quickCart.length = 0; closeModal('modal-quick-sale'); await refreshAll(); };
 
-  /* quickSellPrompt (from inventory or scanner) */
+  /* quickSellPrompt for immediate sale */
   async function quickSellPrompt(productId){
-    const qtyStr = prompt('Cantidad a vender (rápido):','1'); if(!qtyStr) return;
+    const qtyStr = prompt('Cantidad a vender (rápido):', '1'); if (!qtyStr) return;
     const qty = Math.max(1, Number(qtyStr));
     const payment = prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO', 'EFECTIVO') || 'EFECTIVO';
     let customerName = null;
     if(payment.toUpperCase() === 'A_CREDITO') customerName = prompt('Nombre del cliente:') || null;
-    const prod = state.products.find(p=>p.id===productId); if(!prod) return alert('Producto no encontrado');
+    const prod = state.products.find(p => p.id === productId); if(!prod) return alert('Producto no encontrado');
     prod.stock = (prod.stock||0) - qty; await put('products', prod);
     await add('movements', { id:uid(), type:'sale', productId, qty, date: new Date().toISOString() });
     const total = qty * prod.price;
@@ -461,15 +506,19 @@
   /* ---------------------------
      Clients modal (A CREDITO)
      --------------------------- */
-  $('#open-clients').onclick = ()=> showModal('modal-clients');
-  $('#add-client').onclick = async ()=> { const name = $('#client-name').value.trim(); if(!name) return alert('Ingresa nombre'); const existing = await get('customers', name).catch(()=>null); if(existing) return alert('Cliente ya existe'); await put('customers', { name, balance: 0, createdAt: new Date().toISOString() }); $('#client-name').value=''; await refreshAll(); showModal('modal-clients'); };
+  $('#open-clients').onclick = ()=> { showModal('modal-clients'); };
+  $('#add-client').onclick = async ()=> {
+    const name = $('#client-name').value.trim(); if(!name) return alert('Ingresa nombre');
+    const existing = await get('customers', name).catch(()=>null); if(existing) return alert('Cliente ya existe');
+    await put('customers', { name, balance: 0, createdAt: new Date().toISOString() }); $('#client-name').value=''; await refreshAll(); showModal('modal-clients');
+  };
   async function renderClients(){
     const el = $('#clients-list'); el.innerHTML=''; const clients = state.customers || [];
     if(!clients.length) el.innerHTML = '<div class="text-sm text-gray-600">No hay clientes registrados.</div>';
     for(const c of clients){
-      const d=document.createElement('div'); d.className='p-2 border-b flex justify-between items-center';
+      const d = document.createElement('div'); d.className='p-2 border rounded flex justify-between items-center bg-white';
       d.innerHTML = `<div><div class="font-medium">${c.name}</div><div class="text-xs text-gray-500">Saldo: S/ ${money(c.balance||0)}</div></div>
-        <div class="flex gap-2"><button data-name="${c.name}" class="px-2 py-1 border rounded btn-abono">Abono</button><button data-name="${c.name}" class="px-2 py-1 bg-green-600 text-white rounded btn-saldar">Saldar</button></div>`;
+        <div class="flex gap-2"><button data-name="${c.name}" class="px-3 py-2 border rounded btn-abono">Abono</button><button data-name="${c.name}" class="px-3 py-2 bg-green-600 text-white rounded btn-saldar">Saldar</button></div>`;
       el.appendChild(d);
     }
     $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = await get('customers', name); const newBal = (c.balance||0) - amt; await put('customers', { name, balance: newBal < 0 ? 0 : newBal, lastPayment: new Date().toISOString() }); alert('Abono registrado'); await refreshAll(); });
@@ -477,7 +526,7 @@
   }
 
   /* ---------------------------
-     Responsible (one per day)
+     Responsible handling
      --------------------------- */
   $('#save-responsible').onclick = async ()=>{
     const date = $('#responsible-date').value; const name = $('#responsible-name').value.trim();
@@ -489,25 +538,23 @@
   async function updateResponsibleBanner(){ const today = todayYMD(); $('#responsible-date').value = today; const r = await get('responsibles', today).catch(()=>null); if(r && r.name){ $('#responsible-display').textContent = `${r.name} (${today})`; $('#responsible-name').value = r.name; } else { $('#responsible-display').textContent = 'Sin encargado asignado para hoy'; $('#responsible-name').value = ''; } }
 
   /* ---------------------------
-     Charts
+     Charts (small)
      --------------------------- */
   let chartSales, chartStock;
   function updateCharts(){
     const salesData = state.sales.slice(-8).map(s=>({ x: new Date(s.date).toLocaleString(), y: s.total }));
-    const ctxS = $('#chart-sales').getContext('2d'); if(chartSales) chartSales.destroy();
-    chartSales = new Chart(ctxS, { type:'bar', data:{ labels: salesData.map(s=>s.x), datasets:[{ label:'Ventas', data: salesData.map(s=>s.y) }]}, options:{ responsive:true }});
+    const ctxS = $('#chart-sales')?.getContext('2d'); if(ctxS){ if(chartSales) chartSales.destroy(); chartSales = new Chart(ctxS, { type:'bar', data:{ labels: salesData.map(s=>s.x), datasets:[{ label:'Ventas', data: salesData.map(s=>s.y) }]}, options:{ responsive:true } }); }
     const stockData = state.products.slice().sort((a,b)=>b.stock-a.stock).slice(0,6);
-    const ctxSt = $('#chart-stock').getContext('2d'); if(chartStock) chartStock.destroy();
-    chartStock = new Chart(ctxSt, { type:'pie', data:{ labels: stockData.map(p=>p.name), datasets:[{ label:'Stock', data: stockData.map(p=>p.stock) }]}, options:{ responsive:true }});
+    const ctxSt = $('#chart-stock')?.getContext('2d'); if(ctxSt){ if(chartStock) chartStock.destroy(); chartStock = new Chart(ctxSt, { type:'pie', data:{ labels: stockData.map(p=>p.name), datasets:[{ label:'Stock', data: stockData.map(p=>p.stock) }]}, options:{ responsive:true } }); }
   }
 
   /* ---------------------------
-     Reports (preview + print)
+     Reports (preview/print)
      --------------------------- */
-  $('#open-report-modal').onclick = ()=> showModal('modal-report');
-  $('#btn-generate-report').onclick = async ()=> { const from = $('#report-from').value; const to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango'); const { previewHtml } = await buildReportHTML(from,to); $('#report-preview').innerHTML = previewHtml; };
-  $('#btn-print-report').onclick = async ()=> { const from = $('#report-from').value; const to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango'); const { printableHtml } = await buildReportHTML(from,to); const w = window.open('', '_blank'); w.document.open(); w.document.write(printableHtml); w.document.close(); setTimeout(()=> w.print(), 500); };
-  async function buildReportHTML(from,to){
+  $('#open-report-modal')?.addEventListener('click', ()=> showModal('modal-report'));
+  $('#btn-generate-report')?.addEventListener('click', async ()=> { const from = $('#report-from').value; const to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango'); const { previewHtml } = await buildReportHTML(from,to); $('#report-preview').innerHTML = previewHtml; });
+  $('#btn-print-report')?.addEventListener('click', async ()=> { const from = $('#report-from').value; const to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango'); const { printableHtml } = await buildReportHTML(from,to); const w = window.open('', '_blank'); w.document.open(); w.document.write(printableHtml); w.document.close(); setTimeout(()=> w.print(), 600); });
+  async function buildReportHTML(from, to){
     const salesAll = await all('sales');
     const sales = salesAll.filter(s => { const d = localYMDFromISO(s.date); return d>=from && d<=to; }).sort((a,b)=>a.date.localeCompare(b.date));
     const company='MINIMARKET LA ESQUINA DEL AHORRO';
@@ -524,14 +571,14 @@
   /* ---------------------------
      Export/Import
      --------------------------- */
-  $('#btn-export').onclick = async ()=>{ const data = { products: await all('products'), sales: await all('sales'), movements: await all('movements'), customers: await all('customers'), responsibles: await all('responsibles') }; const blob = new Blob([JSON.stringify(data,null,2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'tienda-smart-export.json'; a.click(); URL.revokeObjectURL(url); };
-  $('#btn-import').onclick = ()=>{ const inp = document.createElement('input'); inp.type='file'; inp.accept='application/json'; inp.onchange = async ()=>{ const f = inp.files[0]; if(!f) return; const txt = await f.text(); const obj = JSON.parse(txt); if(obj.products) for(const p of obj.products) await put('products', p); if(obj.sales) for(const s of obj.sales) await put('sales', s); if(obj.movements) for(const m of obj.movements) await put('movements', m); if(obj.customers) for(const c of obj.customers) await put('customers', c); if(obj.responsibles) for(const r of obj.responsibles) await put('responsibles', r); await refreshAll(); }; inp.click(); };
+  $('#btn-export')?.addEventListener('click', async ()=>{ const data = { products: await all('products'), sales: await all('sales'), movements: await all('movements'), customers: await all('customers'), responsibles: await all('responsibles') }; const blob = new Blob([JSON.stringify(data,null,2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'tienda-smart-export.json'; a.click(); URL.revokeObjectURL(url); });
+  $('#btn-import')?.addEventListener('click', ()=>{ const inp = document.createElement('input'); inp.type='file'; inp.accept='application/json'; inp.onchange = async ()=>{ const f = inp.files[0]; if(!f) return; const txt = await f.text(); const obj = JSON.parse(txt); if(obj.products) for(const p of obj.products) await put('products', p); if(obj.sales) for(const s of obj.sales) await put('sales', s); if(obj.movements) for(const m of obj.movements) await put('movements', m); if(obj.customers) for(const c of obj.customers) await put('customers', c); if(obj.responsibles) for(const r of obj.responsibles) await put('responsibles', r); await refreshAll(); }; inp.click(); });
 
   /* ---------------------------
      SCANNER: OpenCV (WASM) preprocess + BarcodeDetector + Quagga fallback
      --------------------------- */
   let cvReady=false, awaitingCvInit=false;
-  if(window.cv && cv['onRuntimeInitialized']){ awaitingCvInit=true; cv['onRuntimeInitialized']=()=>{ cvReady=true; awaitingCvInit=false; console.info('OpenCV ready'); }; } else if(window.cv){ cvReady=true; }
+  if(window.cv && cv['onRuntimeInitialized']){ awaitingCvInit=true; cv['onRuntimeInitialized'] = ()=>{ cvReady=true; awaitingCvInit=false; console.info('OpenCV ready'); }; } else if(window.cv){ cvReady=true; }
 
   const video = $('#video'); let videoStream=null, currentVideoTrack=null;
   let detectionLoop=false, quaggaActive=false, readBuffer=[];
@@ -588,6 +635,7 @@
   function computeROI(bitmap){ const bw = bitmap.width, bh = bitmap.height; const w = Math.floor(bw * 0.6), h = Math.floor(bh * 0.28); const sx = Math.floor((bw-w)/2), sy = Math.floor((bh-h)/2); return { sx, sy, sw: w, sh: h }; }
 
   async function startBarcodeDetection(){
+    if(!isAuthenticated()) return;
     $('#scanned-code').value=''; readBuffer=[];
     if(awaitingCvInit){ console.info('Esperando OpenCV...'); while(awaitingCvInit) await new Promise(r=>setTimeout(r,100)); }
     try{
@@ -606,7 +654,7 @@
             if(barcodes && barcodes.length>0){
               const candidate = (barcodes[0].rawValue || '').trim();
               const confirmed = pushRead(candidate);
-              if(confirmed){ $('#scanned-code').value = confirmed; showConfirmation(confirmed); await new Promise(r=>setTimeout(r,800)); } 
+              if(confirmed){ $('#scanned-code').value = confirmed; showConfirmation(confirmed); await new Promise(r=>setTimeout(r,900)); }
             }
             bitmap.close(); cropped.close();
           }catch(err){
@@ -624,14 +672,12 @@
   function drawROI(roi){ if(!overlayCtx) resizeOverlay(); const scaleX = overlayCanvas.width / (video.videoWidth || 1); const scaleY = overlayCanvas.height / (video.videoHeight || 1); overlayCtx.strokeStyle='rgba(0,255,100,0.9)'; overlayCtx.lineWidth=3; overlayCtx.strokeRect(roi.sx*scaleX, roi.sy*scaleY, roi.sw*scaleX, roi.sh*scaleY); }
   function showConfirmation(text){ if(!overlayCtx) resizeOverlay(); overlayCtx.font='20px monospace'; overlayCtx.fillStyle='rgba(0,0,0,0.6)'; const x=10, y=30; const w = overlayCtx.measureText(text).width + 20; overlayCtx.fillRect(x, y-22, w, 28); overlayCtx.fillStyle='white'; overlayCtx.fillText(text, x+8, y); }
 
-  function fallbackQuagga(){ startCameraHighRes().then(()=>{ if(!window.Quagga) return alert('Quagga fallback no disponible'); quaggaActive = true; Quagga.init({ inputStream:{ name:'Live', type:'LiveStream', target:'#video', constraints:{ facingMode:'environment', width:1280, height:720 } }, locator:{ patchSize:'large', halfSample:false }, decoder:{ readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader'] }, locate:true }, err=>{ if(err){ console.error('Quagga init', err); return; } Quagga.start(); }); Quagga.onProcessed(result=>{ clearOverlay(); if(!result) return; if(result.boxes) result.boxes.filter(b=>b!==result.box).forEach(b=> drawPath(b,'rgba(255,255,255,0.2)')); if(result.box) drawPath(result.box,'lime'); }); Quagga.onDetected(data=>{ const code = data && data.codeResult && data.codeResult.code; if(code){ const confirmed = pushRead(code); if(confirmed){ $('#scanned-code').value = confirmed; try{ Quagga.stop(); }catch(e){} } } }); function drawPath(path, color){ if(!overlayCtx) resizeOverlay(); overlayCtx.strokeStyle = color; overlayCtx.lineWidth = 3; overlayCtx.beginPath(); overlayCtx.moveTo(path[0].x, path[0].y); for(let i=1;i<path.length;i++) overlayCtx.lineTo(path[i].x, path[i].y); overlayCtx.closePath(); overlayCtx.stroke(); } }).catch(e=>console.warn('fallbackQuagga camera fail', e)); }
+  function fallbackQuagga(){ startCameraHighRes().then(()=>{ if(!window.Quagga) return alert('Quagga fallback no disponible'); quaggaActive=true; Quagga.init({ inputStream:{ name:'Live', type:'LiveStream', target:'#video', constraints:{ facingMode:'environment', width:1280, height:720 } }, locator:{ patchSize:'large', halfSample:false }, decoder:{ readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader'] }, locate:true }, err=>{ if(err){ console.error('Quagga init', err); return; } Quagga.start(); }); Quagga.onProcessed(result=>{ clearOverlay(); if(!result) return; if(result.boxes) result.boxes.filter(b=>b!==result.box).forEach(b=> drawPath(b,'rgba(255,255,255,0.2)')); if(result.box) drawPath(result.box,'lime'); }); Quagga.onDetected(data=>{ const code = data && data.codeResult && data.codeResult.code; if(code){ const confirmed = pushRead(code); if(confirmed){ $('#scanned-code').value = confirmed; try{ Quagga.stop(); }catch(e){} } } }); function drawPath(path, color){ if(!overlayCtx) resizeOverlay(); overlayCtx.strokeStyle = color; overlayCtx.lineWidth = 3; overlayCtx.beginPath(); overlayCtx.moveTo(path[0].x, path[0].y); for(let i=1;i<path.length;i++) overlayCtx.lineTo(path[i].x, path[i].y); overlayCtx.closePath(); overlayCtx.stroke(); } }).catch(e=>console.warn('fallbackQuagga camera fail', e)); }
 
   async function stopCamera(){ detectionLoop = false; if(quaggaActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} quaggaActive=false; } if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); video.srcObject = null; videoStream = null; currentVideoTrack = null; clearOverlay(); readBuffer = []; }
 
-  $('#open-scan').onclick = ()=> { showModal('modal-scan'); startBarcodeDetection().catch(()=>{}); };
-  $('#close-scan')?.addEventListener('click', async ()=>{ await stopCamera(); closeModal('modal-scan'); });
+  $('#open-scan').onclick = ()=> { if(!isAuthenticated()) return showLogin(); showModal('modal-scan'); startBarcodeDetection().catch(()=>{}); };
   $('#stop-camera').onclick = async ()=> { await stopCamera(); };
-
   $('#toggle-torch').onclick = async ()=>{ if(!currentVideoTrack) return alert('Cámara no activada'); try{ const caps = currentVideoTrack.getCapabilities(); if(!caps.torch) return alert('Linterna no soportada'); await currentVideoTrack.applyConstraints({ advanced: [{ torch: true }] }); }catch(e){ console.warn('torch', e); alert('Linterna no soportada'); } };
 
   $('#fill-product').onclick = ()=> { const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado'); const p = findProductByCode(code); if(p) openProductModal(p); else { $('#product-barcode').value = code; openProductModal(); } };
@@ -645,25 +691,23 @@
   }
 
   /* ---------------------------
-     Init
+     Init bindings and final touches
      --------------------------- */
-  (async ()=>{
-    await openDB();
-    // ensure responsible for today
-    const today = todayYMD(); const r = await get('responsibles', today).catch(()=>null);
-    if(!r){ const name = prompt(`No hay encargado registrado para hoy (${today}). Ingresa su nombre (opcional):`); if(name !== null && name.trim() !== '') await put('responsibles', { date: today, name: name.trim() }); }
-    // seed small products if none
-    const products = await all('products'); if(products.length===0){ const seed=[ { id:uid(), name:'Coca Cola 500ml', category:'Bebidas', price:10.99, barcode:'7758753103282', stock:48, createdAt:new Date().toISOString() }, { id:uid(), name:'Agua San Luis 625ml', category:'Bebidas', price:3.50, barcode:'7752482381011', stock:32, createdAt:new Date().toISOString() } ]; for(const p of seed) await put('products', p); }
-    await refreshAll();
+  (function initBindings(){
+    // theme toggle
+    $('#btn-theme').onclick = ()=> { const cur = document.body.getAttribute('data-theme') || 'light'; document.body.setAttribute('data-theme', cur === 'light' ? 'dark' : 'light'); };
+    // search input
+    $('#search').oninput = debounce(e => renderInventoryMobile(e.target.value), 160);
+
+    // if already authenticated, start app
+    if(isAuthenticated()){
+      $('#current-user').textContent = localStorage.getItem(AUTH_KEY); $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden');
+      startAppAfterAuth();
+    }
+    // ensure overlay backdrop click closes modals is handled above
     window.addEventListener('resize', ()=>{ try{ resizeOverlay(); }catch(e){} });
-    // close modals when backdrop clicked - already handled in manager
-    // attach modal openers that used older functions:
-    $('#open-add-product').addEventListener('click', ()=> openProductModal());
   })();
 
-  // small bindings
-  $('#search').oninput = debounce(e => renderInventory(e.target.value), 160);
-  $('#btn-dark').onclick = ()=> document.documentElement.classList.toggle('dark');
   </script>
 </body>
 </html>
