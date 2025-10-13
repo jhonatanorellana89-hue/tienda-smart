@@ -2,32 +2,45 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart (Offline)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart (App móvil)</title>
 
   <!-- Tailwind CDN (prototipo) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Quagga (fallback para escáner) -->
+  <!-- OpenCV.js (WASM) -->
+  <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+  <!-- Quagga fallback -->
   <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
 
-  <!-- Chart.js para reportes -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    .modal-backdrop { background: rgba(0,0,0,0.5); }
-    .table-fixed tbody tr:hover { background: rgba(0,0,0,0.03); }
-    #video-wrap { position: relative; }
-    #overlay-canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
-    .small-muted { color: #6b7280; }
-    /* Styles for preview inside modal */
-    .report-preview-box { font-family: Arial, Helvetica, sans-serif; font-size: 13px; color: #111; }
-    .report-preview-box h2 { margin:0; }
-    .report-table th { background: #f3f4f6; padding:8px; text-align:left; }
-    .report-table td { padding:8px; border-bottom:1px solid #ddd; vertical-align:top; }
+    :root { --bg: #f8fafc; --card: #fff; --muted: #6b7280; }
+    [data-theme="dark"] { --bg:#0b1220; --card:#0f172a; --muted:#9ca3af; color-scheme: dark; }
+    body { background: var(--bg); font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; }
+    /* Global backdrop */
+    #global-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(2px); z-index: 40; display: none; opacity: 0; transition: opacity .18s ease; }
+    #global-backdrop.visible { display:block; opacity:1; }
+    /* Modal shell */
+    .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; z-index: 50; padding: 1rem; overflow:auto; }
+    .modal.visible { display:flex; }
+    .modal .modal-content { width:100%; max-width:860px; background: var(--card); color: inherit; border-radius: 12px; box-shadow: 0 12px 40px rgba(12,18,28,0.28); padding: 1rem; transform: translateY(0); transition: transform .16s ease, opacity .16s ease; }
+    .modal .modal-close { background:transparent; border:none; cursor:pointer; }
+    /* overlay canvas */
+    #overlay-canvas { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:20; }
+    /* scan guide */
+    .scan-guide { position:absolute; left:50%; top:50%; width:64%; height:28%; transform:translate(-50%,-50%); border:2px dashed rgba(255,255,255,0.6); border-radius:8px; pointer-events:none; z-index:30; }
+    /* small screens */
+    @media (max-width:640px){ .modal .modal-content { margin: 0 12px; max-width:calc(100% - 24px); } .controls { flex-direction:column; align-items:flex-end; } }
   </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 min-h-screen">
+<body class="min-h-screen text-gray-800" data-theme="light">
+  <!-- Global Backdrop (single instance) -->
+  <div id="global-backdrop" aria-hidden="true"></div>
+
   <div class="max-w-6xl mx-auto p-4">
     <!-- Header -->
     <header class="flex items-start justify-between mb-4 gap-4">
@@ -37,40 +50,45 @@
         </div>
         <div>
           <h1 class="text-xl font-semibold">MINIMARKET LA ESQUINA DEL AHORRO</h1>
-          <p class="text-sm text-gray-500 dark:text-gray-400">TiendaSmart — Inventario y ventas (Offline)</p>
+          <p class="text-sm text-gray-500">TiendaSmart — Offline (IndexedDB)</p>
         </div>
       </div>
 
-      <div class="flex items-center gap-3">
-        <div class="flex flex-col items-end text-right mr-2">
-          <label class="text-xs small-muted">Encargado (fecha)</label>
-          <div class="flex gap-2">
-            <input id="responsible-date" type="date" class="px-2 py-1 rounded border bg-white dark:bg-gray-800">
-            <input id="responsible-name" placeholder="Nombre encargado" class="px-2 py-1 rounded border w-44 bg-white dark:bg-gray-800">
-            <button id="save-responsible" class="px-2 py-1 bg-indigo-600 text-white rounded">Guardar</button>
-          </div>
+      <div class="controls flex flex-col items-end gap-2">
+        <div class="flex items-center gap-2">
+          <input id="search" type="search" placeholder="Buscar por nombre o código..." class="px-3 py-2 rounded border bg-white">
+          <button id="btn-dark" class="px-3 py-2 rounded bg-gray-200">Modo</button>
         </div>
-
-        <input id="search" type="search" placeholder="Buscar por nombre o código..." class="px-3 py-2 rounded border bg-white dark:bg-gray-800">
-        <button id="btn-dark" class="px-3 py-2 rounded bg-gray-200 dark:bg-gray-700">Modo</button>
-
         <div class="flex gap-2">
-          <button id="open-add-product" class="px-4 py-2 bg-green-500 text-white rounded shadow">+ Producto</button>
-          <button id="open-scan" class="px-4 py-2 bg-yellow-500 text-white rounded shadow">📷 Escanear</button>
-          <button id="open-quick-sale" class="px-4 py-2 bg-red-500 text-white rounded shadow">⚡ Venta rápida</button>
+          <button id="open-add-product" class="px-4 py-2 bg-green-500 text-white rounded">+ Producto</button>
+          <button id="open-scan" class="px-4 py-2 bg-yellow-500 text-white rounded">📷 Escanear</button>
+          <button id="open-quick-sale" class="px-4 py-2 bg-red-500 text-white rounded">⚡ Venta rápida</button>
+          <button id="open-clients" class="px-4 py-2 bg-indigo-600 text-white rounded">Clientes</button>
         </div>
       </div>
     </header>
 
-    <!-- Main grid -->
+    <!-- Responsible banner -->
+    <div id="responsible-banner" class="mb-3 p-3 rounded shadow-sm bg-white flex items-center justify-between">
+      <div>
+        <div class="text-xs text-gray-600">Encargado del día</div>
+        <div id="responsible-display" class="font-medium">—</div>
+      </div>
+      <div class="flex gap-2 items-center">
+        <input id="responsible-date" type="date" class="px-2 py-1 rounded border bg-white">
+        <input id="responsible-name" placeholder="Nombre encargado" class="px-2 py-1 rounded border w-44 bg-white">
+        <button id="save-responsible" class="px-3 py-1 bg-indigo-600 text-white rounded">Guardar</button>
+      </div>
+    </div>
+
+    <!-- Main -->
     <main class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <!-- Inventory + actions -->
-      <section class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+      <section class="lg:col-span-2 bg-white rounded-lg p-4 shadow">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-medium">Inventario</h2>
           <div class="flex gap-2">
-            <button id="btn-import" class="px-3 py-1 border rounded">Importar JSON</button>
-            <button id="btn-export" class="px-3 py-1 border rounded">Exportar JSON</button>
+            <button id="btn-import" class="px-3 py-1 border rounded">Importar</button>
+            <button id="btn-export" class="px-3 py-1 border rounded">Exportar</button>
           </div>
         </div>
 
@@ -79,12 +97,12 @@
             <thead class="text-left text-gray-500 text-xs uppercase">
               <tr>
                 <th class="w-1/12">#</th>
-                <th class="w-3/12">Nombre</th>
+                <th class="w-4/12">Nombre</th>
                 <th class="w-2/12">Categoría</th>
                 <th class="w-2/12">Código</th>
                 <th class="w-1/12">Stock</th>
                 <th class="w-1/12">Precio</th>
-                <th class="w-2/12">Acciones</th>
+                <th class="w-1/12">Acciones</th>
               </tr>
             </thead>
             <tbody id="inventory-body"></tbody>
@@ -92,109 +110,107 @@
         </div>
       </section>
 
-      <!-- Panel derecho: reportes + movimientos -->
-      <aside class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
+      <aside class="bg-white rounded-lg p-4 shadow">
         <h3 class="text-lg font-medium mb-2">Reportes rápidos</h3>
-        <div class="space-y-4">
-          <div><canvas id="chart-sales" height="150"></canvas></div>
-          <div><canvas id="chart-stock" height="150"></canvas></div>
+        <div class="space-y-3">
+          <canvas id="chart-sales" height="120"></canvas>
+          <canvas id="chart-stock" height="120"></canvas>
           <div class="flex gap-2">
             <button id="open-income" class="flex-1 px-3 py-2 bg-blue-600 text-white rounded">+ Ingreso</button>
             <button id="open-sale" class="flex-1 px-3 py-2 bg-red-600 text-white rounded">+ Venta</button>
           </div>
-          <div class="flex gap-2">
-            <button id="open-report-modal" class="w-full px-3 py-2 bg-gray-800 text-white rounded">Imprimir ventas por fechas</button>
-          </div>
+          <button id="open-report-modal" class="w-full px-3 py-2 bg-gray-800 text-white rounded">Imprimir ventas por fechas</button>
         </div>
       </aside>
     </main>
 
     <footer class="mt-6 text-xs text-gray-500">
-      <p>Prototipo TiendaSmart / MINIMARKET LA ESQUINA DEL AHORRO — Datos locales en el navegador. Para usar la cámara debes abrir en <strong>https</strong> o <strong>localhost</strong>.</p>
+      <p>Abre en <strong>https</strong> o <strong>localhost</strong> para usar la cámara. Si OpenCV está cargando al abrir el escáner espera unos segundos.</p>
     </footer>
   </div>
 
-  <!-- Modales (Product, Scanner, Quick Sale, Income, Sale, Report) -->
+  <!-- ===========================
+       MODALES (estructura unificada)
+       - cada modal usa class="modal" y su contenido class="modal-content"
+       - botones de cierre usan data-close-modal
+     =========================== -->
+
   <!-- Product Modal -->
-  <div id="modal-product" class="hidden fixed inset-0 z-40 flex items-center justify-center">
-    <div class="modal-backdrop absolute inset-0"></div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg p-6 z-50 w-full max-w-xl shadow-lg">
-      <h4 class="text-lg font-semibold mb-2">Agregar / Editar Producto</h4>
+  <div id="modal-product" class="modal" role="dialog" aria-hidden="true">
+    <div class="modal-content">
+      <div class="flex justify-between items-center mb-2">
+        <h4 class="text-lg font-semibold">Agregar / Editar Producto</h4>
+        <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
+      </div>
       <form id="form-product" class="space-y-3">
         <input type="hidden" id="product-id">
-        <div class="grid grid-cols-2 gap-2">
-          <input id="product-name" placeholder="Nombre" required class="px-3 py-2 rounded border col-span-2">
-          <input id="product-category" placeholder="Categoría" class="px-3 py-2 rounded border">
-          <input id="product-price" placeholder="Precio" type="number" step="0.01" class="px-3 py-2 rounded border">
-          <input id="product-barcode" placeholder="Código de barras" class="px-3 py-2 rounded border">
-          <input id="product-stock" placeholder="Stock" type="number" step="1" class="px-3 py-2 rounded border">
+        <input id="product-name" placeholder="Nombre" required class="w-full px-3 py-2 rounded border">
+        <div class="flex gap-2">
+          <input id="product-category" placeholder="Categoría" class="flex-1 px-3 py-2 rounded border">
+          <input id="product-price" placeholder="Precio" type="number" step="0.01" class="w-28 px-3 py-2 rounded border">
+        </div>
+        <div class="flex gap-2">
+          <input id="product-barcode" placeholder="Código de barras" class="flex-1 px-3 py-2 rounded border">
+          <input id="product-stock" placeholder="Stock" type="number" class="w-24 px-3 py-2 rounded border">
         </div>
         <div class="flex justify-end gap-2">
-          <button type="button" id="close-product" class="px-3 py-2 rounded border">Cancelar</button>
+          <button type="button" data-close-modal class="px-3 py-2 rounded border">Cancelar</button>
           <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded">Guardar</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Scanner Modal -->
-  <div id="modal-scan" class="hidden fixed inset-0 z-40 flex items-center justify-center">
-    <div class="modal-backdrop absolute inset-0"></div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 z-50 w-full max-w-2xl shadow-lg">
+  <!-- Scanner Modal (scanner-modal class to signal camera) -->
+  <div id="modal-scan" class="modal scanner-modal" role="dialog" aria-hidden="true">
+    <div class="modal-content">
       <div class="flex justify-between items-center mb-2">
-        <h4 class="font-semibold">Escáner de Códigos</h4>
-        <div class="flex items-center gap-2">
-          <button id="toggle-torch" class="px-2 py-1 border rounded hidden">🔦 Linterna</button>
-          <button id="close-scan" class="px-2 py-1 border rounded">Cerrar</button>
+        <h4 class="text-lg font-semibold text-white">Escáner</h4>
+        <div class="flex gap-2">
+          <button id="toggle-torch" class="px-2 py-1 border rounded hidden">🔦</button>
+          <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
         </div>
       </div>
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        <div id="video-wrap" class="relative">
-          <video id="video" class="w-full h-64 bg-black rounded object-cover"></video>
-          <canvas id="overlay-canvas"></canvas>
-          <div class="mt-2 text-sm text-gray-500">Apunta la cámara hacia el código de barras. Se confirmarán lecturas iguales consecutivas para mayor fiabilidad.</div>
-        </div>
-        <div>
-          <label class="text-sm">Código detectado</label>
-          <input id="scanned-code" class="w-full px-3 py-2 rounded border mb-2">
-          <div class="flex gap-2 mb-2">
-            <button id="fill-product" class="px-3 py-2 bg-indigo-600 text-white rounded">Buscar producto / Editar</button>
-            <button id="quick-sell-detected" class="px-3 py-2 bg-red-600 text-white rounded">Vender ahora</button>
-            <button id="stop-camera" class="px-3 py-2 border rounded">Detener</button>
-          </div>
-          <div class="text-xs text-gray-500">Si el producto no existe, puedes crear uno y guardar el código detectado automáticamente.</div>
+      <div id="video-wrap" class="relative bg-black rounded overflow-hidden">
+        <video id="video" autoplay muted playsinline class="w-full" style="height:360px;object-fit:cover"></video>
+        <canvas id="overlay-canvas"></canvas>
+        <div class="scan-guide"></div>
+      </div>
+      <div class="mt-3 p-3 bg-white rounded">
+        <input id="scanned-code" class="w-full px-2 py-1 border rounded mb-2" placeholder="Código detectado">
+        <div class="flex gap-2">
+          <button id="fill-product" class="flex-1 px-2 py-2 bg-indigo-600 text-white rounded">Buscar/Editar</button>
+          <button id="quick-sell-detected" class="flex-1 px-2 py-2 bg-red-600 text-white rounded">Vender</button>
+          <button id="stop-camera" class="px-3 py-2 border rounded">Detener</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Quick Sale Modal -->
-  <div id="modal-quick-sale" class="hidden fixed inset-0 z-40 flex items-center justify-center">
-    <div class="modal-backdrop absolute inset-0"></div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 z-50 w-full max-w-md shadow-lg">
+  <!-- Quick Sale -->
+  <div id="modal-quick-sale" class="modal" role="dialog" aria-hidden="true">
+    <div class="modal-content">
       <div class="flex justify-between items-center mb-2">
-        <h4 class="font-semibold">Venta rápida</h4>
-        <button id="close-quick-sale" class="px-2 py-1 border rounded">Cerrar</button>
+        <h4 class="text-lg font-semibold">Venta rápida</h4>
+        <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
       </div>
       <form id="form-quick-sale" class="space-y-3">
-        <input id="quick-search" placeholder="Buscar por nombre o pegar código..." class="w-full px-3 py-2 rounded border">
+        <input id="quick-search" placeholder="Buscar o pegar código..." class="w-full px-3 py-2 border rounded">
         <div class="flex gap-2">
-          <select id="quick-product" class="flex-1 px-3 py-2 rounded border"></select>
-          <input id="quick-qty" type="number" min="1" value="1" class="w-24 px-3 py-2 rounded border">
+          <select id="quick-product" class="flex-1 px-3 py-2 border rounded"></select>
+          <input id="quick-qty" type="number" min="1" value="1" class="w-24 px-3 py-2 border rounded">
         </div>
-
         <div class="flex gap-2 items-center">
-          <label class="text-sm">Tipo pago</label>
+          <label>Pago</label>
           <select id="quick-payment" class="px-2 py-1 rounded border">
             <option value="EFECTIVO">EFECTIVO</option>
             <option value="YAPE">YAPE</option>
-            <option value="FIAR">FIAR (Por pagar)</option>
+            <option value="A_CREDITO">A CREDITO</option>
           </select>
-          <input id="quick-customer" placeholder="Nombre cliente (si FIAR)" class="px-2 py-1 rounded border flex-1 bg-white dark:bg-gray-800">
+          <input id="quick-customer" placeholder="Nombre cliente (si A CREDITO)" class="flex-1 px-2 py-2 border rounded">
         </div>
-
         <div class="flex justify-between items-center">
-          <div class="text-sm">Total: <span id="quick-total">0.00</span></div>
+          <div>Total: <span id="quick-total">0.00</span></div>
           <div class="flex gap-2">
             <button type="button" id="quick-add-cart" class="px-3 py-2 border rounded">Agregar</button>
             <button type="submit" class="px-3 py-2 bg-red-600 text-white rounded">Cobrar</button>
@@ -208,797 +224,446 @@
     </div>
   </div>
 
-  <!-- Income Modal -->
-  <div id="modal-income" class="hidden fixed inset-0 z-40 flex items-center justify-center">
-    <div class="modal-backdrop absolute inset-0"></div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 z-50 w-full max-w-md shadow-lg">
-      <h4 class="font-semibold mb-2">Registrar Ingreso (aumentar stock)</h4>
+  <!-- Income -->
+  <div id="modal-income" class="modal" role="dialog" aria-hidden="true">
+    <div class="modal-content">
+      <div class="flex justify-between items-center mb-2">
+        <h4 class="text-lg font-semibold">Registrar Ingreso (stock)</h4>
+        <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
+      </div>
       <form id="form-income" class="space-y-3">
-        <select id="income-product" class="w-full px-3 py-2 rounded border"></select>
-        <input id="income-qty" type="number" min="1" value="1" class="w-full px-3 py-2 rounded border">
+        <select id="income-product" class="w-full px-3 py-2 border rounded"></select>
+        <input id="income-qty" type="number" min="1" value="1" class="w-full px-3 py-2 border rounded">
         <div class="flex justify-end gap-2">
-          <button type="button" id="close-income" class="px-3 py-2 border rounded">Cancelar</button>
+          <button type="button" data-close-modal class="px-3 py-2 border rounded">Cancelar</button>
           <button type="submit" class="px-3 py-2 bg-blue-600 text-white rounded">Guardar</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Sale Modal -->
-  <div id="modal-sale" class="hidden fixed inset-0 z-40 flex items-center justify-center">
-    <div class="modal-backdrop absolute inset-0"></div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 z-50 w-full max-w-2xl shadow-lg">
-      <h4 class="font-semibold mb-2">Registrar Venta</h4>
+  <!-- Sale -->
+  <div id="modal-sale" class="modal" role="dialog" aria-hidden="true">
+    <div class="modal-content">
+      <div class="flex justify-between items-center mb-2">
+        <h4 class="text-lg font-semibold">Registrar Venta</h4>
+        <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
+      </div>
       <form id="form-sale" class="space-y-3">
         <div class="flex gap-2 items-center">
-          <label class="text-sm">Cliente (opcional)</label>
-          <input id="sale-customer" placeholder="Nombre cliente" class="px-2 py-1 rounded border flex-1 bg-white dark:bg-gray-800">
-          <label class="text-sm">Tipo pago</label>
-          <select id="sale-payment" class="px-2 py-1 rounded border">
+          <input id="sale-customer" placeholder="Cliente (opcional)" class="px-2 py-2 border rounded flex-1">
+          <select id="sale-payment" class="px-2 py-2 border rounded">
             <option value="EFECTIVO">EFECTIVO</option>
             <option value="YAPE">YAPE</option>
-            <option value="FIAR">FIAR (Por pagar)</option>
+            <option value="A_CREDITO">A CREDITO</option>
           </select>
         </div>
         <div id="sale-items" class="space-y-2"></div>
-        <div class="flex gap-2 justify-between items-center">
-          <button id="add-sale-item" type="button" class="px-3 py-1 border rounded">Agregar producto</button>
+        <div class="flex justify-between items-center">
+          <button id="add-sale-item" type="button" class="px-3 py-2 border rounded">Agregar producto</button>
           <div>Total: <span id="sale-total">0.00</span></div>
         </div>
         <div class="flex justify-end gap-2">
-          <button type="button" id="close-sale" class="px-3 py-2 border rounded">Cancelar</button>
+          <button type="button" data-close-modal class="px-3 py-2 border rounded">Cancelar</button>
           <button type="submit" class="px-3 py-2 bg-red-600 text-white rounded">Vender</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Report Modal -->
-  <div id="modal-report" class="hidden fixed inset-0 z-50 flex items-center justify-center">
-    <div class="modal-backdrop absolute inset-0"></div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 z-50 w-full max-w-2xl shadow-lg">
-      <h4 class="font-semibold mb-2">Reporte de Ventas — Imprimir</h4>
-      <div class="grid grid-cols-2 gap-2 mb-3">
-        <div>
-          <label class="text-xs">Desde</label>
-          <input id="report-from" type="date" class="w-full px-2 py-1 rounded border bg-white dark:bg-gray-800">
-        </div>
-        <div>
-          <label class="text-xs">Hasta</label>
-          <input id="report-to" type="date" class="w-full px-2 py-1 rounded border bg-white dark:bg-gray-800">
-        </div>
+  <!-- Report -->
+  <div id="modal-report" class="modal" role="dialog" aria-hidden="true">
+    <div class="modal-content">
+      <div class="flex justify-between items-center mb-2">
+        <h4 class="text-lg font-semibold">Reporte de Ventas — Imprimir</h4>
+        <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
       </div>
-      <div class="flex gap-2 justify-end">
+      <div class="grid grid-cols-2 gap-2 mb-3">
+        <div><label class="text-xs">Desde</label><input id="report-from" type="date" class="w-full px-2 py-1 rounded border"></div>
+        <div><label class="text-xs">Hasta</label><input id="report-to" type="date" class="w-full px-2 py-1 rounded border"></div>
+      </div>
+      <div class="flex gap-2 justify-end mb-3">
         <button id="btn-generate-report" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar vista</button>
         <button id="btn-print-report" class="px-3 py-2 bg-gray-800 text-white rounded">Imprimir</button>
-        <button id="close-report" class="px-3 py-2 border rounded">Cerrar</button>
       </div>
-      <div id="report-preview" class="mt-4 overflow-auto max-h-64 text-sm"></div>
+      <div id="report-preview" class="max-h-64 overflow-auto text-sm"></div>
     </div>
   </div>
 
+  <!-- Clients -->
+  <div id="modal-clients" class="modal" role="dialog" aria-hidden="true">
+    <div class="modal-content">
+      <div class="flex justify-between items-center mb-2">
+        <h4 class="text-lg font-semibold">Clientes (A CREDITO)</h4>
+        <button class="modal-close" data-close-modal aria-label="Cerrar">✕</button>
+      </div>
+      <div class="flex gap-2 mb-2">
+        <input id="client-name" placeholder="Nuevo cliente (nombre)" class="flex-1 px-2 py-2 border rounded">
+        <button id="add-client" class="px-3 py-2 bg-green-600 text-white rounded">Agregar</button>
+      </div>
+      <div id="clients-list" class="max-h-64 overflow-auto"></div>
+    </div>
+  </div>
+
+  <!-- ===========================
+       APP SCRIPT
+     =========================== -->
   <script>
-    /* ----------------------------- Helpers ---------------------------- */
-    const $ = sel => document.querySelector(sel);
-    const $$ = sel => Array.from(document.querySelectorAll(sel));
-    const uid = () => 'id-' + Math.random().toString(36).slice(2,9);
-    const money = v => Number(v||0).toFixed(2);
-    const pad2 = n => String(n).padStart(2,'0');
-    function localYMDFromISO(iso){
-      const d = new Date(iso);
-      return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
-    }
+  /* ---------------------------
+     Helpers & IndexedDB wrapper
+     --------------------------- */
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const uid = () => 'id-' + Math.random().toString(36).slice(2,9);
+  const money = v => Number(v||0).toFixed(2);
+  const todayYMD = ()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  const localYMDFromISO = iso => { const d=new Date(iso); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+  function debounce(fn, wait=200){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), wait); }; }
 
-    /* ----------------------------- IndexedDB (stores) ---------------------------- */
-    const DB_NAME='TiendaSmartDB', DB_VERSION=3;
-    let db;
-    function openDB(){
-      return new Promise((res, rej)=>{
-        const r = indexedDB.open(DB_NAME, DB_VERSION);
-        r.onupgradeneeded = e => {
-          const idb = e.target.result;
-          if (!idb.objectStoreNames.contains('products')) idb.createObjectStore('products',{keyPath:'id'});
-          if (!idb.objectStoreNames.contains('sales')) idb.createObjectStore('sales',{keyPath:'id'});
-          if (!idb.objectStoreNames.contains('movements')) idb.createObjectStore('movements',{keyPath:'id'});
-          if (!idb.objectStoreNames.contains('customers')) idb.createObjectStore('customers',{keyPath:'name'});
-          if (!idb.objectStoreNames.contains('responsibles')) idb.createObjectStore('responsibles',{keyPath:'date'});
-        };
-        r.onsuccess = e => { db = e.target.result; res(db); };
-        r.onerror = e => rej(e);
-      });
-    }
-    function store(name, mode='readonly'){ return db.transaction(name, mode).objectStore(name); }
-    function put(name, item){ return new Promise((res,rej)=>{ const rq = store(name,'readwrite').put(item); rq.onsuccess=()=>res(item); rq.onerror= e=>rej(e); }); }
-    function add(name, item){ return new Promise((res,rej)=>{ const rq = store(name,'readwrite').add(item); rq.onsuccess=()=>res(item); rq.onerror= e=>rej(e); }); }
-    function all(name){ return new Promise((res,rej)=>{ const rq = store(name,'readonly').getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=e=>rej(e); }); }
-    function get(name, key){ return new Promise((res,rej)=>{ const rq = store(name,'readonly').get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=e=>rej(e); }); }
-    function remove(name, key){ return new Promise((res,rej)=>{ const rq = store(name,'readwrite').delete(key); rq.onsuccess=()=>res(); rq.onerror=e=>rej(e); }); }
+  const DB_NAME='TiendaSmartDB', DB_VERSION=6;
+  let db;
+  function openDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open(DB_NAME, DB_VERSION); r.onupgradeneeded = e=>{ const idb=e.target.result; if(!idb.objectStoreNames.contains('products')) idb.createObjectStore('products',{keyPath:'id'}); if(!idb.objectStoreNames.contains('sales')) idb.createObjectStore('sales',{keyPath:'id'}); if(!idb.objectStoreNames.contains('movements')) idb.createObjectStore('movements',{keyPath:'id'}); if(!idb.objectStoreNames.contains('customers')) idb.createObjectStore('customers',{keyPath:'name'}); if(!idb.objectStoreNames.contains('responsibles')) idb.createObjectStore('responsibles',{keyPath:'date'}); }; r.onsuccess = e=>{ db = e.target.result; res(db); }; r.onerror = e=>rej(e); }); }
+  const store = (name,mode='readonly') => db.transaction(name, mode).objectStore(name);
+  const put = (name,item) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').put(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
+  const add = (name,item) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').add(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
+  const all = (name) => new Promise((res,rej)=>{ const rq=store(name,'readonly').getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=e=>rej(e); });
+  const get = (name,key) => new Promise((res,rej)=>{ const rq=store(name,'readonly').get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=e=>rej(e); });
+  const remove = (name,key) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').delete(key); rq.onsuccess=()=>res(); rq.onerror=e=>rej(e); });
 
-    /* ----------------------------- App state & render ---------------------------- */
-    const state = { products: [], sales: [] };
-    async function refreshAll(){
-      state.products = await all('products');
-      state.sales = await all('sales');
-      renderInventory();
-      renderIncomeSelects();
-      renderQuickSelect();
-      updateCharts();
-    }
+  /* ---------------------------
+     App state & refresh
+     --------------------------- */
+  const state = { products:[], sales:[], customers:[], responsibles:[] };
+  async function refreshAll(){
+    state.products = await all('products');
+    state.sales = await all('sales');
+    state.customers = await all('customers');
+    state.responsibles = await all('responsibles');
+    renderInventory(); renderIncomeSelects(); renderQuickSelect(); renderClients(); updateCharts(); updateResponsibleBanner();
+  }
 
-    /* ----------------------------- Inventory (render + delegation) ---------------------------- */
-    const inventoryBody = $('#inventory-body');
-    function renderInventory(filter=''){
-      const q = (filter||'').trim().toLowerCase();
-      inventoryBody.innerHTML = '';
-      state.products.forEach((p,i)=>{
-        const codeNorm = (p.barcode||'').replace(/\D/g,'');
-        if (q && !(p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q) || codeNorm.includes(q.replace(/\D/g,'')))) return;
-        const tr = document.createElement('tr'); tr.dataset.id = p.id;
-        tr.innerHTML = `
-          <td class="py-2">${i+1}</td>
-          <td class="py-2">${p.name}</td>
-          <td class="py-2">${p.category||''}</td>
-          <td class="py-2">${p.barcode||''}</td>
-          <td class="py-2">${p.stock||0}</td>
-          <td class="py-2">${money(p.price)}</td>
-          <td class="py-2">
-            <div class="flex gap-1">
-              <button data-action="edit" class="px-2 py-1 border rounded">Editar</button>
-              <button data-action="income" class="px-2 py-1 border rounded">+Stock</button>
-              <button data-action="sale" class="px-2 py-1 border rounded">Vender</button>
-              <button data-action="quick" class="px-2 py-1 bg-red-500 text-white rounded">Venta rápida</button>
-              <button data-action="delete" class="px-2 py-1 border rounded text-red-600">Borrar</button>
-            </div>
-          </td>
-        `;
-        inventoryBody.appendChild(tr);
-      });
-    }
-
-    inventoryBody.addEventListener('click', async (e)=>{
-      const btn = e.target.closest('button'); if (!btn) return;
-      const tr = btn.closest('tr'); const id = tr && tr.dataset.id; const action = btn.dataset.action; if (!id || !action) return;
-      if (action==='edit') openProductModal(state.products.find(x=>x.id===id));
-      if (action==='delete'){ if(!confirm('¿Borrar producto?')) return; await remove('products', id); await refreshAll(); }
-      if (action==='income') openIncomeFor(id);
-      if (action==='sale') addSaleItemFromProduct(id);
-      if (action==='quick') quickSellPrompt(id);
+  /* ---------------------------
+     Inventory render & delegation
+     --------------------------- */
+  const inventoryBody = $('#inventory-body');
+  function renderInventory(filter=''){
+    const q=(filter||'').trim().toLowerCase();
+    inventoryBody.innerHTML='';
+    state.products.forEach((p,i)=>{
+      const codeNorm = (p.barcode||'').replace(/\D/g,'');
+      if(q && !(p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q) || codeNorm.includes(q.replace(/\D/g,'')))) return;
+      const tr=document.createElement('tr'); tr.dataset.id=p.id;
+      tr.innerHTML = `<td class="py-2">${i+1}</td><td class="py-2">${p.name}</td><td class="py-2">${p.category||''}</td><td class="py-2">${p.barcode||''}</td><td class="py-2">${p.stock||0}</td><td class="py-2">${money(p.price)}</td><td class="py-2"><div class="flex gap-1"><button data-action="edit" class="px-2 py-1 border rounded">Editar</button><button data-action="income" class="px-2 py-1 border rounded">+Stock</button><button data-action="sale" class="px-2 py-1 border rounded">Vender</button><button data-action="quick" class="px-2 py-1 bg-red-500 text-white rounded">Venta rápida</button><button data-action="delete" class="px-2 py-1 border rounded text-red-600">Borrar</button></div></td>`;
+      inventoryBody.appendChild(tr);
     });
+  }
+  inventoryBody.addEventListener('click', async e=>{
+    const btn = e.target.closest('button'); if(!btn) return;
+    const tr = btn.closest('tr'); const id = tr && tr.dataset.id; const action = btn.dataset.action; if(!id||!action) return;
+    if(action==='edit') openProductModal(state.products.find(x=>x.id===id));
+    if(action==='delete'){ if(!confirm('¿Borrar producto?')) return; await remove('products', id); await refreshAll(); }
+    if(action==='income') openIncomeFor(id);
+    if(action==='sale') addSaleItemFromProduct(id);
+    if(action==='quick') quickSellPrompt(id);
+  });
 
-    /* ----------------------------- Product Modal ---------------------------- */
-    const modalProduct = $('#modal-product');
-    $('#open-add-product').onclick = ()=> openProductModal();
-    $('#close-product').onclick = ()=> modalProduct.classList.add('hidden');
+  /* ---------------------------
+     Modal manager (global backdrop)
+     --------------------------- */
+  const globalBackdrop = document.getElementById('global-backdrop');
+  let currentOpenModal = null;
+  async function _stopCameraSafe(){ try{ if(typeof stopCamera === 'function') await stopCamera(); }catch(e){ console.warn('stopCamera error', e); } }
+  function showModal(modalId, { focusSelector } = {}){ // opens modal
+    if (currentOpenModal && currentOpenModal !== modalId) closeModal(currentOpenModal);
+    const modal = document.getElementById(modalId); if(!modal) return;
+    globalBackdrop.classList.add('visible'); globalBackdrop.setAttribute('aria-hidden','false');
+    modal.classList.add('visible'); modal.setAttribute('aria-hidden','false');
+    document.documentElement.style.overflow='hidden'; document.body.style.overflow='hidden';
+    currentOpenModal = modalId;
+    setTimeout(()=>{ if(focusSelector){ const el=modal.querySelector(focusSelector); if(el) el.focus(); return; } const first = modal.querySelector('[autofocus]') || modal.querySelector('input, button, select, textarea'); if(first) first.focus(); },120);
+  }
+  async function closeModal(modalId){
+    const modal = document.getElementById(modalId);
+    if(!modal){ globalBackdrop.classList.remove('visible'); document.documentElement.style.overflow=''; document.body.style.overflow=''; currentOpenModal=null; return; }
+    if(modal.classList.contains('scanner-modal')) await _stopCameraSafe();
+    modal.classList.remove('visible'); modal.setAttribute('aria-hidden','true');
+    setTimeout(()=>{ const anyVisible = Array.from(document.querySelectorAll('.modal')).some(m => m.classList.contains('visible')); if(!anyVisible){ globalBackdrop.classList.remove('visible'); globalBackdrop.setAttribute('aria-hidden','true'); document.documentElement.style.overflow=''; document.body.style.overflow=''; currentOpenModal=null; } else { const remaining = document.querySelector('.modal.visible'); if(remaining) currentOpenModal = remaining.id; } },120);
+  }
+  globalBackdrop.addEventListener('click', async ()=>{ if(!currentOpenModal) return; await closeModal(currentOpenModal); });
+  document.addEventListener('keydown', async e=>{ if(e.key==='Escape' && currentOpenModal) await closeModal(currentOpenModal); });
+  document.addEventListener('click', e=>{ const btn = e.target.closest('[data-close-modal]'); if(!btn) return; const modal = btn.closest('.modal'); if(!modal) return; closeModal(modal.id); });
 
-    function openProductModal(product){
-      $('#form-product').reset();
-      $('#product-id').value = '';
-      if (product){
-        $('#product-id').value = product.id;
-        $('#product-name').value = product.name;
-        $('#product-category').value = product.category || '';
-        $('#product-price').value = product.price || 0;
-        $('#product-barcode').value = product.barcode || '';
-        $('#product-stock').value = product.stock || 0;
-      }
-      modalProduct.classList.remove('hidden');
+  /* ---------------------------
+     Product modal logic
+     --------------------------- */
+  const modalProduct = $('#modal-product');
+  $('#open-add-product').addEventListener('click', ()=> openProductModal());
+  function openProductModal(product){
+    $('#form-product').reset(); $('#product-id').value='';
+    if(product){ $('#product-id').value = product.id; $('#product-name').value = product.name; $('#product-category').value = product.category||''; $('#product-price').value = product.price||0; $('#product-barcode').value = product.barcode||''; $('#product-stock').value = product.stock||0; }
+    showModal('modal-product', { focusSelector:'#product-name' });
+  }
+  $('#form-product').onsubmit = async e=>{ e.preventDefault(); const id = $('#product-id').value || uid(); const prod = { id, name: $('#product-name').value.trim(), category: $('#product-category').value.trim(), price: Number($('#product-price').value)||0, barcode: $('#product-barcode').value.trim(), stock: Number($('#product-stock').value)||0, createdAt:new Date().toISOString() }; await put('products', prod); closeModal('modal-product'); await refreshAll(); };
+
+  /* ---------------------------
+     Income logic
+     --------------------------- */
+  $('#open-income').onclick = ()=> openIncomeModal();
+  function renderIncomeSelects(){ const sel = $('#income-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} — Stock: ${p.stock||0}`; sel.appendChild(o); }); }
+  function openIncomeModal(){ renderIncomeSelects(); showModal('modal-income'); }
+  function openIncomeFor(productId){ renderIncomeSelects(); $('#income-product').value = productId; showModal('modal-income'); }
+  $('#form-income').onsubmit = async e=>{ e.preventDefault(); const pid = $('#income-product').value; const qty = Number($('#income-qty').value)||0; const p = state.products.find(x=>x.id===pid); p.stock = (p.stock||0) + qty; await put('products',p); await add('movements', { id:uid(), type:'income', productId: pid, qty, date: new Date().toISOString() }); closeModal('modal-income'); await refreshAll(); };
+
+  /* ---------------------------
+     Sale (full)
+     --------------------------- */
+  $('#open-sale').onclick = ()=> { showModal('modal-sale'); openSaleModal(); };
+  function openSaleModal(){ $('#sale-items').innerHTML=''; addSaleItemRow(); updateSaleTotal(); }
+  function addSaleItemRow(productId=''){ const row=document.createElement('div'); row.className='grid grid-cols-12 gap-2 items-center'; row.innerHTML = `<select class="col-span-6 px-2 py-1 border sale-product"></select><input type="number" class="col-span-2 px-2 py-1 border sale-qty" value="1" min="1"><input type="number" step="0.01" class="col-span-2 px-2 py-1 border sale-price" placeholder="Precio"><button type="button" class="col-span-2 px-2 py-1 border sale-remove">Quitar</button>`; $('#sale-items').appendChild(row); fillSaleRow(row, productId); }
+  function fillSaleRow(row, productId){ const sel = row.querySelector('.sale-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); }); if(productId) sel.value = productId; const price = row.querySelector('.sale-price'); const qty = row.querySelector('.sale-qty'); sel.onchange = ()=>{ const p = state.products.find(x=>x.id===sel.value); price.value = p ? p.price : ''; updateSaleTotal(); }; price.oninput = updateSaleTotal; qty.oninput = updateSaleTotal; row.querySelector('.sale-remove').onclick = ()=>{ row.remove(); updateSaleTotal(); }; }
+  $('#add-sale-item').onclick = ()=> addSaleItemRow();
+  function updateSaleTotal(){ let t=0; document.querySelectorAll('#sale-items > div').forEach(r=>{ const q=Number(r.querySelector('.sale-qty').value)||0; const p=Number(r.querySelector('.sale-price').value)||0; t += q*p; }); $('#sale-total').textContent = money(t); }
+  $('#form-sale').onsubmit = async e=>{ e.preventDefault(); const customer = $('#sale-customer').value.trim(); const payment = $('#sale-payment').value; const items=[]; document.querySelectorAll('#sale-items > div').forEach(r=>{ const pid = r.querySelector('.sale-product').value; const qty = Number(r.querySelector('.sale-qty').value)||0; const price = Number(r.querySelector('.sale-price').value)||0; if(qty>0) items.push({ productId: pid, qty, price }); }); if(items.length===0) return alert('Agregar al menos un producto'); for(const it of items){ const p = state.products.find(x=>x.id===it.productId); p.stock = (p.stock||0) - it.qty; await put('products', p); await add('movements', { id:uid(), type:'sale', productId: it.productId, qty: it.qty, date: new Date().toISOString() }); } const total = items.reduce((s,i)=>s + i.qty*i.price,0); const date = new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); const sale = { id:uid(), items, total, date, customerName: customer || null, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName }; await add('sales', sale); if(payment === 'A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customer, balance: prev + total, lastSale: date }); } closeModal('modal-sale'); await refreshAll(); };
+
+  /* ---------------------------
+     Quick sale
+     --------------------------- */
+  $('#open-quick-sale').onclick = ()=> { renderQuickSelect(); showModal('modal-quick-sale'); };
+  function renderQuickSelect(){ const sel=$('#quick-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); }); updateQuickTotal(); }
+  $('#quick-search').oninput = debounce(function(){ const v=this.value.trim().toLowerCase(); if(!v) return; const digits = v.replace(/\D/g,''); let found=null; if(digits.length>0) found = state.products.find(p => (p.barcode||'').replace(/\D/g,'').endsWith(digits) || (p.barcode||'')===v); if(!found) found = state.products.find(p => p.name.toLowerCase().includes(v)); if(found) $('#quick-product').value = found.id; updateQuickTotal(); },160);
+  function updateQuickTotal(){ const pid=$('#quick-product').value; const qty=Number($('#quick-qty').value)||0; const p = state.products.find(x=>x.id===pid); $('#quick-total').textContent = money(p ? p.price*qty : 0); }
+  $('#quick-product').onchange = updateQuickTotal; $('#quick-qty').oninput = updateQuickTotal;
+  const quickCart = [];
+  $('#quick-add-cart').onclick = function(){ const pid=$('#quick-product').value; const qty=Number($('#quick-qty').value)||1; const p = state.products.find(x=>x.id===pid); if(!p) return alert('Selecciona un producto'); quickCart.push({ productId: pid, qty, price: p.price }); renderQuickCart(); };
+  function renderQuickCart(){ const el = $('#quick-cart'); el.innerHTML=''; quickCart.forEach((it,idx)=>{ const p = state.products.find(x=>x.id===it.productId); const d=document.createElement('div'); d.className='flex justify-between items-center'; d.innerHTML = `<div>${p.name} x ${it.qty}</div><div>${money(it.qty*it.price)} <button data-idx="${idx}" class="ml-2 text-sm text-red-600 btn-remove-quick">Quitar</button></div>`; el.appendChild(d); }); $$('.btn-remove-quick').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); }); }
+  $('#form-quick-sale').onsubmit = async function(e){ e.preventDefault(); if(quickCart.length===0) return alert('Agregar productos'); const customer=$('#quick-customer').value.trim(); const payment=$('#quick-payment').value; for(const it of quickCart){ const p = state.products.find(x=>x.id===it.productId); p.stock=(p.stock||0)-it.qty; await put('products',p); await add('movements',{ id:uid(), type:'sale', productId:it.productId, qty:it.qty, date:new Date().toISOString() }); } const total = quickCart.reduce((s,i)=>s+i.qty*i.price,0); const date=new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); const sale = { id:uid(), items: quickCart.slice(), total, date, customerName: customer || null, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName }; await add('sales', sale); if(payment === 'A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers',{ name: customer, balance: prev + total, lastSale: date }); } quickCart.length=0; closeModal('modal-quick-sale'); await refreshAll(); };
+
+  /* quickSellPrompt (from inventory or scanner) */
+  async function quickSellPrompt(productId){
+    const qtyStr = prompt('Cantidad a vender (rápido):','1'); if(!qtyStr) return;
+    const qty = Math.max(1, Number(qtyStr));
+    const payment = prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO', 'EFECTIVO') || 'EFECTIVO';
+    let customerName = null;
+    if(payment.toUpperCase() === 'A_CREDITO') customerName = prompt('Nombre del cliente:') || null;
+    const prod = state.products.find(p=>p.id===productId); if(!prod) return alert('Producto no encontrado');
+    prod.stock = (prod.stock||0) - qty; await put('products', prod);
+    await add('movements', { id:uid(), type:'sale', productId, qty, date: new Date().toISOString() });
+    const total = qty * prod.price;
+    const date = new Date().toISOString();
+    const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD();
+    const responsibleObj = await get('responsibles', respDate).catch(()=>null);
+    const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||'');
+    await add('sales', { id:uid(), items:[{ productId, qty, price: prod.price }], total, date, customerName, paid: (payment.toUpperCase()!=='A_CREDITO'), paymentType: payment.toUpperCase(), responsible: responsibleName });
+    if(payment.toUpperCase()==='A_CREDITO' && customerName){ const existing = await get('customers', customerName).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customerName, balance: prev + total, lastSale: date }); }
+    await refreshAll();
+  }
+
+  /* ---------------------------
+     Clients modal (A CREDITO)
+     --------------------------- */
+  $('#open-clients').onclick = ()=> showModal('modal-clients');
+  $('#add-client').onclick = async ()=> { const name = $('#client-name').value.trim(); if(!name) return alert('Ingresa nombre'); const existing = await get('customers', name).catch(()=>null); if(existing) return alert('Cliente ya existe'); await put('customers', { name, balance: 0, createdAt: new Date().toISOString() }); $('#client-name').value=''; await refreshAll(); showModal('modal-clients'); };
+  async function renderClients(){
+    const el = $('#clients-list'); el.innerHTML=''; const clients = state.customers || [];
+    if(!clients.length) el.innerHTML = '<div class="text-sm text-gray-600">No hay clientes registrados.</div>';
+    for(const c of clients){
+      const d=document.createElement('div'); d.className='p-2 border-b flex justify-between items-center';
+      d.innerHTML = `<div><div class="font-medium">${c.name}</div><div class="text-xs text-gray-500">Saldo: S/ ${money(c.balance||0)}</div></div>
+        <div class="flex gap-2"><button data-name="${c.name}" class="px-2 py-1 border rounded btn-abono">Abono</button><button data-name="${c.name}" class="px-2 py-1 bg-green-600 text-white rounded btn-saldar">Saldar</button></div>`;
+      el.appendChild(d);
     }
-    $('#form-product').onsubmit = async e => {
-      e.preventDefault();
-      const id = $('#product-id').value || uid();
-      const prod = {
-        id,
-        name: $('#product-name').value.trim(),
-        category: $('#product-category').value.trim(),
-        price: Number($('#product-price').value) || 0,
-        barcode: $('#product-barcode').value.trim(),
-        stock: Number($('#product-stock').value) || 0,
-        createdAt: new Date().toISOString()
-      };
-      await put('products', prod);
-      modalProduct.classList.add('hidden');
-      await refreshAll();
-    };
+    $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = await get('customers', name); const newBal = (c.balance||0) - amt; await put('customers', { name, balance: newBal < 0 ? 0 : newBal, lastPayment: new Date().toISOString() }); alert('Abono registrado'); await refreshAll(); });
+    $$('.btn-saldar').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; if(!confirm(`¿Saldar cuenta de ${name}? Esto pondrá su saldo a 0.`)) return; await put('customers',{ name, balance: 0, lastPayment: new Date().toISOString() }); alert('Cuenta saldada'); await refreshAll(); });
+  }
 
-    /* ----------------------------- Income ---------------------------- */
-    const modalIncome = $('#modal-income');
-    $('#open-income').onclick = ()=> openIncomeModal();
-    $('#close-income').onclick = ()=> modalIncome.classList.add('hidden');
+  /* ---------------------------
+     Responsible (one per day)
+     --------------------------- */
+  $('#save-responsible').onclick = async ()=>{
+    const date = $('#responsible-date').value; const name = $('#responsible-name').value.trim();
+    if(!date) return alert('Selecciona fecha');
+    const existing = await get('responsibles', date).catch(()=>null);
+    if(existing && existing.name && existing.name !== name){ if(!confirm(`Ya existe un responsable para ${date}: "${existing.name}". ¿Sobrescribir?`)) return; }
+    await put('responsibles', { date, name }); alert('Responsable guardado'); await refreshAll();
+  };
+  async function updateResponsibleBanner(){ const today = todayYMD(); $('#responsible-date').value = today; const r = await get('responsibles', today).catch(()=>null); if(r && r.name){ $('#responsible-display').textContent = `${r.name} (${today})`; $('#responsible-name').value = r.name; } else { $('#responsible-display').textContent = 'Sin encargado asignado para hoy'; $('#responsible-name').value = ''; } }
 
-    function renderIncomeSelects(){ const sel = $('#income-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o = document.createElement('option'); o.value=p.id; o.textContent=`${p.name} — Stock: ${p.stock||0}`; sel.appendChild(o); }); }
-    function openIncomeModal(){ renderIncomeSelects(); modalIncome.classList.remove('hidden'); }
-    function openIncomeFor(productId){ renderIncomeSelects(); $('#income-product').value = productId; modalIncome.classList.remove('hidden'); }
+  /* ---------------------------
+     Charts
+     --------------------------- */
+  let chartSales, chartStock;
+  function updateCharts(){
+    const salesData = state.sales.slice(-8).map(s=>({ x: new Date(s.date).toLocaleString(), y: s.total }));
+    const ctxS = $('#chart-sales').getContext('2d'); if(chartSales) chartSales.destroy();
+    chartSales = new Chart(ctxS, { type:'bar', data:{ labels: salesData.map(s=>s.x), datasets:[{ label:'Ventas', data: salesData.map(s=>s.y) }]}, options:{ responsive:true }});
+    const stockData = state.products.slice().sort((a,b)=>b.stock-a.stock).slice(0,6);
+    const ctxSt = $('#chart-stock').getContext('2d'); if(chartStock) chartStock.destroy();
+    chartStock = new Chart(ctxSt, { type:'pie', data:{ labels: stockData.map(p=>p.name), datasets:[{ label:'Stock', data: stockData.map(p=>p.stock) }]}, options:{ responsive:true }});
+  }
 
-    $('#form-income').onsubmit = async e => {
-      e.preventDefault();
-      const pid = $('#income-product').value;
-      const qty = Number($('#income-qty').value)||0;
-      const p = state.products.find(x=>x.id===pid);
-      p.stock = (p.stock||0)+qty;
-      await put('products', p);
-      await add('movements', { id: uid(), type:'income', productId: pid, qty, date: new Date().toISOString() });
-      modalIncome.classList.add('hidden');
-      await refreshAll();
-    };
+  /* ---------------------------
+     Reports (preview + print)
+     --------------------------- */
+  $('#open-report-modal').onclick = ()=> showModal('modal-report');
+  $('#btn-generate-report').onclick = async ()=> { const from = $('#report-from').value; const to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango'); const { previewHtml } = await buildReportHTML(from,to); $('#report-preview').innerHTML = previewHtml; };
+  $('#btn-print-report').onclick = async ()=> { const from = $('#report-from').value; const to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango'); const { printableHtml } = await buildReportHTML(from,to); const w = window.open('', '_blank'); w.document.open(); w.document.write(printableHtml); w.document.close(); setTimeout(()=> w.print(), 500); };
+  async function buildReportHTML(from,to){
+    const salesAll = await all('sales');
+    const sales = salesAll.filter(s => { const d = localYMDFromISO(s.date); return d>=from && d<=to; }).sort((a,b)=>a.date.localeCompare(b.date));
+    const company='MINIMARKET LA ESQUINA DEL AHORRO';
+    const responsibles = await all('responsibles'); const respMap={}; responsibles.forEach(r=> respMap[r.date]=r.name);
+    let totalAll=0; let rows='';
+    for(const s of sales){ const d = new Date(s.date).toLocaleString(); const resp = s.responsible || respMap[s.date.slice(0,10)] || ''; totalAll += Number(s.total||0); const customer = s.customerName ? `${s.customerName}${s.paid? '':' (A CREDITO)'}` : (s.paid? 'Contado':'A CREDITO'); const payment = s.paymentType || (s.paid? 'EFECTIVO':'A_CREDITO'); let itemsHtml = '<ul style="margin:0;padding-left:16px;">'; for(const it of s.items){ const p = state.products.find(x=>x.id===it.productId); itemsHtml += `<li>${p? p.name : it.productId} — ${it.qty} x ${money(it.price)} = ${money(it.qty*it.price)}</li>`; } itemsHtml += '</ul>'; rows += `<tr><td style="padding:8px">${d}</td><td style="padding:8px">${s.id}</td><td style="padding:8px">${customer}</td><td style="padding:8px">${resp}</td><td style="padding:8px">${payment}</td><td style="padding:8px">${itemsHtml}</td><td style="padding:8px;text-align:right">${money(s.total)}</td></tr>`; }
+    const fiadas = sales.filter(s => s.paid === false || (s.paymentType && s.paymentType.toUpperCase()==='A_CREDITO'));
+    let fiadasRows=''; for(const f of fiadas){ const d = new Date(f.date).toLocaleString(); fiadasRows += `<tr><td style="padding:8px">${d}</td><td style="padding:8px">${f.id}</td><td style="padding:8px">${f.customerName||'Sin nombre'}</td><td style="padding:8px">${f.responsible||''}</td><td style="padding:8px">${money(f.total)}</td></tr>`; }
+    const previewHtml = `<div><div style="display:flex;justify-content:space-between;align-items:center;"><div><h2>${company}</h2><div style="color:#666">Reporte de ventas</div></div><div style="text-align:right"><div>Generado: ${new Date().toLocaleString()}</div><div>Periodo: ${from} → ${to}</div></div></div><hr style="margin:12px 0;border:none;border-top:2px solid #222"><table style="width:100%;border-collapse:collapse"><thead><tr><th>Fecha</th><th>ID</th><th>Cliente</th><th>Encargado</th><th>Pago</th><th>Items</th><th style="text-align:right">Total</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas en este periodo</td></tr>'}</tbody></table><div style="margin-top:12px;text-align:right;font-weight:bold">Total período: ${money(totalAll)}</div>${fiadas.length ? `<hr style="margin:12px 0"><h4>Ventas por cobrar (A CREDITO)</h4><table style="width:100%;border-collapse:collapse;"><thead><tr><th>Fecha</th><th>ID</th><th>Cliente</th><th>Encargado</th><th>Monto</th></tr></thead><tbody>${fiadasRows}</tbody></table>` : ''}</div>`;
+    const printableHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Reporte ${from} - ${to}</title><style>body{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#111;margin:0;padding:16px}th{background:#f3f4f6;padding:8px;text-align:left}td{padding:8px;border-bottom:1px solid #ddd;vertical-align:top}</style></head><body>${previewHtml}</body></html>`;
+    return { previewHtml, printableHtml };
+  }
 
-    /* ----------------------------- Sale (full) ---------------------------- */
-    const modalSale = $('#modal-sale');
-    $('#open-sale').onclick = ()=> openSaleModal();
-    $('#close-sale').onclick = ()=> modalSale.classList.add('hidden');
+  /* ---------------------------
+     Export/Import
+     --------------------------- */
+  $('#btn-export').onclick = async ()=>{ const data = { products: await all('products'), sales: await all('sales'), movements: await all('movements'), customers: await all('customers'), responsibles: await all('responsibles') }; const blob = new Blob([JSON.stringify(data,null,2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'tienda-smart-export.json'; a.click(); URL.revokeObjectURL(url); };
+  $('#btn-import').onclick = ()=>{ const inp = document.createElement('input'); inp.type='file'; inp.accept='application/json'; inp.onchange = async ()=>{ const f = inp.files[0]; if(!f) return; const txt = await f.text(); const obj = JSON.parse(txt); if(obj.products) for(const p of obj.products) await put('products', p); if(obj.sales) for(const s of obj.sales) await put('sales', s); if(obj.movements) for(const m of obj.movements) await put('movements', m); if(obj.customers) for(const c of obj.customers) await put('customers', c); if(obj.responsibles) for(const r of obj.responsibles) await put('responsibles', r); await refreshAll(); }; inp.click(); };
 
-    function openSaleModal(){
-      modalSale.classList.remove('hidden');
-      $('#sale-items').innerHTML = '';
-      addSaleItemRow();
-      updateSaleTotal();
-    }
+  /* ---------------------------
+     SCANNER: OpenCV (WASM) preprocess + BarcodeDetector + Quagga fallback
+     --------------------------- */
+  let cvReady=false, awaitingCvInit=false;
+  if(window.cv && cv['onRuntimeInitialized']){ awaitingCvInit=true; cv['onRuntimeInitialized']=()=>{ cvReady=true; awaitingCvInit=false; console.info('OpenCV ready'); }; } else if(window.cv){ cvReady=true; }
 
-    function addSaleItemRow(productId=''){
-      const row = document.createElement('div');
-      row.className = 'grid grid-cols-12 gap-2 items-center';
-      row.innerHTML = `<select class="col-span-6 px-2 py-1 border sale-product"></select><input type="number" class="col-span-2 px-2 py-1 border sale-qty" value="1" min="1"><input type="number" step="0.01" class="col-span-2 px-2 py-1 border sale-price" placeholder="Precio"><button type="button" class="col-span-2 px-2 py-1 border sale-remove">Quitar</button>`;
-      $('#sale-items').appendChild(row);
-      fillSaleRow(row, productId);
-    }
+  const video = $('#video'); let videoStream=null, currentVideoTrack=null;
+  let detectionLoop=false, quaggaActive=false, readBuffer=[];
+  const READ_CONFIRM=4, READ_WINDOW_MS=2200;
+  let overlayCanvas = $('#overlay-canvas'); let overlayCtx = overlayCanvas ? overlayCanvas.getContext('2d') : null;
 
-    function fillSaleRow(row, productId){
-      const sel = row.querySelector('.sale-product'); sel.innerHTML = '';
-      state.products.forEach(p => { const o = document.createElement('option'); o.value = p.id; o.textContent = `${p.name} (stock ${p.stock||0})`; sel.appendChild(o); });
-      if (productId) sel.value = productId;
-      const price = row.querySelector('.sale-price');
-      const qty = row.querySelector('.sale-qty');
-      sel.onchange = ()=> { const p = state.products.find(x=>x.id===sel.value); price.value = p ? p.price : ''; updateSaleTotal(); };
-      price.oninput = updateSaleTotal; qty.oninput = updateSaleTotal;
-      row.querySelector('.sale-remove').onclick = ()=> { row.remove(); updateSaleTotal(); };
-    }
+  function resizeOverlay(){ overlayCanvas = $('#overlay-canvas'); if(!overlayCanvas) return; overlayCanvas.width = video.clientWidth; overlayCanvas.height = video.clientHeight; overlayCtx = overlayCanvas.getContext('2d'); }
+  function clearOverlay(){ if(!overlayCtx) resizeOverlay(); overlayCtx.clearRect(0,0,overlayCanvas.width, overlayCanvas.height); }
 
-    $('#add-sale-item').onclick = ()=> addSaleItemRow();
-    function updateSaleTotal(){
-      let t = 0;
-      document.querySelectorAll('#sale-items > div').forEach(r=>{
-        const q = Number(r.querySelector('.sale-qty').value)||0;
-        const p = Number(r.querySelector('.sale-price').value)||0;
-        t += q*p;
-      });
-      $('#sale-total').textContent = money(t);
-    }
+  function pushRead(code){ const now = Date.now(); readBuffer = readBuffer.filter(r=> now - r.t < READ_WINDOW_MS); readBuffer.push({ code, t: now }); const last = readBuffer.slice(-READ_CONFIRM); if(last.length >= READ_CONFIRM && last.every(x=> x.code === last[0].code)) return last[0].code; return null; }
 
-    $('#form-sale').onsubmit = async e => {
-      e.preventDefault();
-      const customer = $('#sale-customer').value.trim();
-      const payment = $('#sale-payment').value; // EFECTIVO/YAPE/FIAR
-      const items = [];
-      document.querySelectorAll('#sale-items > div').forEach(r=>{
-        const pid = r.querySelector('.sale-product').value;
-        const qty = Number(r.querySelector('.sale-qty').value)||0;
-        const price = Number(r.querySelector('.sale-price').value)||0;
-        if (qty>0) items.push({ productId: pid, qty, price });
-      });
-      if (items.length===0) return alert('Agregar al menos un producto');
+  async function startCameraHighRes(){
+    try{
+      const constraints = { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1920 }, height:{ ideal:1080 }, advanced:[{ focusMode:'continuous' }] } };
+      videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = videoStream; currentVideoTrack = videoStream.getVideoTracks()[0];
+      const caps = currentVideoTrack.getCapabilities ? currentVideoTrack.getCapabilities() : {};
+      if(caps && caps.torch) $('#toggle-torch').classList.remove('hidden'); else $('#toggle-torch').classList.add('hidden');
+      await video.play(); resizeOverlay();
+    }catch(err){ console.warn('startCameraHighRes', err); alert('No se pudo acceder a la cámara. Revisa permisos o usa https/localhost.'); throw err; }
+  }
 
-      // update stocks & movements
-      for (const it of items){
-        const p = state.products.find(x=>x.id===it.productId);
-        p.stock = (p.stock||0) - it.qty;
-        await put('products', p);
-        await add('movements', { id: uid(), type:'sale', productId: it.productId, qty: it.qty, date: new Date().toISOString() });
-      }
+  async function captureProcessedFrame(){
+    const w = video.videoWidth || 1280, h = video.videoHeight || 720;
+    const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.filter = 'contrast(140%) brightness(105%) saturate(115%)';
+    ctx.drawImage(video, 0, 0, w, h);
 
-      const total = items.reduce((s,i)=>s + i.qty*i.price, 0);
-      const date = new Date().toISOString();
-
-      // responsible for sale date (lookup today's responsible)
-      const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : localYMDFromISO(new Date().toISOString());
-      const responsibleObj = await get('responsibles', respDate).catch(()=>null);
-      const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||'');
-
-      // sale object
-      const sale = { id: uid(), items, total, date, customerName: customer || null, paid: (payment!=='FIAR'), paymentType: payment, responsible: responsibleName };
-      await add('sales', sale);
-
-      // update customer balance if FIAR
-      if (payment === 'FIAR' && customer){
-        const existing = await get('customers', customer).catch(()=>null);
-        const prev = existing && existing.balance ? existing.balance : 0;
-        await put('customers', { name: customer, balance: prev + total, lastSale: date });
-      }
-
-      modalSale.classList.add('hidden');
-      await refreshAll();
-    };
-
-    /* ----------------------------- Quick Sale ---------------------------- */
-    const modalQuickSale = $('#modal-quick-sale');
-    $('#open-quick-sale').onclick = ()=> openQuickSale();
-    $('#close-quick-sale').onclick = ()=> modalQuickSale.classList.add('hidden');
-    function renderQuickSelect(){
-      const sel = $('#quick-product'); sel.innerHTML='';
-      state.products.forEach(p=>{ const o = document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); });
-      updateQuickTotal();
-    }
-    function openQuickSale(){
-      renderQuickSelect();
-      $('#quick-cart').innerHTML='';
-      $('#quick-search').value=''; $('#quick-qty').value = 1; $('#quick-customer').value=''; $('#quick-payment').value='EFECTIVO';
-      modalQuickSale.classList.remove('hidden');
-    }
-
-    $('#quick-search').oninput = function(){
-      const v = this.value.trim().toLowerCase(); if (!v) return;
-      const digits = v.replace(/\D/g,'');
-      let found = null;
-      if (digits.length>0) found = state.products.find(p => (p.barcode||'').replace(/\D/g,'').endsWith(digits) || (p.barcode||'')===v);
-      if (!found) found = state.products.find(p => p.name.toLowerCase().includes(v));
-      if (found) $('#quick-product').value = found.id;
-      updateQuickTotal();
-    };
-    function updateQuickTotal(){
-      const pid = $('#quick-product').value;
-      const qty = Number($('#quick-qty').value) || 0;
-      const p = state.products.find(x=>x.id===pid);
-      $('#quick-total').textContent = money(p ? p.price*qty : 0);
-    }
-    $('#quick-product').onchange = updateQuickTotal; $('#quick-qty').oninput = updateQuickTotal;
-
-    const quickCart = [];
-    $('#quick-add-cart').onclick = function(){
-      const pid = $('#quick-product').value;
-      const qty = Number($('#quick-qty').value) || 1;
-      const p = state.products.find(x=>x.id===pid);
-      if (!p) return alert('Selecciona un producto');
-      quickCart.push({ productId: pid, qty, price: p.price });
-      renderQuickCart();
-    };
-    function renderQuickCart(){
-      const el = $('#quick-cart'); el.innerHTML = '';
-      quickCart.forEach((it, idx)=>{
-        const p = state.products.find(x=>x.id===it.productId);
-        const d = document.createElement('div'); d.className='flex justify-between items-center';
-        d.innerHTML = `<div>${p.name} x ${it.qty}</div><div>${money(it.qty*it.price)} <button data-idx="${idx}" class="ml-2 text-sm text-red-600 btn-remove-quick">Quitar</button></div>`;
-        el.appendChild(d);
-      });
-      $$('.btn-remove-quick').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); });
-    }
-
-    $('#form-quick-sale').onsubmit = async function(e){
-      e.preventDefault();
-      if (quickCart.length===0) return alert('Agregar al menos un producto al carrito');
-      const customer = $('#quick-customer').value.trim();
-      const payment = $('#quick-payment').value; // EFECTIVO/YAPE/FIAR
-
-      for (const it of quickCart){
-        const p = state.products.find(x=>x.id===it.productId);
-        p.stock = (p.stock||0) - it.qty;
-        await put('products', p);
-        await add('movements', { id: uid(), type:'sale', productId: it.productId, qty: it.qty, date: new Date().toISOString() });
-      }
-
-      const total = quickCart.reduce((s,i)=>s + i.qty*i.price, 0);
-      const date = new Date().toISOString();
-      const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : localYMDFromISO(new Date().toISOString());
-      const responsibleObj = await get('responsibles', respDate).catch(()=>null);
-      const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||'');
-
-      const sale = { id: uid(), items: quickCart.slice(), total, date, customerName: customer || null, paid: (payment!=='FIAR'), paymentType: payment, responsible: responsibleName };
-      await add('sales', sale);
-
-      if (payment === 'FIAR' && customer){
-        const existing = await get('customers', customer).catch(()=>null);
-        const prev = existing && existing.balance ? existing.balance : 0;
-        await put('customers', { name: customer, balance: prev + total, lastSale: date });
-      }
-
-      quickCart.length = 0;
-      modalQuickSale.classList.add('hidden');
-      await refreshAll();
-    };
-
-    // quick sell from scanner (with payment selection flow)
-    async function quickSellPrompt(productId){
-      const qtyStr = prompt('Cantidad a vender (rápido):', '1');
-      if (!qtyStr) return;
-      const qty = Math.max(1, Number(qtyStr));
-      const payment = prompt('Tipo pago: EFECTIVO, YAPE o FIAR', 'EFECTIVO') || 'EFECTIVO';
-      let customerName = null;
-      if (payment.toUpperCase() === 'FIAR') customerName = prompt('Nombre del cliente:') || null;
-      const prod = state.products.find(p=>p.id===productId);
-      if (!prod) return alert('Producto no encontrado');
-      prod.stock = (prod.stock||0) - qty;
-      await put('products', prod);
-      await add('movements', { id: uid(), type:'sale', productId, qty, date: new Date().toISOString() });
-      const total = qty * prod.price;
-      const date = new Date().toISOString();
-      const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : localYMDFromISO(new Date().toISOString());
-      const responsibleObj = await get('responsibles', respDate).catch(()=>null);
-      const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||'');
-      await add('sales', { id: uid(), items:[{ productId, qty, price: prod.price }], total, date, customerName, paid: (payment.toUpperCase()!=='FIAR'), paymentType: payment.toUpperCase(), responsible: responsibleName });
-      if (payment.toUpperCase() === 'FIAR' && customerName){
-        const existing = await get('customers', customerName).catch(()=>null);
-        const prev = existing && existing.balance ? existing.balance : 0;
-        await put('customers', { name: customerName, balance: prev + total, lastSale: date });
-      }
-      await refreshAll();
-    }
-
-    /* ----------------------------- Search & misc UI ---------------------------- */
-    $('#search').oninput = e => renderInventory(e.target.value);
-    $('#btn-dark').onclick = ()=> document.documentElement.classList.toggle('dark');
-
-    /* ----------------------------- Responsible (encargado) ---------------------------- */
-    $('#save-responsible').onclick = async ()=>{
-      const date = $('#responsible-date').value;
-      const name = $('#responsible-name').value.trim();
-      if (!date) return alert('Selecciona una fecha');
-      await put('responsibles', { date, name });
-      alert('Responsable guardado para ' + date);
-    };
-
-    /* Ensure a responsible exists for today (prompt once on first load) */
-    async function ensureTodayResponsible(){
-      const today = localYMDFromISO(new Date().toISOString());
-      $('#responsible-date').value = today;
-      const r = await get('responsibles', today).catch(()=>null);
-      if (r && r.name){ $('#responsible-name').value = r.name; return; }
-      // ask user to input responsible for today (small non-blocking prompt)
-      const name = prompt('No hay encargado para hoy ('+today+'). Ingresa nombre del encargado (opcional):');
-      if (name !== null && name.trim() !== ''){
-        await put('responsibles', { date: today, name: name.trim() });
-        $('#responsible-name').value = name.trim();
-      }
-    }
-
-    /* ----------------------------- Charts ---------------------------- */
-    let chartSales, chartStock;
-    function updateCharts(){
-      const salesData = state.sales.slice(-10).map(s=>({ x: new Date(s.date).toLocaleString(), y: s.total }));
-      const ctxS = $('#chart-sales').getContext('2d');
-      if (chartSales) chartSales.destroy();
-      chartSales = new Chart(ctxS, { type:'bar', data:{ labels:salesData.map(s=>s.x), datasets:[{ label:'Ventas', data:salesData.map(s=>s.y) }]}, options:{ responsive:true }});
-      const stockData = state.products.slice().sort((a,b)=>b.stock-a.stock).slice(0,6);
-      const ctxSt = $('#chart-stock').getContext('2d');
-      if (chartStock) chartStock.destroy();
-      chartStock = new Chart(ctxSt, { type:'pie', data:{ labels:stockData.map(p=>p.name), datasets:[{ label:'Stock', data:stockData.map(p=>p.stock) }]}, options:{ responsive:true }});
-    }
-
-    /* ----------------------------- Barcode scanner (same robust approach) ---------------------------- */
-    let videoStream; let quaggaActive=false; let detector; let readBuffer=[];
-    const READ_CONFIRM=3, READ_WINDOW_MS=1500;
-    let overlayCanvas = $('#overlay-canvas'), overlayCtx = overlayCanvas ? overlayCanvas.getContext('2d') : null;
-    const video = $('#video'), scannedCodeInput = $('#scanned-code'), toggleTorchBtn = $('#toggle-torch');
-    let currentVideoTrack=null, torchOn=false;
-
-    function normalizeCode(code){ return (code||'').trim(); }
-    async function startCamera(){
+    if(cvReady){
       try{
-        const constraints = { video: { facingMode: { ideal:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } } };
-        videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = videoStream;
-        currentVideoTrack = videoStream.getVideoTracks()[0];
-        const caps = currentVideoTrack.getCapabilities ? currentVideoTrack.getCapabilities() : {};
-        if (caps.torch && toggleTorchBtn) toggleTorchBtn.classList.remove('hidden'); else if (toggleTorchBtn) toggleTorchBtn.classList.add('hidden');
-        await video.play(); resizeOverlay();
-      }catch(e){ console.error('camera', e); alert('No se pudo acceder a la cámara. Usa HTTPS o localhost y revisa permisos.'); }
+        let src = cv.imread(canvas);
+        let gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+        let blurred = new cv.Mat(); cv.bilateralFilter(gray, blurred, 9, 75, 75, cv.BORDER_DEFAULT);
+        let clahe = new cv.Mat();
+        try{ let claheObj = new cv.CLAHE(3.0, new cv.Size(8,8)); claheObj.apply(blurred, clahe); claheObj.delete(); }catch(x){ cv.equalizeHist(blurred, clahe); }
+        let thresh = new cv.Mat(); cv.adaptiveThreshold(clahe, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 47, 10);
+        let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3,3));
+        cv.morphologyEx(thresh, thresh, cv.MORPH_CLOSE, kernel);
+        let out = new cv.Mat(); cv.cvtColor(thresh, out, cv.COLOR_GRAY2RGBA);
+        cv.imshow(canvas, out);
+        src.delete(); gray.delete(); blurred.delete(); clahe.delete(); thresh.delete(); kernel.delete(); out.delete();
+        const bitmap = await createImageBitmap(canvas);
+        return bitmap;
+      }catch(err){
+        console.warn('OpenCV error', err);
+        return await createImageBitmap(canvas);
+      }
+    } else {
+      return await createImageBitmap(canvas);
     }
-    function resizeOverlay(){ overlayCanvas = $('#overlay-canvas'); if (!overlayCanvas) return; overlayCanvas.width = video.clientWidth; overlayCanvas.height = video.clientHeight; overlayCtx = overlayCanvas.getContext('2d'); }
-    async function stopCamera(){ if (videoStream) videoStream.getTracks().forEach(t=>t.stop()); video.srcObject=null; videoStream=null; currentVideoTrack=null; if (quaggaActive && window.Quagga) try{ Quagga.stop(); }catch(e){} clearOverlay(); readBuffer=[]; }
-    function clearOverlay(){ if (overlayCtx) overlayCtx.clearRect(0,0,overlayCanvas.width, overlayCanvas.height); }
-    function pushRead(code){
-      const now = Date.now();
-      readBuffer = readBuffer.filter(r => now - r.t < READ_WINDOW_MS);
-      readBuffer.push({ code, t: now });
-      const last = readBuffer.slice(-READ_CONFIRM);
-      if (last.length >= READ_CONFIRM && last.every(x=>x.code === last[0].code)) return last[0].code;
-      return null;
-    }
+  }
 
-    async function startBarcodeDetection(){
-      scannedCodeInput.value=''; readBuffer=[];
-      if ('BarcodeDetector' in window){
-        try{
-          detector = new BarcodeDetector({ formats: ['ean_13','qr_code','code_128','upc_e','ean_8','upc_a'] });
-          await startCamera();
-          const loop = async ()=>{
-            if (!video || video.readyState < 2){ requestAnimationFrame(loop); return; }
-            try{
-              const barcodes = await detector.detect(video);
-              clearOverlay();
-              if (barcodes && barcodes.length>0){
-                barcodes.forEach(b=> { if (b.boundingBox) drawBoundingBox(b.boundingBox); });
-                const candidate = normalizeCode(barcodes[0].rawValue);
-                const confirmed = pushRead(candidate);
-                if (confirmed){
-                  scannedCodeInput.value = confirmed;
-                  if (overlayCtx){
-                    overlayCtx.font='20px monospace';
-                    overlayCtx.fillStyle='rgba(0,0,0,0.6)';
-                    const w = overlayCtx.measureText(confirmed).width + 20;
-                    overlayCtx.fillRect(10,10,w,36);
-                    overlayCtx.fillStyle='white';
-                    overlayCtx.fillText(confirmed,20,36);
-                  }
-                }
-              }
-            }catch(e){ console.warn('detector fail', e); fallbackQuagga(); }
-            requestAnimationFrame(loop);
-          };
-          requestAnimationFrame(loop);
-          return;
-        }catch(e){ console.warn('barcodeDetector init', e); fallbackQuagga(); }
-      } else fallbackQuagga();
-    }
+  function computeROI(bitmap){ const bw = bitmap.width, bh = bitmap.height; const w = Math.floor(bw * 0.6), h = Math.floor(bh * 0.28); const sx = Math.floor((bw-w)/2), sy = Math.floor((bh-h)/2); return { sx, sy, sw: w, sh: h }; }
 
-    function drawBoundingBox(b){ try{ if (!overlayCtx) resizeOverlay(); overlayCtx.strokeStyle='lime'; overlayCtx.lineWidth=3; overlayCtx.strokeRect(b.x, b.y, b.width, b.height); }catch(e){} }
-
-    function fallbackQuagga(){
-      startCamera().then(()=>{
-        if (!window.Quagga) return;
-        quaggaActive=true;
-        Quagga.init({
-          inputStream: { name:'Live', type:'LiveStream', target:'#video', constraints:{ facingMode:'environment', width:1280, height:720 } },
-          locator: { patchSize:'medium', halfSample:true },
-          decoder: { readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader'] },
-          locate: true
-        }, function(err){ if (err){ console.error('Quagga init', err); return; } Quagga.start(); });
-
-        Quagga.onProcessed(function(result){
-          clearOverlay();
-          if (!result) return;
-          if (result.boxes) result.boxes.filter(b => b !== result.box).forEach(b => drawPath(b,'rgba(255,255,255,0.2)'));
-          if (result.box) drawPath(result.box,'lime');
-        });
-
-        Quagga.onDetected(function(data){
-          const code = data && data.codeResult && data.codeResult.code;
-          if (code){
-            const candidate = normalizeCode(code);
-            const confirmed = pushRead(candidate);
-            if (confirmed){
-              scannedCodeInput.value = confirmed;
-              try{ Quagga.stop(); }catch(e){}
+  async function startBarcodeDetection(){
+    $('#scanned-code').value=''; readBuffer=[];
+    if(awaitingCvInit){ console.info('Esperando OpenCV...'); while(awaitingCvInit) await new Promise(r=>setTimeout(r,100)); }
+    try{
+      if('BarcodeDetector' in window){
+        const detector = new BarcodeDetector({ formats: ['ean_13','code_128','upc_e','upc_a','ean_8'] });
+        await startCameraHighRes();
+        detectionLoop = true;
+        while(detectionLoop){
+          if(!video || video.readyState < 2){ await new Promise(r=>setTimeout(r,100)); continue; }
+          try{
+            const bitmap = await captureProcessedFrame();
+            const roi = computeROI(bitmap);
+            const cropped = await createImageBitmap(bitmap, roi.sx, roi.sy, roi.sw, roi.sh);
+            const barcodes = await detector.detect(cropped);
+            clearOverlay(); drawROI(roi);
+            if(barcodes && barcodes.length>0){
+              const candidate = (barcodes[0].rawValue || '').trim();
+              const confirmed = pushRead(candidate);
+              if(confirmed){ $('#scanned-code').value = confirmed; showConfirmation(confirmed); await new Promise(r=>setTimeout(r,800)); } 
             }
+            bitmap.close(); cropped.close();
+          }catch(err){
+            console.warn('BarcodeDetector loop error', err); detectionLoop = false; fallbackQuagga(); break;
           }
-        });
-
-        function drawPath(path, color){
-          if (!overlayCtx) resizeOverlay();
-          overlayCtx.strokeStyle=color; overlayCtx.lineWidth=3; overlayCtx.beginPath(); overlayCtx.moveTo(path[0].x, path[0].y);
-          for (let i=1;i<path.length;i++) overlayCtx.lineTo(path[i].x, path[i].y);
-          overlayCtx.closePath(); overlayCtx.stroke();
+          await new Promise(r=>setTimeout(r,80));
         }
-      });
-    }
-
-    $('#open-scan').onclick = ()=> { $('#modal-scan').classList.remove('hidden'); startBarcodeDetection(); };
-    $('#close-scan').onclick = async ()=> { $('#modal-scan').classList.add('hidden'); await stopCamera(); };
-    $('#stop-camera').onclick = stopCamera;
-    if (toggleTorchBtn) toggleTorchBtn.onclick = async ()=>{ if (!currentVideoTrack) return; try{ torchOn = !torchOn; await currentVideoTrack.applyConstraints({ advanced:[{ torch: torchOn }] }); toggleTorchBtn.textContent = torchOn ? '🔦 ON' : '🔦 Linterna'; }catch(e){ console.warn('torch', e); alert('Linterna no soportada.'); } };
-
-    $('#fill-product').onclick = ()=> {
-      const code = $('#scanned-code').value.trim();
-      if (!code) return alert('No hay código detectado');
-      const p = findProductByCode(code);
-      if (p) openProductModal(p);
-      else { $('#product-barcode').value = code; openProductModal(); }
-    };
-
-    $('#quick-sell-detected').onclick = async ()=>{
-      const code = $('#scanned-code').value.trim();
-      if (!code) return alert('No hay código detectado');
-      const p = findProductByCode(code);
-      if (!p){ if (!confirm('Producto no encontrado. ¿Crear nuevo producto con este código?')) return; $('#product-barcode').value = code; openProductModal(); return; }
-      // offer quick payment options
-      const qty = Number(prompt('Cantidad a vender (rápido):','1')) || 1;
-      const payment = prompt('Tipo pago: EFECTIVO, YAPE o FIAR', 'EFECTIVO') || 'EFECTIVO';
-      let customer = null;
-      if (payment.toUpperCase()==='FIAR') customer = prompt('Nombre del cliente:') || null;
-
-      p.stock = (p.stock||0) - qty; await put('products', p);
-      await add('movements', { id: uid(), type:'sale', productId: p.id, qty, date: new Date().toISOString() });
-      const total = qty * p.price; const date = new Date().toISOString();
-      const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : localYMDFromISO(new Date().toISOString());
-      const responsibleObj = await get('responsibles', respDate).catch(()=>null);
-      const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||'');
-      await add('sales', { id: uid(), items:[{ productId: p.id, qty, price: p.price }], total, date, customerName: customer, paid: (payment.toUpperCase()!=='FIAR'), paymentType: payment.toUpperCase(), responsible: responsibleName });
-      if (payment.toUpperCase()==='FIAR' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customer, balance: prev + total, lastSale: date }); }
-      alert('Venta rápida registrada');
-      await refreshAll();
-    };
-
-    function findProductByCode(code){
-      const norm = (code||'').replace(/\D/g,'');
-      let p = state.products.find(x => (x.barcode||'') === code || (x.barcode||'').replace(/\D/g,'') === norm);
-      if (!p && norm.length>6) p = state.products.find(x => (x.barcode||'').replace(/\D/g,'').endsWith(norm));
-      return p;
-    }
-
-    /* ----------------------------- Reports: preview & print (fixed) ---------------------------- */
-    $('#open-report-modal').onclick = ()=> $('#modal-report').classList.remove('hidden');
-    $('#close-report').onclick = ()=> $('#modal-report').classList.add('hidden');
-
-    $('#btn-generate-report').onclick = async ()=>{
-      const from = $('#report-from').value;
-      const to = $('#report-to').value;
-      if (!from || !to) return alert('Selecciona rango de fechas');
-      const { previewHtml } = await buildReportHTML(from, to);
-      // render preview (only inner HTML snippet)
-      $('#report-preview').innerHTML = previewHtml;
-    };
-
-    $('#btn-print-report').onclick = async ()=>{
-      const from = $('#report-from').value;
-      const to = $('#report-to').value;
-      if (!from || !to) return alert('Selecciona rango de fechas');
-      const { printableHtml } = await buildReportHTML(from, to);
-      const w = window.open('', '_blank');
-      w.document.open();
-      w.document.write(printableHtml);
-      w.document.close();
-      // wait briefly then print
-      setTimeout(()=> w.print(), 400);
-    };
-
-    async function buildReportHTML(from, to){
-      // from/to are yyyy-mm-dd (local)
-      // Convert sales to local date string for comparison
-      const salesAll = await all('sales');
-      const sales = salesAll.filter(s=>{
-        const local = localYMDFromISO(s.date);
-        return local >= from && local <= to;
-      }).sort((a,b)=> a.date.localeCompare(b.date));
-
-      const company = 'MINIMARKET LA ESQUINA DEL AHORRO';
-      // responsible map
-      const responsibles = await all('responsibles'); const respMap = {};
-      responsibles.forEach(r => respMap[r.date] = r.name);
-
-      let totalAll = 0;
-      let rows = '';
-      // Build table rows for each sale
-      for (const s of sales){
-        const d = new Date(s.date).toLocaleString();
-        const resp = s.responsible || respMap[s.date.slice(0,10)] || '';
-        totalAll += Number(s.total||0);
-        const customer = s.customerName ? `${s.customerName}${s.paid? '':' (Por pagar)'}` : (s.paid? 'Contado' : 'Por pagar');
-        const payment = s.paymentType || (s.paid? 'EFECTIVO':'FIAR');
-        let itemsHtml = '<ul style="margin:0;padding-left:16px;">';
-        for (const it of s.items){
-          const p = state.products.find(x=>x.id===it.productId);
-          itemsHtml += `<li>${p? p.name : it.productId} — ${it.qty} x ${money(it.price)} = ${money(it.qty*it.price)}</li>`;
-        }
-        itemsHtml += '</ul>';
-        rows += `<tr>
-          <td class="report-td">${d}</td>
-          <td class="report-td">${s.id}</td>
-          <td class="report-td">${customer}</td>
-          <td class="report-td">${resp}</td>
-          <td class="report-td">${payment}</td>
-          <td class="report-td">${itemsHtml}</td>
-          <td class="report-td" style="text-align:right">${money(s.total)}</td>
-        </tr>`;
+        return;
+      } else {
+        fallbackQuagga();
       }
+    }catch(err){ console.warn('startBarcodeDetection error', err); fallbackQuagga(); }
+  }
 
-      // Build "Ventas por cobrar" (FIAR)
-      const fiadas = sales.filter(s => s.paid === false || (s.paymentType && s.paymentType.toUpperCase() === 'FIAR'));
-      let fiadasRows = '';
-      if (fiadas.length){
-        for (const f of fiadas){
-          const d = new Date(f.date).toLocaleString();
-          fiadasRows += `<tr>
-            <td class="report-td">${d}</td>
-            <td class="report-td">${f.id}</td>
-            <td class="report-td">${f.customerName || 'Sin nombre'}</td>
-            <td class="report-td">${f.responsible || ''}</td>
-            <td class="report-td">${money(f.total)}</td>
-          </tr>`;
-        }
-      }
+  function drawROI(roi){ if(!overlayCtx) resizeOverlay(); const scaleX = overlayCanvas.width / (video.videoWidth || 1); const scaleY = overlayCanvas.height / (video.videoHeight || 1); overlayCtx.strokeStyle='rgba(0,255,100,0.9)'; overlayCtx.lineWidth=3; overlayCtx.strokeRect(roi.sx*scaleX, roi.sy*scaleY, roi.sw*scaleX, roi.sh*scaleY); }
+  function showConfirmation(text){ if(!overlayCtx) resizeOverlay(); overlayCtx.font='20px monospace'; overlayCtx.fillStyle='rgba(0,0,0,0.6)'; const x=10, y=30; const w = overlayCtx.measureText(text).width + 20; overlayCtx.fillRect(x, y-22, w, 28); overlayCtx.fillStyle='white'; overlayCtx.fillText(text, x+8, y); }
 
-      // Preview HTML (inner snippet)
-      const previewHtml = `
-        <div class="report-preview-box">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <h2>${company}</h2>
-              <div style="color:#666">Reporte de ventas</div>
-            </div>
-            <div style="text-align:right">
-              <div>Generado: ${new Date().toLocaleString()}</div>
-              <div>Periodo: ${from} → ${to}</div>
-            </div>
-          </div>
-          <hr style="margin:12px 0 12px;border:none;border-top:2px solid #222">
-          <table class="report-table" style="width:100%;border-collapse:collapse">
-            <thead>
-              <tr>
-                <th>Fecha</th><th>ID Venta</th><th>Cliente</th><th>Encargado</th><th>Pago</th><th>Items</th><th style="text-align:right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas en este periodo</td></tr>'}
-            </tbody>
-          </table>
-          <div style="margin-top:12px;text-align:right;font-weight:bold">Total período: ${money(totalAll)}</div>
-          ${fiadas.length ? `<hr style="margin:12px 0"><h4>Ventas por cobrar (FIAR)</h4>
-            <table style="width:100%;border-collapse:collapse"><thead><tr><th>Fecha</th><th>ID</th><th>Cliente</th><th>Encargado</th><th>Monto</th></tr></thead><tbody>${fiadasRows}</tbody></table>` : ''}
-        </div>
-      `;
+  function fallbackQuagga(){ startCameraHighRes().then(()=>{ if(!window.Quagga) return alert('Quagga fallback no disponible'); quaggaActive = true; Quagga.init({ inputStream:{ name:'Live', type:'LiveStream', target:'#video', constraints:{ facingMode:'environment', width:1280, height:720 } }, locator:{ patchSize:'large', halfSample:false }, decoder:{ readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader'] }, locate:true }, err=>{ if(err){ console.error('Quagga init', err); return; } Quagga.start(); }); Quagga.onProcessed(result=>{ clearOverlay(); if(!result) return; if(result.boxes) result.boxes.filter(b=>b!==result.box).forEach(b=> drawPath(b,'rgba(255,255,255,0.2)')); if(result.box) drawPath(result.box,'lime'); }); Quagga.onDetected(data=>{ const code = data && data.codeResult && data.codeResult.code; if(code){ const confirmed = pushRead(code); if(confirmed){ $('#scanned-code').value = confirmed; try{ Quagga.stop(); }catch(e){} } } }); function drawPath(path, color){ if(!overlayCtx) resizeOverlay(); overlayCtx.strokeStyle = color; overlayCtx.lineWidth = 3; overlayCtx.beginPath(); overlayCtx.moveTo(path[0].x, path[0].y); for(let i=1;i<path.length;i++) overlayCtx.lineTo(path[i].x, path[i].y); overlayCtx.closePath(); overlayCtx.stroke(); } }).catch(e=>console.warn('fallbackQuagga camera fail', e)); }
 
-      // Printable full HTML
-      const printableHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Reporte ${from} - ${to}</title>
-        <style>
-          body{font-family: Arial,Helvetica,sans-serif;font-size:13px;color:#111;margin:0;padding:16px}
-          h2{margin:0}
-          table{width:100%;border-collapse:collapse}
-          th{background:#f3f4f6;padding:8px;text-align:left}
-          td{padding:8px;border-bottom:1px solid #ddd;vertical-align:top}
-        </style>
-        </head><body>
-        <div>
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div><h2>${company}</h2><div style="color:#666">Reporte de ventas</div></div>
-            <div style="text-align:right"><div>Generado: ${new Date().toLocaleString()}</div><div>Periodo: ${from} → ${to}</div></div>
-          </div>
-          <hr style="margin:12px 0 18px;border:none;border-top:2px solid #222">
-          <table><thead><tr><th>Fecha</th><th>ID Venta</th><th>Cliente</th><th>Encargado</th><th>Pago</th><th>Items</th><th style="text-align:right">Total</th></tr></thead><tbody>
-            ${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas en este periodo</td></tr>'}
-          </tbody></table>
-          <div style="margin-top:12px;text-align:right;font-weight:bold">Total período: ${money(totalAll)}</div>
-          ${fiadas.length ? `<hr style="margin:12px 0"><h4>Ventas por cobrar (FIAR)</h4>
-            <table><thead><tr><th>Fecha</th><th>ID</th><th>Cliente</th><th>Encargado</th><th>Monto</th></tr></thead><tbody>${fiadasRows}</tbody></table>` : ''}
-        </div>
-      </body></html>`;
+  async function stopCamera(){ detectionLoop = false; if(quaggaActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} quaggaActive=false; } if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); video.srcObject = null; videoStream = null; currentVideoTrack = null; clearOverlay(); readBuffer = []; }
 
-      return { previewHtml, printableHtml };
-    }
+  $('#open-scan').onclick = ()=> { showModal('modal-scan'); startBarcodeDetection().catch(()=>{}); };
+  $('#close-scan')?.addEventListener('click', async ()=>{ await stopCamera(); closeModal('modal-scan'); });
+  $('#stop-camera').onclick = async ()=> { await stopCamera(); };
 
-    /* ----------------------------- Export / Import ---------------------------- */
-    $('#btn-export').onclick = async ()=>{
-      const data = { products: await all('products'), sales: await all('sales'), movements: await all('movements'), customers: await all('customers'), responsibles: await all('responsibles') };
-      const blob = new Blob([JSON.stringify(data,null,2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href=url; a.download='tienda-smart-export.json'; a.click(); URL.revokeObjectURL(url);
-    };
-    $('#btn-import').onclick = ()=> {
-      const inp = document.createElement('input'); inp.type='file'; inp.accept='application/json';
-      inp.onchange = async ()=>{
-        const f = inp.files[0];
-        if (!f) return;
-        const txt = await f.text();
-        const obj = JSON.parse(txt);
-        if (obj.products) for(const p of obj.products) await put('products', p);
-        if (obj.sales) for(const s of obj.sales) await put('sales', s);
-        if (obj.movements) for(const m of obj.movements) await put('movements', m);
-        if (obj.customers) for(const c of obj.customers) await put('customers', c);
-        if (obj.responsibles) for(const r of obj.responsibles) await put('responsibles', r);
-        await refreshAll();
-      };
-      inp.click();
-    };
+  $('#toggle-torch').onclick = async ()=>{ if(!currentVideoTrack) return alert('Cámara no activada'); try{ const caps = currentVideoTrack.getCapabilities(); if(!caps.torch) return alert('Linterna no soportada'); await currentVideoTrack.applyConstraints({ advanced: [{ torch: true }] }); }catch(e){ console.warn('torch', e); alert('Linterna no soportada'); } };
 
-    /* ----------------------------- ServiceWorker (PWA base) ---------------------------- */
-    if ('serviceWorker' in navigator) { try{ navigator.serviceWorker.register('sw.js'); }catch(e){ console.warn('sw', e); } }
+  $('#fill-product').onclick = ()=> { const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado'); const p = findProductByCode(code); if(p) openProductModal(p); else { $('#product-barcode').value = code; openProductModal(); } };
+  $('#quick-sell-detected').onclick = async ()=>{ const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado'); const p = findProductByCode(code); if(!p){ if(!confirm('Producto no encontrado. ¿Crear nuevo?')) return; $('#product-barcode').value = code; openProductModal(); return; } const qty = Number(prompt('Cantidad a vender (rápido):','1')) || 1; const payment = prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO', 'EFECTIVO') || 'EFECTIVO'; let customer = null; if(payment.toUpperCase()==='A_CREDITO') customer = prompt('Nombre del cliente:') || null; p.stock = (p.stock||0) - qty; await put('products', p); await add('movements', { id:uid(), type:'sale', productId: p.id, qty, date: new Date().toISOString() }); const total = qty * p.price; const date = new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); await add('sales', { id:uid(), items:[{ productId: p.id, qty, price: p.price }], total, date, customerName: customer, paid: (payment.toUpperCase()!=='A_CREDITO'), paymentType: payment.toUpperCase(), responsible: responsibleName }); if(payment.toUpperCase()==='A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customer, balance: prev + total, lastSale: date }); } alert('Venta rápida registrada'); await refreshAll(); };
 
-    /* ----------------------------- Init ---------------------------- */
-    (async ()=>{
-      await openDB();
-      await ensureTodayResponsible();
-      await refreshAll();
-      // seed if empty
-      const products = await all('products');
-      if (products.length===0){
-        const seed = [
-          { id: uid(), name:'Camiseta', category:'Ropa', price:15.00, barcode:'1234567890123', stock:10, createdAt:new Date().toISOString() },
-          { id: uid(), name:'Gorra', category:'Accesorios', price:8.5, barcode:'978020137962', stock:6, createdAt:new Date().toISOString() }
-        ];
-        for (const p of seed) await put('products', p);
-        await refreshAll();
-      }
-      window.addEventListener('resize', ()=>{ try{ resizeOverlay(); }catch(e){} });
-    })();
+  function findProductByCode(code){
+    const norm = (code||'').replace(/\D/g,'');
+    let p = state.products.find(x => (x.barcode||'') === code || (x.barcode||'').replace(/\D/g,'') === norm);
+    if(!p && norm.length>6) p = state.products.find(x => (x.barcode||'').replace(/\D/g,'').endsWith(norm));
+    return p;
+  }
 
-    // close modals on backdrop click
-    $$('.modal-backdrop').forEach(b=> b.parentElement.addEventListener('click', (e)=>{ if (e.target === b.parentElement) b.parentElement.classList.add('hidden'); }));
+  /* ---------------------------
+     Init
+     --------------------------- */
+  (async ()=>{
+    await openDB();
+    // ensure responsible for today
+    const today = todayYMD(); const r = await get('responsibles', today).catch(()=>null);
+    if(!r){ const name = prompt(`No hay encargado registrado para hoy (${today}). Ingresa su nombre (opcional):`); if(name !== null && name.trim() !== '') await put('responsibles', { date: today, name: name.trim() }); }
+    // seed small products if none
+    const products = await all('products'); if(products.length===0){ const seed=[ { id:uid(), name:'Coca Cola 500ml', category:'Bebidas', price:10.99, barcode:'7758753103282', stock:48, createdAt:new Date().toISOString() }, { id:uid(), name:'Agua San Luis 625ml', category:'Bebidas', price:3.50, barcode:'7752482381011', stock:32, createdAt:new Date().toISOString() } ]; for(const p of seed) await put('products', p); }
+    await refreshAll();
+    window.addEventListener('resize', ()=>{ try{ resizeOverlay(); }catch(e){} });
+    // close modals when backdrop clicked - already handled in manager
+    // attach modal openers that used older functions:
+    $('#open-add-product').addEventListener('click', ()=> openProductModal());
+  })();
 
+  // small bindings
+  $('#search').oninput = debounce(e => renderInventory(e.target.value), 160);
+  $('#btn-dark').onclick = ()=> document.documentElement.classList.toggle('dark');
   </script>
 </body>
 </html>
