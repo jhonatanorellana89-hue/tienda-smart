@@ -2,17 +2,16 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <!-- evitar zoom (pedido del usuario) -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart</title>
 
-  <!-- Tailwind (rápido para prototipo) -->
+  <!-- Tailwind CSS (fast prototype) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- OpenCV.js (opcional, mejora preprocesado si está disponible) -->
+  <!-- OpenCV.js (opcional para mejor preprocesado) -->
   <script async src="https://docs.opencv.org/4.x/opencv.js"></script>
 
-  <!-- Quagga (fallback scanner) -->
+  <!-- Quagga fallback -->
   <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
 
   <!-- Chart.js -->
@@ -22,34 +21,33 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
+  <!-- Fuse.js para búsqueda rápida y fuzzy -->
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
+
+  <!-- Firebase (compat easy client usage) - solo si activas cloud -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
   <style>
     :root { --bg:#f8fafc; --card:#fff; --muted:#6b7280; }
     [data-theme="dark"]{ --bg:#071029; --card:#0f1724; --muted:#9ca3af; color-scheme:dark; }
-    html,body{ height:100%; touch-action: manipulation; -webkit-user-select:none; -ms-user-select:none; user-select:none; }
+    html,body{ height:100%; -webkit-user-select:none; -ms-user-select:none; user-select:none; }
     body{ background:var(--bg); font-family:Inter,system-ui,Segoe UI,Roboto,Arial; margin:0; color:#0b1220; -webkit-tap-highlight-color: transparent; }
     .app{ max-width:920px; margin:0 auto; padding-bottom:120px; }
     #global-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,0.45); z-index:40; display:none; opacity:0; transition:opacity .18s; }
     #global-backdrop.visible{ display:block; opacity:1; }
-
     .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:50; padding:1rem; overflow:auto; -webkit-overflow-scrolling:touch; }
     .modal.visible{ display:flex; }
-    .modal .modal-content{ width:100%; max-width:760px; border-radius:12px; background:var(--card); color:inherit; padding:1rem; box-shadow:0 12px 40px rgba(2,6,23,0.12); }
+    .modal .modal-content{ width:100%; max-width:760px; border-radius:12px; padding:1rem; background:var(--card); color:inherit; box-shadow:0 12px 40px rgba(2,6,23,0.12); }
     @media(max-width:640px){ .modal .modal-content{ width:100%; height:100%; border-radius:0; padding:0; display:flex; flex-direction:column; } }
-
     #overlay-canvas{ position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:20; }
     .scan-guide{ position:absolute; left:50%; top:50%; width:64%; height:28%; transform:translate(-50%,-50%); border:2px dashed rgba(255,255,255,0.6); border-radius:8px; pointer-events:none; z-index:30; }
-
     .bottom-bar{ position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; gap:8px; padding:10px; background:linear-gradient(0deg, rgba(255,255,255,0.98), rgba(255,255,255,0.95)); box-shadow:0 -6px 18px rgba(2,6,23,0.06); }
     .inv-card{ background:var(--card); border-radius:12px; padding:12px; box-shadow:0 6px 18px rgba(2,6,23,0.06); display:flex; justify-content:space-between; align-items:center; gap:8px; }
-    .print-table th{ background:#f3f4f6; padding:8px; text-align:left; }
-    .print-table td{ padding:8px; border-bottom:1px solid #e5e7eb; vertical-align:top; }
-    input, select, button, textarea { -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
-    /* impresión (estilo limpio) */
-    @media print{
-      body *{ visibility: hidden; }
-      .print-area, .print-area *{ visibility: visible; }
-      .print-area{ position: absolute; left: 0; top: 0; width: 100%; }
-    }
+    .suggestions{ position:absolute; z-index:80; background:white; border-radius:8px; box-shadow:0 8px 30px rgba(2,6,23,0.08); max-height:220px; overflow:auto; width:100%; }
+    .suggestion-item{ padding:8px; cursor:pointer; }
+    .suggestion-item:hover, .suggestion-item.active{ background:#f3f4f6; }
+    @media print{ body *{ visibility:hidden } .print-area, .print-area *{ visibility:visible } .print-area{ position:relative; } }
   </style>
 </head>
 <body data-theme="light">
@@ -67,6 +65,7 @@
         </div>
       </div>
       <div class="flex items-center gap-3">
+        <div id="cloud-indicator" class="hidden text-xs px-2 py-1 bg-green-100 text-green-800 rounded">Cloud ON</div>
         <div id="current-user" class="hidden px-3 py-1 rounded-full text-sm bg-gradient-to-r from-indigo-500 to-pink-500 text-white"></div>
         <button id="btn-logout" class="hidden px-3 py-2 border rounded text-sm">Salir</button>
         <button id="btn-theme" class="px-3 py-2 border rounded text-sm">Modo</button>
@@ -74,7 +73,7 @@
       </div>
     </div>
 
-    <!-- responsable -->
+    <!-- Responsible -->
     <div class="mb-3 p-3 rounded shadow-sm bg-white flex items-center justify-between">
       <div>
         <div class="text-xs text-gray-600">Encargado del día</div>
@@ -87,8 +86,17 @@
       </div>
     </div>
 
-    <div class="mb-3">
+    <div class="mb-3 relative">
       <input id="search" type="search" placeholder="Buscar producto o código..." class="w-full px-4 py-3 rounded-lg shadow-sm border bg-white" />
+      <div id="search-suggestions" class="suggestions hidden"></div>
+    </div>
+
+    <div class="flex gap-3 mb-3">
+      <button id="btn-export-csv" class="px-3 py-2 border rounded">Exportar inventario (CSV)</button>
+      <label class="px-3 py-2 border rounded cursor-pointer bg-white">
+        Importar CSV <input id="import-csv-input" type="file" accept=".csv" class="hidden">
+      </label>
+      <button id="btn-cloud-setup" class="px-3 py-2 border rounded">Config Cloud</button>
     </div>
 
     <div id="inventory-list" class="space-y-3 mb-28"></div>
@@ -106,8 +114,9 @@
     <button id="open-clients" class="flex-1 px-4 py-3 rounded-lg bg-indigo-600 text-white font-semibold">Clientes</button>
   </div>
 
-  <!-- ---------- MODALES (producto, scanner, quick sale, income, sale, clients, reports, login) ---------- -->
-  <!-- PRODUCT -->
+  <!-- ---------- MODALES (product, scan, quick sale, income, sale, clients, reports, login, cloud config) ---------- -->
+
+  <!-- Product modal -->
   <div id="modal-product" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -133,7 +142,7 @@
     </div>
   </div>
 
-  <!-- SCANNER -->
+  <!-- Scanner modal -->
   <div id="modal-scan" class="modal scanner-modal" role="dialog" aria-hidden="true">
     <div class="modal-content">
       <div class="flex justify-between items-center px-3 py-2">
@@ -159,7 +168,7 @@
     </div>
   </div>
 
-  <!-- QUICK SALE -->
+  <!-- Quick sale modal -->
   <div id="modal-quick-sale" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -167,7 +176,10 @@
         <button data-close-modal class="text-xl">✕</button>
       </div>
       <form id="form-quick-sale" class="p-3 space-y-3 overflow-auto">
-        <input id="quick-search" placeholder="Buscar o pegar código..." class="w-full px-3 py-3 rounded border bg-white" />
+        <div class="relative">
+          <input id="quick-search" placeholder="Buscar producto por nombre o código..." autocomplete="off" class="w-full px-3 py-3 rounded border bg-white" />
+          <div id="quick-suggestions" class="suggestions hidden"></div>
+        </div>
         <div class="flex gap-2">
           <select id="quick-product" class="flex-1 px-3 py-3 border rounded bg-white"></select>
           <input id="quick-qty" type="number" min="1" value="1" class="w-24 px-3 py-3 border rounded bg-white">
@@ -196,7 +208,7 @@
     </div>
   </div>
 
-  <!-- INCOME -->
+  <!-- Income / add stock -->
   <div id="modal-income" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -214,7 +226,7 @@
     </div>
   </div>
 
-  <!-- SALE (detailed) -->
+  <!-- Sale (detailed) -->
   <div id="modal-sale" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -243,7 +255,7 @@
     </div>
   </div>
 
-  <!-- CLIENTS -->
+  <!-- Clients -->
   <div id="modal-clients" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -260,7 +272,7 @@
     </div>
   </div>
 
-  <!-- REPORTS -->
+  <!-- Reports -->
   <div id="modal-reports" class="modal" role="dialog" aria-hidden="true">
     <div class="modal-content mx-3">
       <div class="flex justify-between items-center px-3 py-2 border-b">
@@ -274,7 +286,6 @@
           <button id="tab-inventory" class="px-3 py-2 border rounded">Inventario</button>
         </div>
 
-        <!-- Sales by range -->
         <div id="tab-content-sales-range" class="tab-content">
           <div class="grid grid-cols-2 gap-2 mb-3">
             <div><label class="text-xs">Desde</label><input id="report-from" type="date" class="w-full px-2 py-2 border rounded"></div>
@@ -288,7 +299,6 @@
           <div id="report-preview-range" class="max-h-80 overflow-auto text-sm bg-white p-2 rounded"></div>
         </div>
 
-        <!-- Sales by day (single date) -->
         <div id="tab-content-sales-day" class="tab-content hidden">
           <div class="grid grid-cols-2 gap-2 mb-3">
             <div><label class="text-xs">Fecha</label><input id="day-single" type="date" class="w-full px-2 py-2 border rounded"></div>
@@ -302,7 +312,6 @@
           <div class="mt-3 bg-white rounded p-2 shadow"><canvas id="chart-daily-sales" height="120"></canvas></div>
         </div>
 
-        <!-- Inventory -->
         <div id="tab-content-inventory" class="tab-content hidden">
           <div class="flex gap-2 mb-3 justify-end">
             <button id="btn-generate-inv" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar inventario</button>
@@ -315,7 +324,25 @@
     </div>
   </div>
 
-  <!-- LOGIN -->
+  <!-- Cloud config modal -->
+  <div id="modal-cloud" class="modal" role="dialog" aria-hidden="true">
+    <div class="modal-content mx-3">
+      <div class="flex justify-between items-center px-3 py-2 border-b">
+        <h4 class="text-lg font-semibold">Configuración Cloud (Firestore)</h4>
+        <button data-close-modal class="text-xl">✕</button>
+      </div>
+      <div class="p-3 space-y-3">
+        <p class="text-sm text-gray-600">Pega aquí el objeto <code>firebaseConfig</code> de tu proyecto Firebase. Si no lo pegas, la app seguirá funcionando solo local.</p>
+        <textarea id="cloud-config" class="w-full h-40 p-2 border rounded font-mono" placeholder='Ejemplo: {"apiKey":"...","authDomain":"...","projectId":"...","storageBucket":"...", "messagingSenderId":"...", "appId":"..."}'></textarea>
+        <div class="flex justify-end gap-2">
+          <button id="cloud-disable" class="px-3 py-2 border rounded">Desactivar Cloud</button>
+          <button id="cloud-save" class="px-3 py-2 bg-indigo-600 text-white rounded">Activar / Guardar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Login modal -->
   <div id="modal-login" class="modal visible" role="dialog" aria-hidden="false" style="background: linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.6));">
     <div class="modal-content mx-3" style="max-width:480px;">
       <div class="p-4">
@@ -333,43 +360,115 @@
     </div>
   </div>
 
-  <!-- ---------- SCRIPT: lógica central y mejoras PDF A4 ---------- -->
+  <!-- ---------- SCRIPT: lógica, sync cloud, csv import/export, mejora búsqueda ---------- -->
   <script>
-  (function(){
-    // Short helpers
+  (async function(){
+    // Helpers
     const $ = s => document.querySelector(s);
     const $$ = s => Array.from(document.querySelectorAll(s));
     const uid = () => 'id-' + Math.random().toString(36).slice(2,9);
     const money = v => Number(v||0).toFixed(2);
     const todayYMD = ()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-    function debounce(fn, t=200){ let to; return (...a)=>{ clearTimeout(to); to=setTimeout(()=>fn(...a), t); }; }
+    const debounce = (fn,t=200)=>{ let to; return (...a)=>{ clearTimeout(to); to=setTimeout(()=>fn(...a), t); }; };
 
-    // IndexedDB wrapper
-    const DB_NAME='TiendaSmartDB', DB_VERSION=10;
+    /* -----------------------
+       IndexedDB wrapper (local master copy)
+       ----------------------- */
+    const DB_NAME='TiendaSmartDB', DB_VERSION=11;
     let db;
-    function openDB(){ return new Promise((res,rej)=>{ const req = indexedDB.open(DB_NAME, DB_VERSION); req.onupgradeneeded = e => { const idb = e.target.result; if(!idb.objectStoreNames.contains('products')) idb.createObjectStore('products',{keyPath:'id'}); if(!idb.objectStoreNames.contains('sales')) idb.createObjectStore('sales',{keyPath:'id'}); if(!idb.objectStoreNames.contains('movements')) idb.createObjectStore('movements',{keyPath:'id'}); if(!idb.objectStoreNames.contains('customers')) idb.createObjectStore('customers',{keyPath:'name'}); if(!idb.objectStoreNames.contains('responsibles')) idb.createObjectStore('responsibles',{keyPath:'date'}); }; req.onsuccess = e => { db = e.target.result; res(db); }; req.onerror = e => rej(e); }); }
-    const store = (name, mode='readonly') => db.transaction(name, mode).objectStore(name);
-    const put = (name, item) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').put(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
-    const add = (name, item) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').add(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
-    const all = (name) => new Promise((res,rej)=>{ const rq=store(name,'readonly').getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=e=>rej(e); });
-    const get = (name, key) => new Promise((res,rej)=>{ const rq=store(name,'readonly').get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=e=>rej(e); });
+    function openDB(){ return new Promise((res, rej)=>{ const r=indexedDB.open(DB_NAME, DB_VERSION); r.onupgradeneeded = e=>{ const idb = e.target.result; if(!idb.objectStoreNames.contains('products')) idb.createObjectStore('products',{keyPath:'id'}); if(!idb.objectStoreNames.contains('sales')) idb.createObjectStore('sales',{keyPath:'id'}); if(!idb.objectStoreNames.contains('movements')) idb.createObjectStore('movements',{keyPath:'id'}); if(!idb.objectStoreNames.contains('customers')) idb.createObjectStore('customers',{keyPath:'name'}); if(!idb.objectStoreNames.contains('responsibles')) idb.createObjectStore('responsibles',{keyPath:'date'}); }; r.onsuccess = e=>{ db=e.target.result; res(db); }; r.onerror = e=> rej(e); }); }
+    const store = (name,mode='readonly') => db.transaction(name, mode).objectStore(name);
+    const putLocal = (name, item) => new Promise((res,rej)=>{ const rq = store(name,'readwrite').put(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
+    const addLocal = (name, item) => new Promise((res,rej)=>{ const rq = store(name,'readwrite').add(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
+    const allLocal = (name) => new Promise((res,rej)=>{ const rq = store(name,'readonly').getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=e=>rej(e); });
+    const getLocal = (name, key) => new Promise((res,rej)=>{ const rq = store(name,'readonly').get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=e=>rej(e); });
 
-    // Simple auth
+    /* -----------------------
+       Firebase / Firestore cloud sync (opcional)
+       ----------------------- */
+    let cloudEnabled = false;
+    let firestore = null;
+    let listeners = []; // unsubscribe fns
+    // USER must paste config in modal (stringified JSON)
+    function initCloud(firebaseConfig){
+      try{
+        if(!firebaseConfig || !firebaseConfig.projectId) throw new Error('firebaseConfig inválido');
+        firebase.initializeApp(firebaseConfig);
+        firestore = firebase.firestore();
+        cloudEnabled = true;
+        $('#cloud-indicator').classList.remove('hidden');
+        // set offline persistence? compat SDK may handle it; keep simple.
+        startCloudListeners();
+        console.info('Cloud sync activado');
+      }catch(err){ console.error('initCloud', err); alert('Error inicializando Cloud: ' + (err.message||err)); }
+    }
+
+    // Start listeners to replicate remote -> local in real time
+    function startCloudListeners(){
+      // Unsubscribe previous
+      listeners.forEach(u=>u && typeof u === 'function' && u());
+      listeners = [];
+      if(!firestore) return;
+      // products
+      listeners.push(firestore.collection('products').onSnapshot(async snap=>{
+        for(const doc of snap.docChanges()){
+          const data = doc.doc.data();
+          // merge to local: upsert
+          if(doc.type === 'removed'){ /* ignore for now */ }
+          await putLocal('products', { id: doc.doc.id, ...data });
+        }
+        await refreshAllLocalViews();
+      }));
+      // sales
+      listeners.push(firestore.collection('sales').onSnapshot(async snap=>{
+        for(const doc of snap.docChanges()){
+          const data = doc.doc.data();
+          await putLocal('sales', { id: doc.doc.id, ...data });
+        }
+        await refreshAllLocalViews();
+      }));
+      // customers
+      listeners.push(firestore.collection('customers').onSnapshot(async snap=>{
+        for(const doc of snap.docChanges()){
+          const data = doc.doc.data();
+          await putLocal('customers', { name: doc.doc.id, ...data });
+        }
+        await refreshAllLocalViews();
+      }));
+      // responsibles
+      listeners.push(firestore.collection('responsibles').onSnapshot(async snap=>{
+        for(const doc of snap.docChanges()){
+          const data = doc.doc.data();
+          await putLocal('responsibles', { date: doc.doc.id, ...data });
+        }
+        await refreshAllLocalViews();
+      }));
+    }
+
+    // push local change to cloud (simple lastWriteWins)
+    async function pushToCloud(collectionName, key, data){
+      if(!cloudEnabled || !firestore) return;
+      try{
+        await firestore.collection(collectionName).doc(key).set(data, { merge: true });
+      }catch(err){ console.warn('pushToCloud', err); }
+    }
+
+    /* -----------------------
+       Auth (local simple credentials)
+       ----------------------- */
     const AUTH_USER='lis', AUTH_PASS='magaly', AUTH_KEY='ts_user';
     function isAuthenticated(){ return !!localStorage.getItem(AUTH_KEY); }
     function setAuthenticated(u){ localStorage.setItem(AUTH_KEY, u); $('#current-user').textContent = u; $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); }
     function clearAuth(){ localStorage.removeItem(AUTH_KEY); $('#current-user').classList.add('hidden'); $('#btn-logout').classList.add('hidden'); }
 
-    $('#form-login').addEventListener('submit', e => {
-      e.preventDefault();
-      const u = $('#login-user').value.trim(), p = $('#login-pass').value;
-      if(u === AUTH_USER && p === AUTH_PASS){ setAuthenticated(u); closeLogin(); initApp(); } else alert('Credenciales inválidas');
-    });
+    $('#form-login').addEventListener('submit', e=>{ e.preventDefault(); const u = $('#login-user').value.trim(), p = $('#login-pass').value; if(u===AUTH_USER && p===AUTH_PASS){ setAuthenticated(u); closeLogin(); initApp(); } else alert('Credenciales inválidas'); });
     $('#login-guest').addEventListener('click', ()=>{ setAuthenticated('GUEST'); closeLogin(); initApp(); });
-    $('#btn-logout').addEventListener('click', ()=>{ if(confirm('Cerrar sesión?')){ clearAuth(); location.reload(); }});
+    $('#btn-logout').addEventListener('click', ()=>{ if(confirm('Cerrar sesión?')){ clearAuth(); location.reload(); } });
     function closeLogin(){ const m=$('#modal-login'); m.classList.remove('visible'); m.setAttribute('aria-hidden','true'); }
 
-    // modal manager (detiene cámara si scanner cerrado)
+    /* -----------------------
+       Modal management (detiene cámara al cerrar scanner)
+       ----------------------- */
     const globalBackdrop = $('#global-backdrop'); let currentOpenModal = null;
     async function _stopCameraSafe(){ try{ if(typeof stopCamera === 'function') await stopCamera(); }catch(e){ console.warn(e); } }
     function showModal(id, { focusSelector } = {}){
@@ -392,15 +491,24 @@
     globalBackdrop.addEventListener('click', async ()=>{ if(!currentOpenModal) return; await closeModal(currentOpenModal); });
     document.addEventListener('keydown', async e=>{ if(e.key === 'Escape' && currentOpenModal) await closeModal(currentOpenModal); });
     document.addEventListener('click', e=>{ const btn = e.target.closest('[data-close-modal]'); if(!btn) return; const modal = btn.closest('.modal'); if(!modal) return; closeModal(modal.id); });
-    function showLogin(){ const m = $('#modal-login'); m.classList.add('visible'); m.setAttribute('aria-hidden','false'); }
+    function showLogin(){ const m=$('#modal-login'); m.classList.add('visible'); m.setAttribute('aria-hidden','false'); }
 
-    // app state and refresh
+    /* -----------------------
+       App state + Fuse.js index for fast search
+       ----------------------- */
     const state = { products:[], sales:[], customers:[], responsibles:[] };
-    async function refreshAll(){
-      state.products = await all('products');
-      state.sales = await all('sales');
-      state.customers = await all('customers');
-      state.responsibles = await all('responsibles');
+    let fuse = null;
+    function buildFuseIndex(){
+      const list = state.products.map(p=>({ id:p.id, name:p.name, barcode:p.barcode, category:p.category }));
+      fuse = new Fuse(list, { keys: ['name','barcode','category'], threshold:0.35, minMatchCharLength:1, ignoreLocation:true, useExtendedSearch:true });
+    }
+
+    async function refreshAllLocalViews(){
+      state.products = await allLocal('products');
+      state.sales = await allLocal('sales');
+      state.customers = await allLocal('customers');
+      state.responsibles = await allLocal('responsibles');
+      buildFuseIndex();
       renderInventoryMobile();
       renderIncomeSelects();
       renderQuickSelect();
@@ -410,14 +518,17 @@
     }
 
     /* -----------------------
-       INVENTORY UI (mobile)
+       INVENTORY UI
        ----------------------- */
     const inventoryList = $('#inventory-list');
     function renderInventoryMobile(filter=''){
       const q = (filter||'').trim().toLowerCase();
       inventoryList.innerHTML = '';
       state.products.forEach(p=>{
-        if(q && !(p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q))) return;
+        if(q){
+          const matches = p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q) || (p.category||'').toLowerCase().includes(q);
+          if(!matches) return;
+        }
         const low = (p.stock||0) <= 5;
         const div = document.createElement('div'); div.className='inv-card';
         div.innerHTML = `
@@ -439,35 +550,35 @@
     }
 
     /* -----------------------
-       PRODUCT
+       PRODUCT Modal logic
        ----------------------- */
     $('#open-add-product').addEventListener('click', ()=> openProductModal());
     function openProductModal(product){
       if(!isAuthenticated()) return showLogin();
-      $('#form-product').reset(); $('#product-id').value='';
+      $('#form-product').reset(); $('#product-id').value = '';
       if(product){ $('#product-id').value = product.id; $('#product-name').value = product.name; $('#product-category').value = product.category||''; $('#product-price').value = product.price||0; $('#product-barcode').value = product.barcode||''; $('#product-stock').value = product.stock||0; }
       showModal('modal-product', { focusSelector:'#product-name' });
     }
     $('#form-product').addEventListener('submit', async e => {
       e.preventDefault();
       const id = $('#product-id').value || uid();
-      const prod = { id, name: $('#product-name').value.trim(), category: $('#product-category').value.trim(), price: Number($('#product-price').value)||0, barcode: $('#product-barcode').value.trim(), stock: Number($('#product-stock').value)||0, createdAt: new Date().toISOString() };
-      await put('products', prod);
-      await refreshAll();
+      const prod = { name: $('#product-name').value.trim(), category: $('#product-category').value.trim(), price: Number($('#product-price').value)||0, barcode: $('#product-barcode').value.trim(), stock: Number($('#product-stock').value)||0, updatedAt: new Date().toISOString() };
+      await putLocal('products', { id, ...prod });
+      if(cloudEnabled) await pushToCloud('products', id, prod);
+      await refreshAllLocalViews();
       closeModal('modal-product');
     });
 
     /* -----------------------
-       INCOME
+       INCOME (stock)
        ----------------------- */
     function renderIncomeSelects(){ const sel = $('#income-product'); if(!sel) return; sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} — Stock: ${p.stock||0}`; sel.appendChild(o); }); }
     function openIncomeFor(productId){ renderIncomeSelects(); $('#income-product').value = productId; showModal('modal-income'); }
-    $('#form-income').addEventListener('submit', async e => { e.preventDefault(); const pid = $('#income-product').value; const qty = Number($('#income-qty').value)||0; const p = state.products.find(x=>x.id===pid); p.stock = (p.stock||0) + qty; await put('products', p); await add('movements', { id:uid(), type:'income', productId:pid, qty, date:new Date().toISOString() }); await refreshAll(); closeModal('modal-income'); });
+    $('#form-income').addEventListener('submit', async e => { e.preventDefault(); const pid = $('#income-product').value; const qty = Number($('#income-qty').value)||0; const p = state.products.find(x=>x.id===pid); p.stock = (p.stock||0) + qty; p.updatedAt = new Date().toISOString(); await putLocal('products', p); await addLocal('movements', { id:uid(), type:'income', productId:pid, qty, date:new Date().toISOString() }); if(cloudEnabled){ await pushToCloud('products', pid, p); await pushToCloud('movements', uid(), { type:'income', productId:pid, qty, date:new Date().toISOString() }); } await refreshAllLocalViews(); closeModal('modal-income'); });
 
     /* -----------------------
-       SALES (detailed + quick)
+       SALES (detailed + quick) + improved search
        ----------------------- */
-    // Sale form helpers
     function addSaleItemRow(productId=''){ const row=document.createElement('div'); row.className='grid grid-cols-12 gap-2 items-center'; row.innerHTML = `<select class="col-span-6 px-2 py-1 border sale-product"></select><input type="number" class="col-span-2 px-2 py-1 border sale-qty" value="1" min="1"><input type="number" step="0.01" class="col-span-2 px-2 py-1 border sale-price" placeholder="Precio"><button type="button" class="col-span-2 px-2 py-1 border sale-remove">Quitar</button>`; $('#sale-items').appendChild(row); fillSaleRow(row, productId); }
     function fillSaleRow(row, productId){ const sel = row.querySelector('.sale-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); }); if(productId) sel.value = productId; const price = row.querySelector('.sale-price'); const qty = row.querySelector('.sale-qty'); sel.onchange = ()=>{ const p = state.products.find(x=>x.id===sel.value); price.value = p ? p.price : ''; updateSaleTotal(); }; price.oninput = updateSaleTotal; qty.oninput = updateSaleTotal; row.querySelector('.sale-remove').onclick = ()=>{ row.remove(); updateSaleTotal(); }; }
     $('#add-sale-item').addEventListener('click', ()=> addSaleItemRow());
@@ -477,58 +588,85 @@
       const customer = $('#sale-customer').value.trim(); const payment = $('#sale-payment').value;
       const items = []; document.querySelectorAll('#sale-items > div').forEach(r=>{ const pid = r.querySelector('.sale-product').value; const qty = Number(r.querySelector('.sale-qty').value)||0; const price = Number(r.querySelector('.sale-price').value)||0; if(qty>0) items.push({ productId: pid, qty, price }); });
       if(items.length===0) return alert('Agregar al menos un producto');
-      for(const it of items){ const p = state.products.find(x=>x.id===it.productId); p.stock = (p.stock||0) - it.qty; await put('products', p); await add('movements', { id:uid(), type:'sale', productId: it.productId, qty: it.qty, date: new Date().toISOString() }); }
+      for(const it of items){ const p = state.products.find(x=>x.id===it.productId); p.stock = (p.stock||0) - it.qty; p.updatedAt = new Date().toISOString(); await putLocal('products', p); if(cloudEnabled) await pushToCloud('products', p.id, p); await addLocal('movements', { id:uid(), type:'sale', productId: it.productId, qty: it.qty, date:new Date().toISOString() }); if(cloudEnabled) await pushToCloud('movements', uid(), { type:'sale', productId: it.productId, qty: it.qty, date:new Date().toISOString() }); }
       const total = items.reduce((s,i)=>s + i.qty*i.price,0); const date = new Date().toISOString();
       const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD();
-      const responsibleObj = await get('responsibles', respDate).catch(()=>null);
+      const responsibleObj = await getLocal('responsibles', respDate).catch(()=>null);
       const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||'');
-      const sale = { id:uid(), items, total, date, customerName: customer || null, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName };
-      await add('sales', sale);
-      if(payment === 'A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customer, balance: prev + total, lastSale: date }); }
-      await refreshAll(); closeModal('modal-sale');
+      const saleId = uid();
+      const sale = { items, total, date, customerName: customer || null, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName, createdAt: new Date().toISOString() };
+      await putLocal('sales', { id: saleId, ...sale });
+      if(cloudEnabled) await pushToCloud('sales', saleId, sale);
+      if(payment === 'A_CREDITO' && customer){ const existing = await getLocal('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; const newCust = { name: customer, balance: prev + total, lastSale: date }; await putLocal('customers', newCust); if(cloudEnabled) await pushToCloud('customers', customer, { balance: newCust.balance, lastSale: date }); }
+      await refreshAllLocalViews(); closeModal('modal-sale');
     });
 
-    // Quick sale
+    /* -----------------------
+       Quick sale with Fuse suggestions
+       ----------------------- */
     $('#open-quick-sale').addEventListener('click', ()=> { renderQuickSelect(); showModal('modal-quick-sale'); });
     function renderQuickSelect(){ const sel = $('#quick-product'); sel.innerHTML=''; state.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); }); updateQuickTotal(); }
-    $('#quick-search').addEventListener('input', debounce(function(){ const v=this.value.trim().toLowerCase(); if(!v) return; const digits = v.replace(/\D/g,''); let found=null; if(digits.length>0) found = state.products.find(p => (p.barcode||'').replace(/\D/g,'').endsWith(digits) || (p.barcode||'')===v); if(!found) found = state.products.find(p => p.name.toLowerCase().includes(v)); if(found) $('#quick-product').value = found.id; updateQuickTotal(); },160));
+    $('#quick-search').addEventListener('input', debounce(function(e){
+      const q = this.value.trim();
+      const sugg = $('#quick-suggestions'); if(!q){ sugg.classList.add('hidden'); return; }
+      // use Fuse
+      const results = fuse ? fuse.search(q, { limit: 12 }) : (state.products.filter(p=> p.name.toLowerCase().includes(q.toLowerCase()) || (p.barcode||'').includes(q)));
+      const items = results.map(r => r.item ? r.item : r);
+      sugg.innerHTML = items.map(it=>`<div class="suggestion-item" data-id="${it.id}"><div class="font-medium">${it.name}</div><div class="text-xs text-gray-500">${it.barcode||''} • ${it.category||''}</div></div>`).join('');
+      sugg.classList.toggle('hidden', items.length === 0);
+      // click binding
+      Array.from(sugg.querySelectorAll('.suggestion-item')).forEach(el=> el.addEventListener('click', ()=>{ $('#quick-product').value = el.dataset.id; $('#quick-search').value = el.querySelector('.font-medium').textContent; sugg.classList.add('hidden'); updateQuickTotal(); }));
+    },120));
+    // keyboard nav for suggestions
+    $('#quick-search').addEventListener('keydown', (e)=>{
+      const sugg = $('#quick-suggestions');
+      if(sugg.classList.contains('hidden')) return;
+      const items = Array.from(sugg.querySelectorAll('.suggestion-item'));
+      let idx = items.findIndex(it=>it.classList.contains('active'));
+      if(e.key === 'ArrowDown'){ e.preventDefault(); if(idx >= 0) items[idx].classList.remove('active'); idx = Math.min(items.length-1, idx+1); items[idx].classList.add('active'); items[idx].scrollIntoView({block:'nearest'}); }
+      else if(e.key === 'ArrowUp'){ e.preventDefault(); if(idx >= 0) items[idx].classList.remove('active'); idx = Math.max(0, idx-1); if(items[idx]) items[idx].classList.add('active'); if(items[idx]) items[idx].scrollIntoView({block:'nearest'}); }
+      else if(e.key === 'Enter'){ e.preventDefault(); if(idx >= 0 && items[idx]){ items[idx].click(); } }
+    });
+
     function updateQuickTotal(){ const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||0; const p = state.products.find(x=>x.id===pid); $('#quick-total').textContent = money(p ? p.price * qty : 0); }
     $('#quick-product').addEventListener('change', updateQuickTotal); $('#quick-qty').addEventListener('input', updateQuickTotal);
     const quickCart = [];
     $('#quick-add-cart').addEventListener('click', function(){ const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||1; const p = state.products.find(x=>x.id===pid); if(!p) return alert('Selecciona un producto'); quickCart.push({ productId: pid, qty, price: p.price }); renderQuickCart(); });
     function renderQuickCart(){ const el = $('#quick-cart'); el.innerHTML=''; quickCart.forEach((it,idx)=>{ const p = state.products.find(x=>x.id===it.productId); const d=document.createElement('div'); d.className='flex justify-between items-center'; d.innerHTML = `<div>${p.name} x ${it.qty}</div><div>${money(it.qty*it.price)} <button data-idx="${idx}" class="ml-2 text-sm text-red-600 btn-remove-quick">Quitar</button></div>`; el.appendChild(d); }); $$('.btn-remove-quick').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); }); }
-    $('#form-quick-sale').addEventListener('submit', async function(e){ e.preventDefault(); if(quickCart.length===0) return alert('Agregar productos'); const customer = $('#quick-customer').value.trim(); const payment = $('#quick-payment').value; for(const it of quickCart){ const p = state.products.find(x=>x.id===it.productId); p.stock = (p.stock||0) - it.qty; await put('products', p); await add('movements', { id:uid(), type:'sale', productId: it.productId, qty: it.qty, date:new Date().toISOString() }); } const total = quickCart.reduce((s,i)=>s + i.qty*i.price,0); const date = new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); const sale = { id:uid(), items: quickCart.slice(), total, date, customerName: customer || null, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName }; await add('sales', sale); if(payment === 'A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customer, balance: prev + total, lastSale: date }); } quickCart.length=0; await refreshAll(); closeModal('modal-quick-sale'); });
+    $('#form-quick-sale').addEventListener('submit', async function(e){ e.preventDefault(); if(quickCart.length===0) return alert('Agregar productos'); const customer = $('#quick-customer').value.trim(); const payment = $('#quick-payment').value; for(const it of quickCart){ const p = state.products.find(x=>x.id===it.productId); p.stock = (p.stock||0) - it.qty; p.updatedAt = new Date().toISOString(); await putLocal('products', p); if(cloudEnabled) await pushToCloud('products', p.id, p); await addLocal('movements', { id:uid(), type:'sale', productId: it.productId, qty: it.qty, date:new Date().toISOString() }); if(cloudEnabled) await pushToCloud('movements', uid(), { type:'sale', productId: it.productId, qty: it.qty, date:new Date().toISOString() }); } const total = quickCart.reduce((s,i)=>s + i.qty*i.price,0); const date = new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await getLocal('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); const saleId = uid(); const sale = { items: quickCart.slice(), total, date, customerName: customer || null, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName, createdAt: new Date().toISOString() }; await putLocal('sales', { id: saleId, ...sale }); if(cloudEnabled) await pushToCloud('sales', saleId, sale); if(payment === 'A_CREDITO' && customer){ const existing = await getLocal('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; const newCust = { name: customer, balance: prev + total, lastSale: date }; await putLocal('customers', newCust); if(cloudEnabled) await pushToCloud('customers', customer, { balance: newCust.balance, lastSale: date }); } quickCart.length=0; await refreshAllLocalViews(); closeModal('modal-quick-sale'); });
 
-    // quick sell in inventory
+    /* quick sell from scanner and inventory */
     async function quickSellPrompt(productId){
       const qtyStr = prompt('Cantidad a vender (rápido):','1'); if(!qtyStr) return;
       const qty = Math.max(1, Number(qtyStr));
       const payment = prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO','EFECTIVO') || 'EFECTIVO';
       let customerName = null; if(payment.toUpperCase()==='A_CREDITO') customerName = prompt('Nombre del cliente:') || null;
       const prod = state.products.find(p=>p.id===productId); if(!prod) return alert('Producto no encontrado');
-      prod.stock = (prod.stock||0) - qty; await put('products', prod);
-      await add('movements', { id:uid(), type:'sale', productId, qty, date:new Date().toISOString() });
+      prod.stock = (prod.stock||0) - qty; prod.updatedAt = new Date().toISOString(); await putLocal('products', prod); if(cloudEnabled) await pushToCloud('products', prod.id, prod);
+      await addLocal('movements', { id:uid(), type:'sale', productId, qty, date:new Date().toISOString() }); if(cloudEnabled) await pushToCloud('movements', uid(), { type:'sale', productId, qty, date:new Date().toISOString() });
       const total = qty * prod.price; const date = new Date().toISOString();
       const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD();
-      const responsibleObj = await get('responsibles', respDate).catch(()=>null);
+      const responsibleObj = await getLocal('responsibles', respDate).catch(()=>null);
       const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||'');
-      await add('sales', { id:uid(), items:[{ productId, qty, price: prod.price }], total, date, customerName, paid: (payment.toUpperCase()!=='A_CREDITO'), paymentType: payment.toUpperCase(), responsible: responsibleName });
-      if(payment.toUpperCase()==='A_CREDITO' && customerName){ const existing = await get('customers', customerName).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customerName, balance: prev + total, lastSale: date }); }
-      await refreshAll();
+      const saleId = uid();
+      await putLocal('sales', { id: saleId, items:[{ productId, qty, price: prod.price }], total, date, customerName, paid: (payment.toUpperCase()!=='A_CREDITO'), paymentType: payment.toUpperCase(), responsible: responsibleName, createdAt: new Date().toISOString() });
+      if(cloudEnabled) await pushToCloud('sales', saleId, { items:[{ productId, qty, price: prod.price }], total, date, customerName, paid: (payment.toUpperCase()!=='A_CREDITO'), paymentType: payment.toUpperCase(), responsible: responsibleName, createdAt: new Date().toISOString() });
+      if(payment.toUpperCase()==='A_CREDITO' && customerName){ const existing = await getLocal('customers', customerName).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; const newCust = { name: customerName, balance: prev + total, lastSale: date }; await putLocal('customers', newCust); if(cloudEnabled) await pushToCloud('customers', customerName, { balance: newCust.balance, lastSale: date }); }
+      await refreshAllLocalViews();
     }
 
     /* -----------------------
        CLIENTS
        ----------------------- */
     $('#open-clients').addEventListener('click', ()=> showModal('modal-clients'));
-    $('#add-client').addEventListener('click', async ()=> { const name = $('#client-name').value.trim(); if(!name) return alert('Ingresa nombre'); const existing = await get('customers', name).catch(()=>null); if(existing) return alert('Cliente ya existe'); await put('customers', { name, balance:0, createdAt:new Date().toISOString() }); $('#client-name').value=''; await refreshAll(); showModal('modal-clients'); });
-    async function renderClients(){ const el = $('#clients-list'); el.innerHTML=''; const clients = state.customers || []; if(!clients.length) el.innerHTML = '<div class="text-sm text-gray-600">No hay clientes registrados.</div>'; for(const c of clients){ const d = document.createElement('div'); d.className='p-2 border rounded bg-white flex justify-between items-center'; d.innerHTML = `<div><div class="font-medium">${c.name}</div><div class="text-xs text-gray-500">Saldo: S/ ${money(c.balance||0)}</div></div><div class="flex gap-2"><button data-name="${c.name}" class="px-3 py-2 border rounded btn-abono">Abono</button><button data-name="${c.name}" class="px-3 py-2 bg-green-600 text-white rounded btn-saldar">Saldar</button></div>`; el.appendChild(d); } $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = await get('customers', name); const newBal = (c.balance||0) - amt; await put('customers', { name, balance: newBal < 0 ? 0 : newBal, lastPayment:new Date().toISOString() }); alert('Abono registrado'); await refreshAll(); }); $$('.btn-saldar').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; if(!confirm(`¿Saldar cuenta de ${name}? Esto pondrá su saldo a 0.`)) return; await put('customers',{ name, balance:0, lastPayment:new Date().toISOString() }); alert('Cuenta saldada'); await refreshAll(); }); }
+    $('#add-client').addEventListener('click', async ()=> { const name = $('#client-name').value.trim(); if(!name) return alert('Ingresa nombre'); const existing = await getLocal('customers', name).catch(()=>null); if(existing) return alert('Cliente ya existe'); await putLocal('customers', { name, balance:0, createdAt:new Date().toISOString() }); if(cloudEnabled) await pushToCloud('customers', name, { balance:0, createdAt:new Date().toISOString() }); $('#client-name').value=''; await refreshAllLocalViews(); showModal('modal-clients'); });
+    async function renderClients(){ const el = $('#clients-list'); el.innerHTML=''; const clients = state.customers || []; if(!clients.length) el.innerHTML = '<div class="text-sm text-gray-600">No hay clientes registrados.</div>'; for(const c of clients){ const d = document.createElement('div'); d.className='p-2 border rounded bg-white flex justify-between items-center'; d.innerHTML = `<div><div class="font-medium">${c.name}</div><div class="text-xs text-gray-500">Saldo: S/ ${money(c.balance||0)}</div></div><div class="flex gap-2"><button data-name="${c.name}" class="px-3 py-2 border rounded btn-abono">Abono</button><button data-name="${c.name}" class="px-3 py-2 bg-green-600 text-white rounded btn-saldar">Saldar</button></div>`; el.appendChild(d); } $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = await getLocal('customers', name); const newBal = (c.balance||0) - amt; await putLocal('customers', { name, balance: newBal < 0 ? 0 : newBal, lastPayment:new Date().toISOString() }); if(cloudEnabled) await pushToCloud('customers', name, { balance: newBal < 0 ? 0 : newBal, lastPayment:new Date().toISOString() }); alert('Abono registrado'); await refreshAllLocalViews(); }); $$('.btn-saldar').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; if(!confirm(`¿Saldar cuenta de ${name}? Esto pondrá su saldo a 0.`)) return; await putLocal('customers',{ name, balance:0, lastPayment:new Date().toISOString() }); if(cloudEnabled) await pushToCloud('customers', name, { balance:0, lastPayment:new Date().toISOString() }); alert('Cuenta saldada'); await refreshAllLocalViews(); }); }
 
     /* -----------------------
        RESPONSIBLE (uno por día)
        ----------------------- */
-    $('#save-responsible').addEventListener('click', async ()=> { const date = $('#responsible-date').value; const name = $('#responsible-name').value.trim(); if(!date) return alert('Selecciona fecha'); const existing = await get('responsibles', date).catch(()=>null); if(existing && existing.name && existing.name !== name){ if(!confirm(`Ya existe un responsable para ${date}: "${existing.name}". ¿Sobrescribir?`)) return; } await put('responsibles', { date, name }); alert('Responsable guardado'); await refreshAll(); });
-    async function updateResponsibleBanner(){ const today = todayYMD(); $('#responsible-date').value = today; const r = await get('responsibles', today).catch(()=>null); if(r && r.name){ $('#responsible-display').textContent = `${r.name} (${today})`; $('#responsible-name').value = r.name; } else { $('#responsible-display').textContent = 'Sin encargado asignado para hoy'; $('#responsible-name').value = ''; } }
+    $('#save-responsible').addEventListener('click', async ()=> { const date = $('#responsible-date').value; const name = $('#responsible-name').value.trim(); if(!date) return alert('Selecciona fecha'); const existing = await getLocal('responsibles', date).catch(()=>null); if(existing && existing.name && existing.name !== name){ if(!confirm(`Ya existe un responsable para ${date}: "${existing.name}". ¿Sobrescribir?`)) return; } const obj = { date, name }; await putLocal('responsibles', obj); if(cloudEnabled) await pushToCloud('responsibles', date, { name }); alert('Responsable guardado'); await refreshAllLocalViews(); });
+    async function updateResponsibleBanner(){ const today = todayYMD(); $('#responsible-date').value = today; const r = await getLocal('responsibles', today).catch(()=>null); if(r && r.name){ $('#responsible-display').textContent = `${r.name} (${today})`; $('#responsible-name').value = r.name; } else { $('#responsible-display').textContent = 'Sin encargado asignado para hoy'; $('#responsible-name').value = ''; } }
 
     /* -----------------------
        CHARTS
@@ -546,286 +684,56 @@
     }
 
     /* -----------------------
-       REPORTS & PDF (mejoras A4)
-       - función clave: generateDailyReportAndDownload(date)
+       REPORTS: daily / range / inventory (A4 PDF and print)
        ----------------------- */
-
-    // Genera HTML del reporte para una fecha única (día)
     async function buildDailyReportHTML(date){
-      const allSales = await all('sales');
-      const daySales = allSales.filter(s => {
-        const d = new Date(s.date);
-        const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
-        const iso = `${y}-${m}-${day}`; return iso === date;
-      }).sort((a,b)=>a.date.localeCompare(b.date));
-
-      // Ventas por cobrar (a crédito)
-      const creditSales = daySales.filter(s => s.paymentType === 'A_CREDITO' || !s.paid);
-
-      let rows = '';
-      let total = 0;
+      // similar structure as previous implementation but using latest state + local sales filter
+      const allSales = await allLocal('sales');
+      const daySales = allSales.filter(s=> new Date(s.date).toISOString().slice(0,10) === date ).sort((a,b)=>a.date.localeCompare(b.date));
+      const creditSales = daySales.filter(s=> s.paymentType === 'A_CREDITO' || !s.paid);
+      let rows = '', totalDay = 0;
       for(const s of daySales){
-        total += Number(s.total||0);
+        totalDay += Number(s.total||0);
         const d = new Date(s.date).toLocaleTimeString();
         const payment = s.paymentType || (s.paid ? 'EFECTIVO' : 'A_CREDITO');
-        const items = s.items.map(it => {
-          const p = state.products.find(pp=>pp.id===it.productId);
-          return `${p ? p.name : it.productId} (${it.qty} x S/ ${money(it.price)})`;
-        }).join('<br>');
-        rows += `<tr><td style="padding:6px;border-bottom:1px solid #eee">${d}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.id}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.customerName || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.responsible || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${payment}</td><td style="padding:6px;border-bottom:1px solid #eee">${items}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(s.total)}</td></tr>`;
+        const items = s.items.map(it => { const p = state.products.find(pp=>pp.id===it.productId); return `${p ? p.name : it.productId} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>');
+        rows += `<tr><td style="padding:6px;border-bottom:1px solid #eee">${d}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.id}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.customerName||'-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.responsible||'-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${payment}</td><td style="padding:6px;border-bottom:1px solid #eee">${items}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(s.total)}</td></tr>`;
       }
-
-      // responsable para ese día
-      const r = await get('responsibles', date).catch(()=>null);
+      const r = await getLocal('responsibles', date).catch(()=>null);
       const responsibleName = r && r.name ? r.name : '';
-
-      const creditRows = creditSales.map(s=>{
-        const d = new Date(s.date).toLocaleTimeString();
-        const items = s.items.map(it=>{ const p = state.products.find(pp=>pp.id===it.productId); return `${p? p.name:it.productId} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>');
-        return `<tr><td style="padding:6px;border-bottom:1px solid #eee">${d}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.id}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.customerName || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.responsible || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.paymentType || 'A_CREDITO'}</td><td style="padding:6px;border-bottom:1px solid #eee">${items}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(s.total)}</td></tr>`; }).join('');
-
+      const creditRows = creditSales.map(s=>{ const d = new Date(s.date).toLocaleTimeString(); const items = s.items.map(it=>{ const p=state.products.find(pp=>pp.id===it.productId); return `${p? p.name:it.productId} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>'); return `<tr><td style="padding:6px;border-bottom:1px solid #eee">${d}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.id}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.customerName||'-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.responsible||'-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.paymentType||'A_CREDITO'}</td><td style="padding:6px;border-bottom:1px solid #eee">${items}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(s.total)}</td></tr>`; }).join('');
       const html = `
         <div style="font-family:Arial,Helvetica,sans-serif;color:#111;padding:8mm;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div>
-              <h1 style="margin:0;font-size:18px">MINIMARKET LA ESQUINA DEL AHORRO</h1>
-              <div style="font-size:12px;margin-top:4px">Reporte del dia: <strong>${date}</strong></div>
-            </div>
-            <div style="font-size:12px;text-align:right">
-              Generado: ${new Date().toLocaleString()}<br>
-              Encargado: ${responsibleName || '-'}
-            </div>
-          </div>
-          <hr style="margin:8px 0">
+            <div><h1 style="margin:0;font-size:18px">MINIMARKET LA ESQUINA DEL AHORRO</h1><div style="font-size:12px;margin-top:4px">Reporte del dia: <strong>${date}</strong></div></div>
+            <div style="font-size:12px;text-align:right">Generado: ${new Date().toLocaleString()}<br>Encargado: ${responsibleName || '-'}</div>
+          </div><hr style="margin:8px 0">
           <h3 style="margin-bottom:6px">Ventas del día</h3>
           <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
-            <thead><tr>
-              <th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th>
-              <th style="background:#f3f4f6;padding:6px;text-align:left">ID</th>
-              <th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th>
-              <th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th>
-              <th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th>
-              <th style="background:#f3f4f6;padding:6px;text-align:left">Items</th>
-              <th style="background:#f3f4f6;padding:6px;text-align:right">Total</th>
-            </tr></thead>
-            <tbody>
-              ${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas para esta fecha</td></tr>'}
-            </tbody>
+            <thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas para esta fecha</td></tr>'}</tbody>
           </table>
-          <div style="text-align:right;font-weight:bold;margin-bottom:12px">Total (día): S/ ${money(state.sales.filter(s=> new Date(s.date).toISOString().slice(0,10)===date).reduce((a,b)=>a + Number(b.total||0), 0))}</div>
-
+          <div style="text-align:right;font-weight:bold;margin-bottom:12px">Total (día): S/ ${money(totalDay)}</div>
           <hr style="margin:8px 0">
           <h3 style="margin-bottom:6px">Ventas por cobrar (A CREDITO)</h3>
-          <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
-            <thead><tr>
-            <th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th>
-            </tr></thead>
-            <tbody>
-              ${creditRows.length ? creditRows : '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas por cobrar</td></tr>'}
-            </tbody>
-          </table>
-
+          <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead><tbody>${creditRows.length ? creditRows : '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas por cobrar</td></tr>'}</tbody></table>
           <div style="font-size:11px;color:#666;margin-top:10px">Reporte generado por TiendaSmart — MINIMARKET LA ESQUINA DEL AHORRO</div>
-        </div>
-      `;
+        </div>`;
       return html;
     }
 
-    // Genera PDF A4 con paginación automática y descarga con nombre "Reporte del dia YYYY-MM-DD.pdf"
-    async function generateDailyReportAndDownload(date){
-      if(!date) return alert('Selecciona una fecha');
-      const html = await buildDailyReportHTML(date);
-      // Convertir a elemento temporal
-      const wrapper = document.createElement('div');
-      // fijar ancho para buena calidad (A4 width ~ 210mm → elegir ancho px consistente)
-      // Usamos 1123px width (aprox A4 a 150 DPI) para buena resolución, y luego html2canvas escala.
-      wrapper.style.width = '1123px';
-      wrapper.style.background = '#ffffff';
-      wrapper.innerHTML = html;
-      document.body.appendChild(wrapper); // necesario para que fonts/resolución se apliquen
-
-      try{
-        // escala alta para mejor nitidez
-        const scale = 3; // mayor -> mejor calidad, pero más memoria
-        const canvas = await html2canvas(wrapper, { scale: scale, useCORS:true, logging:false, windowWidth: wrapper.scrollWidth, windowHeight: wrapper.scrollHeight });
-        const imgData = canvas.toDataURL('image/png', 1.0);
-
-        // preparar jsPDF
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p','mm','a4');
-        const pageWidthMM = 210;
-        const pageHeightMM = 297;
-        const marginMM = 10;
-        const usableWidthMM = pageWidthMM - marginMM*2;
-
-        // relacion px -> mm
-        const imgWidthPx = canvas.width;
-        const pxToMm = usableWidthMM / imgWidthPx; // mm per px
-        const imgHeightMM = canvas.height * pxToMm;
-
-        // si cabe en una sola página:
-        if(imgHeightMM <= (pageHeightMM - marginMM*2)){
-          pdf.addImage(imgData, 'PNG', marginMM, marginMM, usableWidthMM, imgHeightMM);
-        } else {
-          // cortar en slices verticales (en px)
-          const pxPerPage = Math.floor((pageHeightMM - marginMM*2) / pxToMm);
-          let remainingHeight = canvas.height;
-          let position = 0;
-          let pageIdx = 0;
-          while(remainingHeight > 0){
-            const sliceHeight = Math.min(pxPerPage, remainingHeight);
-            const tmpCanvas = document.createElement('canvas');
-            tmpCanvas.width = canvas.width;
-            tmpCanvas.height = sliceHeight;
-            const tctx = tmpCanvas.getContext('2d');
-            tctx.fillStyle = '#fff';
-            tctx.fillRect(0,0,tmpCanvas.width,tmpCanvas.height);
-            tctx.drawImage(canvas, 0, position, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
-            const sliceData = tmpCanvas.toDataURL('image/png');
-            const sliceHeightMM = sliceHeight * pxToMm;
-            if(pageIdx > 0) pdf.addPage();
-            pdf.addImage(sliceData, 'PNG', marginMM, marginMM, usableWidthMM, sliceHeightMM);
-            remainingHeight -= sliceHeight;
-            position += sliceHeight;
-            pageIdx++;
-          }
-        }
-
-        const filename = `Reporte del dia ${date}.pdf`;
-        pdf.save(filename);
-        // limpieza
-        canvas && canvas.remove && canvas.remove();
-      }catch(err){
-        console.error('Error generando PDF:', err);
-        alert('Error al generar PDF. Intenta imprimir desde la vista o reducir la escala.');
-      } finally {
-        // retirar wrapper temporal
-        wrapper.remove();
+    // Generic function to render HTML to A4 PDF with slicing and download filename param
+    async function htmlToA4PDFDownload(htmlStringOrElement, filename){
+      // Create wrapper element if string
+      let wrapper;
+      if(typeof htmlStringOrElement === 'string'){
+        wrapper = document.createElement('div'); wrapper.style.width='1123px'; wrapper.style.background='#fff'; wrapper.innerHTML = htmlStringOrElement; document.body.appendChild(wrapper);
+      } else {
+        wrapper = htmlStringOrElement;
       }
-    }
-
-    // Genera vista previa (HTML) para un día (útil en el modal)
-    async function showDailyPreview(date, targetSelector){
-      if(!date) return alert('Selecciona una fecha');
-      const html = await buildDailyReportHTML(date);
-      $(targetSelector).innerHTML = html;
-    }
-
-    // Imprimir en navegador (abre nueva ventana con contenido optimizado)
-    function printHTML(html, title = 'Reporte'){
-      const win = window.open('', '_blank', 'noopener,noreferrer');
-      if(!win) return alert('El navegador bloqueó la apertura de la ventana de impresión. Permite ventanas emergentes o usa Generar PDF.');
-      const doc = win.document;
-      doc.open();
-      doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:Arial,Helvetica,sans-serif;margin:10mm;} table{width:100%;border-collapse:collapse} th{background:#f3f4f6;padding:6px;text-align:left} td{padding:6px;border-bottom:1px solid #eee}</style></head><body>${html}</body></html>`);
-      doc.close();
-      // esperar a que la ventana cargue antes de lanzar print
-      win.focus();
-      setTimeout(()=>{ win.print(); }, 700);
-    }
-
-    /* -----------------------
-       REPORTS UI bindings
-       ----------------------- */
-    $('#tab-sales-range').addEventListener('click', ()=> showTab('sales-range'));
-    $('#tab-sales-day').addEventListener('click', ()=> showTab('sales-day'));
-    $('#tab-inventory').addEventListener('click', ()=> showTab('inventory'));
-    function showTab(name){
-      $$('.tab-content').forEach(el=> el.classList.add('hidden'));
-      $('#tab-content-sales-range').classList.toggle('hidden', name !== 'sales-range');
-      $('#tab-content-sales-day').classList.toggle('hidden', name !== 'sales-day');
-      $('#tab-content-inventory').classList.toggle('hidden', name !== 'inventory');
-      $('#tab-sales-range').classList.toggle('bg-indigo-600', name==='sales-range'); $('#tab-sales-range').classList.toggle('text-white', name==='sales-range');
-      $('#tab-sales-day').classList.toggle('bg-indigo-600', name==='sales-day'); $('#tab-sales-day').classList.toggle('text-white', name==='sales-day');
-      $('#tab-inventory').classList.toggle('bg-indigo-600', name==='inventory'); $('#tab-inventory').classList.toggle('text-white', name==='inventory');
-    }
-
-    // Sales by range (existing feature kept)
-    $('#btn-generate-range').addEventListener('click', async ()=> {
-      const from = $('#report-from').value, to = $('#report-to').value;
-      if(!from || !to) return alert('Selecciona rango');
-      const html = await buildRangeReportHTML(from,to);
-      $('#report-preview-range').innerHTML = html;
-    });
-    $('#btn-pdf-range').addEventListener('click', async ()=> {
-      const from = $('#report-from').value, to = $('#report-to').value;
-      if(!from || !to) return alert('Selecciona rango');
-      const html = await buildRangeReportHTML(from,to);
-      // generar PDF (reutilizar generatePDF generic)
-      const wrapper = document.createElement('div'); wrapper.style.width='1123px'; wrapper.innerHTML = html; document.body.appendChild(wrapper);
-      await generatePDFfromWrapper(wrapper, `Reporte_Ventas_${from}_a_${to}.pdf`);
-      wrapper.remove();
-    });
-    $('#btn-print-range').addEventListener('click', async ()=> {
-      const from = $('#report-from').value, to = $('#report-to').value;
-      if(!from || !to) return alert('Selecciona rango');
-      const html = await buildRangeReportHTML(from,to);
-      printHTML(html, `Reporte ${from} a ${to}`);
-    });
-
-    // Sales by single day
-    $('#btn-generate-day-single').addEventListener('click', async ()=> {
-      const date = $('#day-single').value || todayYMD();
-      await showDailyPreview(date, '#report-preview-day-single');
-    });
-    $('#btn-pdf-day-single').addEventListener('click', async ()=> {
-      const date = $('#day-single').value || todayYMD();
-      await generateDailyReportAndDownload(date);
-    });
-    $('#btn-print-day-single').addEventListener('click', async ()=> {
-      const date = $('#day-single').value || todayYMD();
-      const html = await buildDailyReportHTML(date);
-      printHTML(html, `Reporte del dia ${date}`);
-    });
-
-    // Inventory report
-    $('#btn-generate-inv').addEventListener('click', async ()=> { const html = await buildInventoryReportHTML(); $('#report-preview-inv').innerHTML = html; });
-    $('#btn-pdf-inv').addEventListener('click', async ()=> { const html = await buildInventoryReportHTML(); const wrapper = document.createElement('div'); wrapper.style.width='1123px'; wrapper.innerHTML = html; document.body.appendChild(wrapper); await generatePDFfromWrapper(wrapper, `Reporte_Inventario_${new Date().toISOString().slice(0,10)}.pdf`); wrapper.remove(); });
-    $('#btn-print-inv').addEventListener('click', async ()=> { const html = await buildInventoryReportHTML(); printHTML(html, 'Reporte de Inventario'); });
-
-    $('#btn-open-report').addEventListener('click', ()=> { showModal('modal-reports'); showTab('sales-range'); });
-
-    /* -----------------------
-       Rango: función auxiliar buildRangeReportHTML
-       ----------------------- */
-    async function buildRangeReportHTML(from,to){
-      const allSales = await all('sales');
-      const list = allSales.filter(s=>{
-        const d = new Date(s.date).toISOString().slice(0,10);
-        return d >= from && d <= to;
-      }).sort((a,b)=>a.date.localeCompare(b.date));
-      let rows='';
-      let total=0;
-      for(const s of list){
-        total += Number(s.total||0);
-        const d = new Date(s.date).toLocaleString();
-        const payment = s.paymentType || (s.paid ? 'EFECTIVO' : 'A_CREDITO');
-        const items = s.items.map(it=>{ const p = state.products.find(x=>x.id===it.productId); return `${p? p.name : it.productId} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>');
-        rows += `<tr><td style="padding:6px;border-bottom:1px solid #eee">${d}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.id}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.customerName || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.responsible || '-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${payment}</td><td style="padding:6px;border-bottom:1px solid #eee">${items}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(s.total)}</td></tr>`;
-      }
-      const html = `<div style="padding:8mm;font-family:Arial,Helvetica,sans-serif;color:#111"><div style="display:flex;justify-content:space-between"><div><h2 style="margin:0">MINIMARKET LA ESQUINA DEL AHORRO</h2><div style="font-size:12px">Reporte por rango</div></div><div style="text-align:right;font-size:12px">Periodo: ${from} → ${to}<br>Generado: ${new Date().toLocaleString()}</div></div><hr style="margin:8px 0"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Fecha</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody></table><div style="text-align:right;font-weight:bold;margin-top:8px">Total periodo: S/ ${money(total)}</div></div>`;
-      return html;
-    }
-
-    /* -----------------------
-       INVENTORY build HTML
-       ----------------------- */
-    async function buildInventoryReportHTML(){
-      const products = await all('products');
-      let rows = '', low=0;
-      products.sort((a,b)=>a.name.localeCompare(b.name));
-      for(const p of products){ if((p.stock||0)<=5) low++; rows += `<tr><td style="padding:6px;border-bottom:1px solid #eee">${p.name}</td><td style="padding:6px;border-bottom:1px solid #eee">${p.category||''}</td><td style="padding:6px;border-bottom:1px solid #eee">${p.barcode||''}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">${p.stock||0}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(p.price)}</td></tr>`; }
-      const html = `<div style="padding:8mm;font-family:Arial,Helvetica,sans-serif;color:#111"><div style="display:flex;justify-content:space-between"><div><h2 style="margin:0">MINIMARKET LA ESQUINA DEL AHORRO</h2><div style="font-size:12px">Reporte de inventario</div></div><div style="text-align:right;font-size:12px">Generado: ${new Date().toLocaleString()}</div></div><hr style="margin:8px 0"><div style="margin-bottom:8px">Productos: ${products.length} • Stocks bajos: ${low}</div><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Nombre</th><th style="background:#f3f4f6;padding:6px;text-align:left">Categoría</th><th style="background:#f3f4f6;padding:6px;text-align:left">Código</th><th style="background:#f3f4f6;padding:6px;text-align:right">Stock</th><th style="background:#f3f4f6;padding:6px;text-align:right">Precio</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#666">No hay productos</td></tr>'}</tbody></table></div>`;
-      return html;
-    }
-
-    /* -----------------------
-       PDF util para wrappers (reutilizable)
-       ----------------------- */
-    async function generatePDFfromWrapper(wrapperElement, filename){
       try{
         const scale = 3;
-        const canvas = await html2canvas(wrapperElement, { scale: scale, useCORS:true, logging:false, windowWidth: wrapperElement.scrollWidth, windowHeight: wrapperElement.scrollHeight });
+        const canvas = await html2canvas(wrapper, { scale: scale, useCORS:true, logging:false, windowWidth: wrapper.scrollWidth, windowHeight: wrapper.scrollHeight });
         const imgData = canvas.toDataURL('image/png', 1.0);
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF('p','mm','a4');
@@ -855,14 +763,85 @@
         }
         pdf.save(filename);
       }catch(err){
-        console.error('generatePDFfromWrapper error', err);
-        alert('Error al generar PDF. Intenta imprimir desde la vista.');
+        console.error('htmlToA4PDFDownload error', err);
+        alert('Error generando PDF: ' + (err.message||err));
+      } finally {
+        if(typeof htmlStringOrElement === 'string') wrapper.remove();
       }
     }
 
+    // Build range HTML (reuse earlier style)
+    async function buildRangeReportHTML(from, to){
+      const allSales = await allLocal('sales');
+      const list = allSales.filter(s => { const d = new Date(s.date).toISOString().slice(0,10); return d >= from && d <= to; }).sort((a,b)=>a.date.localeCompare(b.date));
+      let rows=''; let total=0;
+      for(const s of list){
+        total += Number(s.total||0);
+        const d = new Date(s.date).toLocaleString();
+        const payment = s.paymentType || (s.paid ? 'EFECTIVO' : 'A_CREDITO');
+        const items = s.items.map(it=>{ const p = state.products.find(x=>x.id===it.productId); return `${p? p.name : it.productId} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>');
+        rows += `<tr><td style="padding:6px;border-bottom:1px solid #eee">${d}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.id}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.customerName||'-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.responsible||'-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${payment}</td><td style="padding:6px;border-bottom:1px solid #eee">${items}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(s.total)}</td></tr>`;
+      }
+      const html = `<div style="padding:8mm;font-family:Arial,Helvetica,sans-serif;color:#111"><div style="display:flex;justify-content:space-between"><div><h2 style="margin:0">MINIMARKET LA ESQUINA DEL AHORRO</h2><div style="font-size:12px">Reporte por rango</div></div><div style="text-align:right;font-size:12px">Periodo: ${from} → ${to}<br>Generado: ${new Date().toLocaleString()}</div></div><hr style="margin:8px 0"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Fecha</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody></table><div style="text-align:right;font-weight:bold;margin-top:8px">Total periodo: S/ ${money(total)}</div></div>`;
+      return html;
+    }
+
+    async function buildInventoryReportHTML(){
+      const products = await allLocal('products');
+      let rows=''; let low=0;
+      products.sort((a,b)=>a.name.localeCompare(b.name));
+      for(const p of products){ if((p.stock||0)<=5) low++; rows += `<tr><td style="padding:6px;border-bottom:1px solid #eee">${p.name}</td><td style="padding:6px;border-bottom:1px solid #eee">${p.category||''}</td><td style="padding:6px;border-bottom:1px solid #eee">${p.barcode||''}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">${p.stock||0}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(p.price)}</td></tr>`; }
+      const html = `<div style="padding:8mm;font-family:Arial,Helvetica,sans-serif;color:#111"><div style="display:flex;justify-content:space-between"><div><h2 style="margin:0">MINIMARKET LA ESQUINA DEL AHORRO</h2><div style="font-size:12px">Reporte de inventario</div></div><div style="text-align:right;font-size:12px">Generado: ${new Date().toLocaleString()}</div></div><hr style="margin:8px 0"><div style="margin-bottom:8px">Productos: ${products.length} • Stocks bajos: ${low}</div><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Nombre</th><th style="background:#f3f4f6;padding:6px;text-align:left">Categoría</th><th style="background:#f3f4f6;padding:6px;text-align:left">Código</th><th style="background:#f3f4f6;padding:6px;text-align:right">Stock</th><th style="background:#f3f4f6;padding:6px;text-align:right">Precio</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#666">No hay productos</td></tr>'}</tbody></table></div>`;
+      return html;
+    }
+
     /* -----------------------
-       SCANNER (OpenCV + BarcodeDetector + Quagga fallback)
+       CSV Export / Import (inventory)
        ----------------------- */
+    $('#btn-export-csv').addEventListener('click', async ()=> {
+      const products = await allLocal('products');
+      const header = ['id','name','category','price','barcode','stock'];
+      const rows = products.map(p => header.map(h => (p[h] !== undefined ? String(p[h]).replace(/"/g,'""') : '')).map(cell => `"${cell}"`).join(','));
+      const csv = [header.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = `inventario_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    });
+
+    // Simple CSV parser (expects header row with at least name or barcode)
+    $('#import-csv-input').addEventListener('change', async (e)=>{
+      const f = e.target.files[0];
+      if(!f) return;
+      const txt = await f.text();
+      const lines = txt.split(/\r?\n/).filter(l=>l.trim()!=='');
+      if(lines.length < 2) return alert('CSV vacío o mal formado');
+      const header = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,''));
+      const idx = (col)=> header.findIndex(h=> h.toLowerCase() === col);
+      // map columns: id? name (required) price category barcode stock
+      const nameIdx = idx('name'); const barcodeIdx = idx('barcode'); const priceIdx = idx('price'); const stockIdx = idx('stock'); const catIdx = idx('category'); const idIdx = idx('id');
+      if(nameIdx === -1 && barcodeIdx === -1) return alert('CSV debe tener columna "name" o "barcode"');
+      let imported = 0;
+      for(let i=1;i<lines.length;i++){
+        const cols = lines[i].split(',').map(c=>c.trim().replace(/^"|"$/g,''));
+        const name = nameIdx>=0 ? cols[nameIdx] : undefined;
+        const barcode = barcodeIdx>=0 ? cols[barcodeIdx] : undefined;
+        const price = priceIdx>=0 ? parseFloat(cols[priceIdx]) || 0 : 0;
+        const stock = stockIdx>=0 ? parseInt(cols[stockIdx]) || 0 : 0;
+        const category = catIdx>=0 ? cols[catIdx] : '';
+        const id = (idIdx>=0 && cols[idIdx]) ? cols[idIdx] : uid();
+        if(!name && !barcode) continue;
+        const prod = { id, name: name||barcode, category, price, barcode, stock, updatedAt:new Date().toISOString() };
+        await putLocal('products', prod);
+        if(cloudEnabled) await pushToCloud('products', prod.id, prod);
+        imported++;
+      }
+      alert(`Importadas/actualizadas ${imported} filas`); e.target.value = ''; await refreshAllLocalViews();
+    });
+
+    /* -----------------------
+       Scanner (kept improved)
+       ----------------------- */
+    // For brevity reuse earlier scanner logic but keep it integrated
     let cvReady=false, awaitingCvInit=false;
     if(window.cv && cv['onRuntimeInitialized']){ awaitingCvInit=true; cv['onRuntimeInitialized']=()=>{ cvReady=true; awaitingCvInit=false; console.info('OpenCV listo'); }; } else if(window.cv){ cvReady=true; }
     const video = $('#video'); let videoStream=null, currentVideoTrack=null;
@@ -931,9 +910,7 @@
                 if(confirmed){ $('#scanned-code').value = confirmed; showConfirmation(confirmed); await new Promise(r=>setTimeout(r,900)); }
               }
               bitmap.close(); cropped.close();
-            }catch(err){
-              console.warn('BarcodeDetector loop error', err); detectionLoop=false; fallbackQuagga(); break;
-            }
+            }catch(err){ console.warn('BarcodeDetector loop error', err); detectionLoop=false; fallbackQuagga(); break; }
             await new Promise(r=>setTimeout(r,80));
           }
           return;
@@ -978,84 +955,129 @@
 
     async function stopCamera(){ detectionLoop=false; if(quaggaActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} quaggaActive=false; } if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); video.srcObject = null; videoStream=null; currentVideoTrack=null; clearOverlay(); readBuffer=[]; }
 
-    // scanner buttons
+    /* scanner buttons */
     $('#open-scan').addEventListener('click', ()=> { if(!isAuthenticated()) return showLogin(); showModal('modal-scan'); startBarcodeDetection().catch(()=>{}); });
     $('#stop-camera').addEventListener('click', async ()=> stopCamera());
     $('#toggle-torch').addEventListener('click', async ()=> { if(!currentVideoTrack) return alert('Cámara no activada'); try{ const caps = currentVideoTrack.getCapabilities(); if(!caps.torch) return alert('Linterna no soportada'); await currentVideoTrack.applyConstraints({ advanced:[{ torch:true }] }); }catch(e){ console.warn('torch', e); alert('Linterna no soportada'); } });
     $('#fill-product').addEventListener('click', ()=> { const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado'); const p = findProductByCode(code); if(p) openProductModal(p); else { $('#product-barcode').value = code; openProductModal(); } });
-    $('#quick-sell-detected').addEventListener('click', async ()=> { const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado'); const p = findProductByCode(code); if(!p){ if(!confirm('Producto no encontrado. ¿Crear nuevo?')) return; $('#product-barcode').value = code; openProductModal(); return; } const qty = Number(prompt('Cantidad a vender (rápido):','1'))||1; const payment = prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO','EFECTIVO') || 'EFECTIVO'; let customer=null; if(payment.toUpperCase()==='A_CREDITO') customer = prompt('Nombre del cliente:') || null; p.stock=(p.stock||0)-qty; await put('products', p); await add('movements', { id:uid(), type:'sale', productId:p.id, qty, date:new Date().toISOString() }); const total = qty * p.price; const date = new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); await add('sales', { id:uid(), items:[{ productId:p.id, qty, price:p.price }], total, date, customerName: customer, paid: (payment.toUpperCase()!=='A_CREDITO'), paymentType: payment.toUpperCase(), responsible: responsibleName }); if(payment.toUpperCase()==='A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customer, balance: prev + total, lastSale: date }); } alert('Venta rápida registrada'); await refreshAll(); });
+    $('#quick-sell-detected').addEventListener('click', async ()=> { const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado'); const p = findProductByCode(code); if(!p){ if(!confirm('Producto no encontrado. ¿Crear nuevo?')) return; $('#product-barcode').value = code; openProductModal(); return; } const qty = Number(prompt('Cantidad a vender (rápido):','1'))||1; const payment = prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO','EFECTIVO') || 'EFECTIVO'; let customer=null; if(payment.toUpperCase()==='A_CREDITO') customer = prompt('Nombre del cliente:') || null; p.stock=(p.stock||0)-qty; p.updatedAt = new Date().toISOString(); await putLocal('products', p); if(cloudEnabled) await pushToCloud('products', p.id, p); await addLocal('movements', { id:uid(), type:'sale', productId:p.id, qty, date:new Date().toISOString() }); if(cloudEnabled) await pushToCloud('movements', uid(), { type:'sale', productId:p.id, qty, date:new Date().toISOString() }); const total = qty * p.price; const date = new Date().toISOString(); const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD(); const responsibleObj = await getLocal('responsibles', respDate).catch(()=>null); const responsibleName = (responsibleObj && responsibleObj.name) ? responsibleObj.name : ($('#responsible-name').value.trim()||''); const sale = { items:[{ productId:p.id, qty, price:p.price }], total, date, customerName: customer, paid: (payment.toUpperCase()!=='A_CREDITO'), paymentType: payment.toUpperCase(), responsible: responsibleName, createdAt: new Date().toISOString() }; const saleId = uid(); await putLocal('sales', { id: saleId, ...sale }); if(cloudEnabled) await pushToCloud('sales', saleId, sale); if(payment.toUpperCase()==='A_CREDITO' && customer){ const existing = await getLocal('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await putLocal('customers', { name: customer, balance: prev + total, lastSale: date }); if(cloudEnabled) await pushToCloud('customers', customer, { balance: prev + total, lastSale: date }); } alert('Venta rápida registrada'); await refreshAllLocalViews(); });
 
-    function findProductByCode(code){ const norm = (code||'').replace(/\D/g,''); let p = state.products.find(x => (x.barcode||'') === code || (x.barcode||'').replace(/\D/g,'') === norm); if(!p && norm.length>6) p = state.products.find(x => (x.barcode||'').replace(/\D/g,'').endsWith(norm)); return p; }
+    function findProductByCode(code){
+      const norm = (code||'').replace(/\D/g,'');
+      let p = state.products.find(x => (x.barcode||'') === code || (x.barcode||'').replace(/\D/g,'') === norm);
+      if(!p && norm.length>6) p = state.products.find(x => (x.barcode||'').replace(/\D/g,'').endsWith(norm));
+      return p;
+    }
 
     /* -----------------------
-       INIT & seed
+       REPORTS UI bindings (buttons) + print
+       ----------------------- */
+    $('#tab-sales-range').addEventListener('click', ()=> showTab('sales-range'));
+    $('#tab-sales-day').addEventListener('click', ()=> showTab('sales-day'));
+    $('#tab-inventory').addEventListener('click', ()=> showTab('inventory'));
+    function showTab(name){
+      $$('.tab-content').forEach(el=> el.classList.add('hidden'));
+      $('#tab-content-sales-range').classList.toggle('hidden', name !== 'sales-range');
+      $('#tab-content-sales-day').classList.toggle('hidden', name !== 'sales-day');
+      $('#tab-content-inventory').classList.toggle('hidden', name !== 'inventory');
+      $('#tab-sales-range').classList.toggle('bg-indigo-600', name==='sales-range'); $('#tab-sales-range').classList.toggle('text-white', name==='sales-range');
+      $('#tab-sales-day').classList.toggle('bg-indigo-600', name==='sales-day'); $('#tab-sales-day').classList.toggle('text-white', name==='sales-day');
+      $('#tab-inventory').classList.toggle('bg-indigo-600', name==='inventory'); $('#tab-inventory').classList.toggle('text-white', name==='inventory');
+    }
+
+    $('#btn-generate-range').addEventListener('click', async ()=> { const from = $('#report-from').value, to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango'); const html = await buildRangeReportHTML(from,to); $('#report-preview-range').innerHTML = html; });
+    $('#btn-pdf-range').addEventListener('click', async ()=> { const from = $('#report-from').value, to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango'); const html = await buildRangeReportHTML(from,to); await htmlToA4PDFDownload(html, `Reporte_Ventas_${from}_a_${to}.pdf`); });
+    $('#btn-print-range').addEventListener('click', async ()=> { const from = $('#report-from').value, to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango'); const html = await buildRangeReportHTML(from,to); printHTML(html, `Reporte ${from} a ${to}`); });
+
+    $('#btn-generate-day-single').addEventListener('click', async ()=> { const date = $('#day-single').value || todayYMD(); const html = await buildDailyReportHTML(date); $('#report-preview-day-single').innerHTML = html; });
+    $('#btn-pdf-day-single').addEventListener('click', async ()=> { const date = $('#day-single').value || todayYMD(); const html = await buildDailyReportHTML(date); await htmlToA4PDFDownload(html, `Reporte del dia ${date}.pdf`); });
+    $('#btn-print-day-single').addEventListener('click', async ()=> { const date = $('#day-single').value || todayYMD(); const html = await buildDailyReportHTML(date); printHTML(html, `Reporte del dia ${date}`); });
+
+    $('#btn-generate-inv').addEventListener('click', async ()=> { const html = await buildInventoryReportHTML(); $('#report-preview-inv').innerHTML = html; });
+    $('#btn-pdf-inv').addEventListener('click', async ()=> { const html = await buildInventoryReportHTML(); await htmlToA4PDFDownload(html, `Reporte_Inventario_${new Date().toISOString().slice(0,10)}.pdf`); });
+    $('#btn-print-inv').addEventListener('click', async ()=> { const html = await buildInventoryReportHTML(); printHTML(html, 'Reporte de Inventario'); });
+
+    $('#btn-open-report').addEventListener('click', ()=> { showModal('modal-reports'); showTab('sales-range'); });
+
+    // print helper
+    function printHTML(html, title='Reporte'){
+      const win = window.open('', '_blank', 'noopener,noreferrer');
+      if(!win) return alert('El navegador bloqueó la apertura de la ventana de impresión. Permite ventanas emergentes o usa Generar PDF.');
+      const doc = win.document;
+      doc.open();
+      doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:Arial,Helvetica,sans-serif;margin:10mm;} table{width:100%;border-collapse:collapse} th{background:#f3f4f6;padding:6px;text-align:left} td{padding:6px;border-bottom:1px solid #eee}</style></head><body>${html}</body></html>`);
+      doc.close();
+      win.focus();
+      setTimeout(()=>{ win.print(); }, 700);
+    }
+
+    /* -----------------------
+       Cloud config modal bindings
+       ----------------------- */
+    $('#btn-cloud-setup').addEventListener('click', ()=> {
+      // load saved config if present
+      const saved = localStorage.getItem('ts_firebase_config'); if(saved) $('#cloud-config').value = saved;
+      showModal('modal-cloud', { focusSelector:'#cloud-config' });
+    });
+    $('#cloud-save').addEventListener('click', async ()=> {
+      const raw = $('#cloud-config').value.trim();
+      if(!raw) return alert('Pega tu firebaseConfig JSON');
+      try{
+        const cfg = JSON.parse(raw);
+        localStorage.setItem('ts_firebase_config', raw);
+        initCloud(cfg);
+        alert('Cloud activado. Espera unos segundos para sincronizar.');
+        closeModal('modal-cloud');
+      }catch(err){ alert('JSON inválido: ' + err.message); }
+    });
+    $('#cloud-disable').addEventListener('click', ()=> {
+      localStorage.removeItem('ts_firebase_config'); cloudEnabled=false; firestore=null; $('#cloud-indicator').classList.add('hidden');
+      // unsubscribe listeners
+      listeners.forEach(u=>u && typeof u === 'function' && u()); listeners=[];
+      alert('Cloud desactivado. Ahora usando solo IndexedDB local.');
+    });
+
+    /* -----------------------
+       Init app
        ----------------------- */
     async function initApp(){
       await openDB();
-      const products = await all('products');
-      if(products.length===0){
+      // Seed if empty
+      const products = await allLocal('products');
+      if(products.length === 0){
         const seed = [
-          { id:uid(), name:'Coca Cola 500ml', category:'Bebidas', price:10.99, barcode:'7758753103282', stock:48, createdAt:new Date().toISOString() },
-          { id:uid(), name:'Agua San Luis 625ml', category:'Bebidas', price:3.50, barcode:'7752482381011', stock:32, createdAt:new Date().toISOString() }
+          { id:uid(), name:'Coca Cola 500ml', category:'Bebidas', price:10.99, barcode:'7758753103282', stock:48, updatedAt:new Date().toISOString() },
+          { id:uid(), name:'Agua San Luis 625ml', category:'Bebidas', price:3.50, barcode:'7752482381011', stock:32, updatedAt:new Date().toISOString() }
         ];
-        for(const p of seed) await put('products', p);
+        for(const p of seed){ await putLocal('products', p); if(cloudEnabled) await pushToCloud('products', p.id, p); }
       }
-      await refreshAll();
-      const today = todayYMD(); const r = await get('responsibles', today).catch(()=>null);
-      if(!r){ const name = prompt(`No hay encargado registrado para hoy (${today}). Ingresa su nombre (opcional):`); if(name !== null && name.trim() !== '') await put('responsibles', { date: today, name: name.trim() }); }
+
+      // Try to auto-init cloud if config present
+      const rawCfg = localStorage.getItem('ts_firebase_config');
+      if(rawCfg){
+        try{ const cfg = JSON.parse(rawCfg); initCloud(cfg); }catch(e){ console.warn('cloud config invalid'); }
+      }
+
+      await refreshAllLocalViews();
+      const today = todayYMD(); const r = await getLocal('responsibles', today).catch(()=>null);
+      if(!r){ const name = prompt(`No hay encargado registrado para hoy (${today}). Ingresa su nombre (opcional):`); if(name !== null && name.trim() !== ''){ await putLocal('responsibles', { date: today, name }); if(cloudEnabled) await pushToCloud('responsibles', today, { name }); } }
       updateResponsibleBanner();
-      showTab('sales-range');
-      $('#search').addEventListener('input', debounce(e => renderInventoryMobile(e.target.value), 180));
-      window.addEventListener('resize', ()=>{ try{ resizeOverlay(); }catch(e){} });
+      // bind inventory search main input (top)
+      $('#search').addEventListener('input', debounce(e => renderInventoryMobile(e.target.value), 200));
+      // import/export binding already set
+      // window resize overlay handling
+      window.addEventListener('resize', ()=>{ try{ if(overlayCanvas) { overlayCanvas.width = video.clientWidth; overlayCanvas.height = video.clientHeight; } }catch(e){} });
     }
 
-    // Si ya autenticado previamente
+    // Auto-login if previously authenticated
     if(isAuthenticated()){
       $('#current-user').textContent = localStorage.getItem(AUTH_KEY); $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); closeLogin(); initApp();
     }
 
-    // Utility used by range PDF (reused earlier)
-    async function generatePDFfromWrapper(wrapperElement, filename){
-      return generatePDFfromWrapperInternal(wrapperElement, filename);
-    }
-    async function generatePDFfromWrapperInternal(wrapperElement, filename){
-      try{
-        const scale = 3;
-        const canvas = await html2canvas(wrapperElement, { scale: scale, useCORS:true, logging:false, windowWidth: wrapperElement.scrollWidth, windowHeight: wrapperElement.scrollHeight });
-        const imgData = canvas.toDataURL('image/png', 1.0);
-        const { jsPDF } = window.jspdf;
-        const pdf = new jsPDF('p','mm','a4');
-        const pageWidthMM = 210, pageHeightMM = 297, marginMM = 10;
-        const usableWidthMM = pageWidthMM - marginMM*2;
-        const imgWidthPx = canvas.width;
-        const pxToMm = usableWidthMM / imgWidthPx; // mm per px
-        const imgHeightMM = canvas.height * pxToMm;
-        if(imgHeightMM <= (pageHeightMM - marginMM*2)){
-          pdf.addImage(imgData, 'PNG', marginMM, marginMM, usableWidthMM, imgHeightMM);
-        } else {
-          const pxPerPage = Math.floor((pageHeightMM - marginMM*2) / pxToMm);
-          let remainingHeight = canvas.height; let position = 0; let pageIdx = 0;
-          while(remainingHeight > 0){
-            const sliceHeight = Math.min(pxPerPage, remainingHeight);
-            const tmpCanvas = document.createElement('canvas');
-            tmpCanvas.width = canvas.width; tmpCanvas.height = sliceHeight;
-            const tctx = tmpCanvas.getContext('2d');
-            tctx.fillStyle = '#fff'; tctx.fillRect(0,0,tmpCanvas.width,tmpCanvas.height);
-            tctx.drawImage(canvas, 0, position, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
-            const sliceData = tmpCanvas.toDataURL('image/png');
-            const sliceHeightMM = sliceHeight * pxToMm;
-            if(pageIdx > 0) pdf.addPage();
-            pdf.addImage(sliceData, 'PNG', marginMM, marginMM, usableWidthMM, sliceHeightMM);
-            remainingHeight -= sliceHeight; position += sliceHeight; pageIdx++;
-          }
-        }
-        pdf.save(filename);
-      }catch(err){
-        console.error('generatePDFfromWrapperInternal error', err);
-        alert('Error al generar PDF. Intenta imprimir desde la vista.');
-      }
-    }
+    // Provide simple UI hook to initialize cloud for convenience (if user wants to paste config in code)
+    const savedCfg = localStorage.getItem('ts_firebase_config'); if(savedCfg){ try{ initCloud(JSON.parse(savedCfg)); }catch(e){} }
 
+    // Close: end IIFE
   })();
   </script>
 </body>
