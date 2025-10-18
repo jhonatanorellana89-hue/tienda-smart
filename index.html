@@ -2,17 +2,17 @@
 <html lang="es">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart</title>
 
 <!-- Tailwind -->
 <script src="https://cdn.tailwindcss.com"></script>
 
-<!-- Fuse.js (búsqueda difusa, eficiente) -->
+<!-- Fuse.js (búsqueda rápida/difusa) -->
 <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
 
-<!-- OpenCV.js (opcional para mejor preprocesado) -->
-<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+<!-- SheetJS (XLSX import/export) -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
 <!-- Quagga fallback -->
 <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
@@ -24,329 +24,335 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-<!-- Firebase (compat) - sólo si quieres sincronizar: se inicializa sólo si config está provista -->
+<!-- Firebase compat (opcional) -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
 <style>
-  :root{ --bg:#f8fafc; --card:#fff; --muted:#6b7280; }
-  [data-theme="dark"]{ --bg:#071029; --card:#0f1724; --muted:#9ca3af; color-scheme:dark; }
-  html,body{ height:100%; -webkit-user-select:none; user-select:none; margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial; background:var(--bg); }
-  .app{ max-width:920px; margin:0 auto; padding-bottom:140px; }
-  .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:50; padding:1rem; }
+  :root{ --bg:#f2f6fb; --card:#fff; --muted:#6b7280; }
+  [data-theme="dark"]{ --bg:#061025; --card:#0b1622; --muted:#9ca3af; color-scheme:dark; }
+  body{ margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial; background:var(--bg); -webkit-user-select:none; user-select:none; }
+  .app{ max-width:980px; margin:0 auto; padding:18px; padding-bottom:140px; }
+  .bottom-bar{ position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; gap:8px; padding:12px; background:linear-gradient(0deg, rgba(255,255,255,0.98), rgba(255,255,255,0.95)); box-shadow:0 -6px 18px rgba(2,6,23,0.06); }
+  .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:60; padding:12px; }
   .modal.visible{ display:flex; }
-  .modal .content{ width:100%; max-width:760px; border-radius:10px; background:var(--card); padding:0.8rem; box-shadow:0 16px 40px rgba(2,6,23,0.12); }
-  @media(max-width:640px){ .modal .content{ height:100%; max-width:100%; border-radius:0; } }
-  .bottom-bar{ position:fixed; left:0; right:0; bottom:0; z-index:60; display:flex; gap:8px; padding:10px; background:linear-gradient(0deg, rgba(255,255,255,0.98), rgba(255,255,255,0.95)); box-shadow:0 -6px 18px rgba(2,6,23,0.06); }
+  .modal .content{ width:100%; max-width:900px; border-radius:12px; background:var(--card); padding:12px; box-shadow:0 12px 40px rgba(2,6,23,0.12); }
+  @media(max-width:640px){ .modal .content{ width:100%; height:100%; border-radius:0; padding:6px; } }
+  .suggestions{ position:absolute; background:white; border:1px solid #e5e7eb; width:100%; max-height:260px; overflow:auto; z-index:90; border-radius:8px; }
+  .suggestion-item{ padding:10px; cursor:pointer; }
+  .suggestion-item:hover, .suggestion-item.active{ background:#f3f4f6; }
   #overlay-canvas{ position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; z-index:20; }
-  .scan-guide{ position:absolute; left:50%; top:50%; width:64%; height:28%; transform:translate(-50%,-50%); border:2px dashed rgba(255,255,255,0.6); border-radius:8px; pointer-events:none; z-index:30; }
-  /* impresión A4 */
+  .scan-guide{ position:absolute; left:50%; top:50%; width:66%; height:28%; transform:translate(-50%,-50%); border:2px dashed rgba(255,255,255,0.7); border-radius:8px; pointer-events:none; z-index:30; }
   @media print{
     body *{ visibility:hidden; }
     .print-area, .print-area *{ visibility:visible; }
-    .print-area{ position:absolute; left:0; top:0; width:100%; }
+    .print-area{ position: absolute; left:0; top:0; width:100%; }
   }
-  /* suggestions list */
-  .suggestions { position:absolute; background:white; border:1px solid #e5e7eb; width:100%; max-height:240px; overflow:auto; z-index:80; border-radius:6px; }
-  .suggestion-item{ padding:8px 10px; cursor:pointer; }
-  .suggestion-item:hover{ background:#f3f4f6; }
 </style>
 </head>
 <body data-theme="light">
-  <!-- Backdrop -->
-  <div id="backdrop" class="fixed inset-0 bg-black/40 z-40 hidden"></div>
 
-  <div class="app px-4 py-4">
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-3">
-        <div class="w-12 h-12 rounded-lg bg-gradient-to-r from-green-500 to-blue-500 flex items-center justify-center text-white shadow">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h2l.4 2M7 13h10l-1.2 6H6L5 13z"/></svg>
-        </div>
-        <div>
-          <div class="text-sm font-semibold">MINIMARKET</div>
-          <div class="text-xs text-gray-500">La Esquina del Ahorro</div>
-        </div>
+<!-- backdrop -->
+<div id="backdrop" class="fixed inset-0 bg-black/50 z-40 hidden"></div>
+
+<div class="app">
+  <!-- header -->
+  <div class="flex items-center justify-between mb-4">
+    <div class="flex items-center gap-3">
+      <div class="w-12 h-12 rounded-lg bg-gradient-to-r from-green-500 to-blue-500 flex items-center justify-center text-white shadow-lg">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h2l.4 2M7 13h10l-1.2 6H6L5 13z"/></svg>
       </div>
-      <div class="flex items-center gap-2">
-        <div id="cloud-status" class="text-xs text-gray-600">Modo: <span id="mode-label">LOCAL</span></div>
-        <div id="current-user" class="hidden px-3 py-1 rounded-full text-sm bg-indigo-600 text-white"></div>
-        <button id="btn-logout" class="hidden px-3 py-2 border rounded text-sm">Salir</button>
-        <button id="btn-open-report" class="px-3 py-2 border rounded text-sm">Reportes</button>
+      <div>
+        <div class="text-sm font-semibold">MINIMARKET</div>
+        <div class="text-xs text-gray-500">La Esquina del Ahorro</div>
       </div>
     </div>
 
-    <!-- responsable -->
-    <div class="mb-3 p-3 rounded shadow-sm bg-white flex items-center justify-between">
-      <div>
-        <div class="text-xs text-gray-600">Encargado del día</div>
-        <div id="responsible-display" class="font-medium">—</div>
+    <div class="flex items-center gap-2">
+      <div id="mode-label" class="text-xs text-gray-600">Modo: <strong id="mode-state">LOCAL</strong></div>
+      <div id="current-user" class="hidden px-3 py-1 rounded-full text-sm bg-indigo-600 text-white"></div>
+      <button id="btn-logout" class="hidden px-3 py-2 border rounded text-sm">Salir</button>
+      <button id="btn-open-report" class="px-3 py-2 border rounded text-sm">Reportes</button>
+    </div>
+  </div>
+
+  <!-- encargado -->
+  <div class="mb-3 p-3 rounded-lg shadow bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+    <div>
+      <div class="text-xs text-gray-600">Encargado del día</div>
+      <div id="responsible-display" class="font-medium">—</div>
+    </div>
+    <div class="flex gap-2 items-center">
+      <input id="responsible-date" type="date" class="px-2 py-1 rounded border bg-white">
+      <input id="responsible-name" placeholder="Nombre encargado" class="px-2 py-1 rounded border w-48 bg-white">
+      <button id="save-responsible" class="px-3 py-1 bg-indigo-600 text-white rounded">Guardar</button>
+    </div>
+  </div>
+
+  <!-- controls: import/export/sync -->
+  <div class="mb-3 flex flex-wrap gap-2">
+    <button id="btn-export-csv" class="px-3 py-2 bg-gray-800 text-white rounded">Exportar (CSV/XLSX)</button>
+    <button id="btn-import" class="px-3 py-2 border rounded">Importar (CSV/XLSX)</button>
+    <input id="file-import" type="file" accept=".csv,.xlsx" class="hidden">
+    <button id="btn-sync-toggle" class="px-3 py-2 border rounded">Sincronizar (Off)</button>
+  </div>
+
+  <!-- search -->
+  <div class="relative mb-3">
+    <input id="search" type="search" placeholder="Buscar producto por nombre, categoría o código..." class="w-full px-4 py-3 rounded-lg shadow border bg-white" autocomplete="off">
+    <div id="search-suggestions" class="suggestions hidden"></div>
+  </div>
+
+  <!-- inventory list -->
+  <div id="inventory-list" class="space-y-3 mb-28"></div>
+
+  <!-- small charts -->
+  <div class="grid grid-cols-2 gap-3 mb-6">
+    <div class="bg-white rounded-lg p-2 shadow"><canvas id="chart-sales" height="120"></canvas></div>
+    <div class="bg-white rounded-lg p-2 shadow"><canvas id="chart-stock" height="120"></canvas></div>
+  </div>
+</div>
+
+<!-- bottom bar -->
+<div class="bottom-bar">
+  <button id="open-add-product" class="flex-1 px-4 py-3 rounded-lg bg-green-500 text-white font-semibold">+ Producto</button>
+  <button id="open-scan" class="flex-1 px-4 py-3 rounded-lg bg-yellow-500 text-white font-semibold">Escanear</button>
+  <button id="open-quick-sale" class="flex-1 px-4 py-3 rounded-lg bg-red-600 text-white font-semibold">Venta</button>
+  <button id="open-clients" class="flex-1 px-4 py-3 rounded-lg bg-indigo-600 text-white font-semibold">Clientes</button>
+</div>
+
+<!-- ---------- MODALES (product, scan, quick sale, income, sale, clients, reports, login) ---------- -->
+<!-- PRODUCT -->
+<div id="modal-product" class="modal" aria-hidden="true">
+  <div class="content">
+    <div class="flex justify-between items-center pb-2 border-b">
+      <h4 class="text-lg font-semibold">Producto</h4>
+      <button data-close-modal class="text-xl">✕</button>
+    </div>
+    <form id="form-product" class="p-3 space-y-3">
+      <input type="hidden" id="product-id">
+      <input id="product-name" placeholder="Nombre" required class="w-full px-3 py-3 rounded border bg-white text-lg">
+      <div class="flex gap-2">
+        <input id="product-category" placeholder="Categoría" class="flex-1 px-3 py-3 rounded border bg-white">
+        <input id="product-price" placeholder="Precio" type="number" step="0.01" class="w-28 px-3 py-3 rounded border bg-white">
+      </div>
+      <div class="flex gap-2">
+        <input id="product-barcode" placeholder="Código de barras" class="flex-1 px-3 py-3 rounded border bg-white">
+        <input id="product-stock" placeholder="Stock" type="number" class="w-24 px-3 py-3 rounded border bg-white">
+      </div>
+      <div class="flex gap-2">
+        <button type="button" data-close-modal class="flex-1 px-4 py-3 border rounded">Cancelar</button>
+        <button type="submit" class="flex-1 px-4 py-3 bg-green-600 text-white rounded">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- SCANNER -->
+<div id="modal-scan" class="modal scanner-modal" aria-hidden="true">
+  <div class="content">
+    <div class="flex justify-between items-center pb-2 bg-black text-white">
+      <h4 class="text-lg font-semibold">Escáner</h4>
+      <div class="flex gap-2">
+        <button id="toggle-torch" class="px-3 py-2 rounded hidden">🔦</button>
+        <button data-close-modal class="text-xl">✕</button>
+      </div>
+    </div>
+    <div id="video-wrap" class="relative bg-black" style="height:55vh;">
+      <video id="video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover;"></video>
+      <canvas id="overlay-canvas"></canvas>
+      <div class="scan-guide"></div>
+    </div>
+    <div class="p-3 bg-white">
+      <input id="scanned-code" class="w-full px-3 py-2 rounded border mb-2" placeholder="Código detectado">
+      <div class="flex gap-2">
+        <button id="fill-product" class="flex-1 px-3 py-2 bg-indigo-600 text-white rounded">Buscar/Editar</button>
+        <button id="quick-sell-detected" class="flex-1 px-3 py-2 bg-red-600 text-white rounded">Vender</button>
+        <button id="stop-camera" class="px-3 py-2 border rounded">Detener</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- QUICK SALE -->
+<div id="modal-quick-sale" class="modal" aria-hidden="true">
+  <div class="content">
+    <div class="flex justify-between items-center pb-2 border-b">
+      <h4 class="text-lg font-semibold">Venta rápida</h4>
+      <button data-close-modal class="text-xl">✕</button>
+    </div>
+    <form id="form-quick-sale" class="p-3 space-y-3 relative">
+      <div class="relative">
+        <input id="quick-search" placeholder="Buscar por nombre o código (escribe para ver sugerencias)" class="w-full px-3 py-3 rounded border bg-white text-lg" autocomplete="off">
+        <div id="quick-suggestions" class="suggestions hidden"></div>
+      </div>
+      <div class="flex gap-2">
+        <select id="quick-product" class="flex-1 px-3 py-3 border rounded bg-white text-lg"></select>
+        <input id="quick-qty" type="number" min="1" value="1" class="w-28 px-3 py-3 border rounded bg-white text-lg">
       </div>
       <div class="flex gap-2 items-center">
-        <input id="responsible-date" type="date" class="px-2 py-1 rounded border bg-white">
-        <input id="responsible-name" placeholder="Nombre encargado" class="px-2 py-1 rounded border w-40 bg-white">
-        <button id="save-responsible" class="px-3 py-1 bg-indigo-600 text-white rounded">Guardar</button>
+        <label class="text-sm">Pago</label>
+        <select id="quick-payment" class="px-3 py-2 rounded border">
+          <option value="EFECTIVO">EFECTIVO</option>
+          <option value="YAPE">YAPE</option>
+          <option value="A_CREDITO">A CREDITO</option>
+        </select>
+        <input id="quick-customer" placeholder="Nombre cliente (si A CREDITO)" class="flex-1 px-3 py-2 border rounded bg-white">
       </div>
+      <div class="flex justify-between items-center">
+        <div>Total: <span id="quick-total" class="font-semibold">0.00</span></div>
+        <div class="flex gap-2">
+          <button type="button" id="quick-add-cart" class="px-3 py-2 border rounded">Agregar</button>
+          <button type="submit" class="px-3 py-2 bg-red-600 text-white rounded">Cobrar</button>
+        </div>
+      </div>
+      <div>
+        <h5 class="text-sm font-medium">Carrito</h5>
+        <div id="quick-cart" class="space-y-2 mt-2"></div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- INCOME -->
+<div id="modal-income" class="modal" aria-hidden="true">
+  <div class="content">
+    <div class="flex justify-between items-center pb-2 border-b">
+      <h4 class="text-lg font-semibold">Registrar ingreso (stock)</h4>
+      <button data-close-modal class="text-xl">✕</button>
     </div>
+    <form id="form-income" class="p-3 space-y-3">
+      <select id="income-product" class="w-full px-3 py-2 border rounded"></select>
+      <input id="income-qty" type="number" min="1" value="1" class="w-full px-3 py-2 border rounded">
+      <div class="flex justify-end gap-2">
+        <button type="button" data-close-modal class="px-3 py-2 border rounded">Cancelar</button>
+        <button type="submit" class="px-3 py-2 bg-blue-600 text-white rounded">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-    <!-- Controls: import/export -->
-    <div class="flex gap-2 mb-3">
-      <button id="btn-export-csv" class="px-3 py-2 bg-gray-800 text-white rounded">Exportar Inventario (CSV)</button>
-      <button id="btn-import-csv" class="px-3 py-2 border rounded">Importar Inventario (CSV)</button>
-      <input id="file-import" type="file" accept=".csv" class="hidden" />
-      <button id="btn-sync-toggle" class="px-3 py-2 border rounded">Activar sincronización</button>
+<!-- SALE (detailed) -->
+<div id="modal-sale" class="modal" aria-hidden="true">
+  <div class="content">
+    <div class="flex justify-between items-center pb-2 border-b">
+      <h4 class="text-lg font-semibold">Registrar Venta</h4>
+      <button data-close-modal class="text-xl">✕</button>
     </div>
+    <form id="form-sale" class="p-3 space-y-3">
+      <div class="flex gap-2">
+        <input id="sale-customer" placeholder="Cliente (opcional)" class="flex-1 px-3 py-2 border rounded bg-white">
+        <select id="sale-payment" class="px-3 py-2 border rounded">
+          <option value="EFECTIVO">EFECTIVO</option>
+          <option value="YAPE">YAPE</option>
+          <option value="A_CREDITO">A CREDITO</option>
+        </select>
+      </div>
+      <div id="sale-items" class="space-y-2"></div>
+      <div class="flex justify-between items-center">
+        <button id="add-sale-item" type="button" class="px-3 py-2 border rounded">Agregar producto</button>
+        <div>Total: <span id="sale-total">0.00</span></div>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" data-close-modal class="px-3 py-2 border rounded">Cancelar</button>
+        <button type="submit" class="px-3 py-2 bg-red-600 text-white rounded">Vender</button>
+      </div>
+    </form>
+  </div>
+</div>
 
-    <div class="mb-3 relative">
-      <input id="search" type="search" placeholder="Buscar producto o código..." class="w-full px-4 py-3 rounded-lg shadow-sm border bg-white" autocomplete="off" />
-      <div id="search-suggestions" class="suggestions hidden"></div>
+<!-- CLIENTS -->
+<div id="modal-clients" class="modal" aria-hidden="true">
+  <div class="content">
+    <div class="flex justify-between items-center pb-2 border-b">
+      <h4 class="text-lg font-semibold">Clientes (A CREDITO)</h4>
+      <button data-close-modal class="text-xl">✕</button>
     </div>
-
-    <div id="inventory-list" class="space-y-3 mb-28"></div>
-
-    <div class="grid grid-cols-2 gap-3 mb-6">
-      <div class="bg-white rounded-lg p-2 shadow"><canvas id="chart-sales" height="120"></canvas></div>
-      <div class="bg-white rounded-lg p-2 shadow"><canvas id="chart-stock" height="120"></canvas></div>
+    <div class="p-3">
+      <div class="flex gap-2 mb-3">
+        <input id="client-name" placeholder="Nuevo cliente (nombre)" class="flex-1 px-3 py-2 border rounded bg-white">
+        <button id="add-client" class="px-3 py-2 bg-green-600 text-white rounded">Agregar</button>
+      </div>
+      <div id="clients-list" class="space-y-2 max-h-80 overflow-auto"></div>
     </div>
   </div>
+</div>
 
-  <!-- bottom bar -->
-  <div class="bottom-bar">
-    <button id="open-add-product" class="flex-1 px-4 py-3 rounded-lg bg-green-500 text-white font-semibold">+ Producto</button>
-    <button id="open-scan" class="flex-1 px-4 py-3 rounded-lg bg-yellow-500 text-white font-semibold">Escanear</button>
-    <button id="open-quick-sale" class="flex-1 px-4 py-3 rounded-lg bg-red-600 text-white font-semibold">Venta</button>
-    <button id="open-clients" class="flex-1 px-4 py-3 rounded-lg bg-indigo-600 text-white font-semibold">Clientes</button>
-  </div>
-
-  <!-- MODALES: producto, scanner, quick sale, income, sale, clients, reports, login -->
-  <!-- PRODUCT -->
-  <div id="modal-product" class="modal" aria-hidden="true">
-    <div class="content">
-      <div class="flex justify-between items-center pb-2 border-b">
-        <h4 class="text-lg font-semibold">Producto</h4>
-        <button data-close-modal class="text-xl">✕</button>
+<!-- REPORTS -->
+<div id="modal-reports" class="modal" aria-hidden="true">
+  <div class="content">
+    <div class="flex justify-between items-center pb-2 border-b">
+      <h4 class="text-lg font-semibold">Reportes</h4>
+      <button data-close-modal class="text-xl">✕</button>
+    </div>
+    <div class="p-3">
+      <div class="flex gap-2 mb-3">
+        <button id="tab-sales-day" class="px-3 py-2 bg-indigo-600 text-white rounded">Ventas (día)</button>
+        <button id="tab-sales-range" class="px-3 py-2 border rounded">Ventas por rango</button>
+        <button id="tab-inventory" class="px-3 py-2 border rounded">Inventario</button>
       </div>
-      <form id="form-product" class="p-3 space-y-3">
-        <input type="hidden" id="product-id">
-        <input id="product-name" placeholder="Nombre" required class="w-full px-3 py-3 rounded border bg-white">
-        <div class="flex gap-2">
-          <input id="product-category" placeholder="Categoría" class="flex-1 px-3 py-3 rounded border bg-white">
-          <input id="product-price" placeholder="Precio" type="number" step="0.01" class="w-28 px-3 py-3 rounded border bg-white">
+
+      <div id="tab-content-day" class="tab-content">
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <div><label class="text-xs">Fecha</label><input id="report-day-date" type="date" class="w-full px-2 py-2 border rounded"></div>
+          <div class="flex items-end gap-2">
+            <button id="btn-generate-day" class="px-3 py-2 bg-indigo-600 text-white rounded">Vista</button>
+            <button id="btn-download-day" class="px-3 py-2 bg-gray-800 text-white rounded">Descargar PDF</button>
+            <button id="btn-print-day" class="px-3 py-2 border rounded">Imprimir</button>
+          </div>
         </div>
-        <div class="flex gap-2">
-          <input id="product-barcode" placeholder="Código de barras" class="flex-1 px-3 py-3 rounded border bg-white">
-          <input id="product-stock" placeholder="Stock" type="number" class="w-24 px-3 py-3 rounded border bg-white">
+        <div id="report-preview-day" class="bg-white p-2 rounded max-h-80 overflow-auto"></div>
+      </div>
+
+      <div id="tab-content-range" class="tab-content hidden">
+        <div class="grid grid-cols-2 gap-2 mb-3">
+          <div><label class="text-xs">Desde</label><input id="report-from" type="date" class="w-full px-2 py-2 border rounded"></div>
+          <div><label class="text-xs">Hasta</label><input id="report-to" type="date" class="w-full px-2 py-2 border rounded"></div>
         </div>
+        <div class="flex gap-2 mb-3 justify-end">
+          <button id="btn-generate-range" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar</button>
+          <button id="btn-download-range" class="px-3 py-2 bg-gray-800 text-white rounded">Descargar PDF</button>
+          <button id="btn-print-range" class="px-3 py-2 border rounded">Imprimir</button>
+        </div>
+        <div id="report-preview-range" class="bg-white p-2 rounded max-h-80 overflow-auto"></div>
+      </div>
+
+      <div id="tab-content-inv" class="tab-content hidden">
+        <div class="flex gap-2 mb-3 justify-end">
+          <button id="btn-generate-inv" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar inventario</button>
+          <button id="btn-download-inv" class="px-3 py-2 bg-gray-800 text-white rounded">Descargar PDF</button>
+          <button id="btn-print-inv" class="px-3 py-2 border rounded">Imprimir</button>
+        </div>
+        <div id="report-preview-inv" class="bg-white p-2 rounded max-h-80 overflow-auto"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="modal-login" class="modal visible" aria-hidden="false" style="background:linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.6));">
+  <div class="content" style="max-width:480px">
+    <div class="p-4">
+      <h2 class="text-xl font-semibold mb-2">Ingresar — TiendaSmart</h2>
+      <p class="text-sm text-gray-500 mb-4">Usuario: <strong>LIZ</strong> — Contraseña: <strong>MAGALY</strong></p>
+      <form id="form-login" class="space-y-3">
+        <input id="login-user" placeholder="Usuario" class="w-full px-3 py-3 rounded border" autofocus />
+        <input id="login-pass" placeholder="Contraseña" type="password" class="w-full px-3 py-3 rounded border" />
         <div class="flex gap-2">
-          <button type="button" data-close-modal class="flex-1 px-4 py-3 border rounded">Cancelar</button>
-          <button type="submit" class="flex-1 px-4 py-3 bg-green-600 text-white rounded">Guardar</button>
+          <button type="submit" class="flex-1 px-4 py-3 bg-blue-600 text-white rounded font-semibold">Entrar</button>
+          <button type="button" id="login-guest" class="flex-1 px-4 py-3 border rounded">Demo</button>
         </div>
       </form>
     </div>
   </div>
-
-  <!-- SCANNER -->
-  <div id="modal-scan" class="modal scanner-modal" aria-hidden="true">
-    <div class="content">
-      <div class="flex justify-between items-center pb-2 bg-black text-white">
-        <h4 class="text-lg font-semibold">Escáner</h4>
-        <div class="flex gap-2">
-          <button id="toggle-torch" class="px-3 py-2 rounded hidden">🔦</button>
-          <button data-close-modal class="text-xl">✕</button>
-        </div>
-      </div>
-      <div id="video-wrap" class="relative bg-black" style="height:55vh;">
-        <video id="video" autoplay muted playsinline style="width:100%; height:100%; object-fit:cover;"></video>
-        <canvas id="overlay-canvas"></canvas>
-        <div class="scan-guide"></div>
-      </div>
-      <div class="p-3 bg-white">
-        <input id="scanned-code" class="w-full px-3 py-2 rounded border mb-2" placeholder="Código detectado">
-        <div class="flex gap-2">
-          <button id="fill-product" class="flex-1 px-3 py-2 bg-indigo-600 text-white rounded">Buscar/Editar</button>
-          <button id="quick-sell-detected" class="flex-1 px-3 py-2 bg-red-600 text-white rounded">Vender</button>
-          <button id="stop-camera" class="px-3 py-2 border rounded">Detener</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- QUICK SALE -->
-  <div id="modal-quick-sale" class="modal" aria-hidden="true">
-    <div class="content">
-      <div class="flex justify-between items-center pb-2 border-b">
-        <h4 class="text-lg font-semibold">Venta rápida</h4>
-        <button data-close-modal class="text-xl">✕</button>
-      </div>
-      <form id="form-quick-sale" class="p-3 space-y-3 relative">
-        <div class="relative">
-          <input id="quick-search" placeholder="Buscar o pegar código..." class="w-full px-3 py-3 rounded border bg-white" autocomplete="off"/>
-          <div id="quick-suggestions" class="suggestions hidden"></div>
-        </div>
-        <div class="flex gap-2">
-          <select id="quick-product" class="flex-1 px-3 py-3 border rounded bg-white"></select>
-          <input id="quick-qty" type="number" min="1" value="1" class="w-24 px-3 py-3 border rounded bg-white">
-        </div>
-        <div class="flex gap-2 items-center">
-          <label class="text-sm">Pago</label>
-          <select id="quick-payment" class="px-3 py-2 rounded border">
-            <option value="EFECTIVO">EFECTIVO</option>
-            <option value="YAPE">YAPE</option>
-            <option value="A_CREDITO">A CREDITO</option>
-          </select>
-          <input id="quick-customer" placeholder="Nombre cliente (si A CREDITO)" class="flex-1 px-3 py-2 border rounded bg-white">
-        </div>
-        <div class="flex justify-between items-center">
-          <div>Total: <span id="quick-total">0.00</span></div>
-          <div class="flex gap-2">
-            <button type="button" id="quick-add-cart" class="px-3 py-2 border rounded">Agregar</button>
-            <button type="submit" class="px-3 py-2 bg-red-600 text-white rounded">Cobrar</button>
-          </div>
-        </div>
-        <div>
-          <h5 class="text-sm font-medium">Carrito</h5>
-          <div id="quick-cart" class="space-y-2 mt-2"></div>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- INCOME -->
-  <div id="modal-income" class="modal" aria-hidden="true">
-    <div class="content">
-      <div class="flex justify-between items-center pb-2 border-b">
-        <h4 class="text-lg font-semibold">Registrar ingreso (stock)</h4>
-        <button data-close-modal class="text-xl">✕</button>
-      </div>
-      <form id="form-income" class="p-3 space-y-3">
-        <select id="income-product" class="w-full px-3 py-2 border rounded"></select>
-        <input id="income-qty" type="number" min="1" value="1" class="w-full px-3 py-2 border rounded">
-        <div class="flex justify-end gap-2">
-          <button type="button" data-close-modal class="px-3 py-2 border rounded">Cancelar</button>
-          <button type="submit" class="px-3 py-2 bg-blue-600 text-white rounded">Guardar</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- SALE (detailed) -->
-  <div id="modal-sale" class="modal" aria-hidden="true">
-    <div class="content">
-      <div class="flex justify-between items-center pb-2 border-b">
-        <h4 class="text-lg font-semibold">Registrar Venta</h4>
-        <button data-close-modal class="text-xl">✕</button>
-      </div>
-      <form id="form-sale" class="p-3 space-y-3">
-        <div class="flex gap-2">
-          <input id="sale-customer" placeholder="Cliente (opcional)" class="flex-1 px-3 py-2 border rounded bg-white">
-          <select id="sale-payment" class="px-3 py-2 border rounded">
-            <option value="EFECTIVO">EFECTIVO</option>
-            <option value="YAPE">YAPE</option>
-            <option value="A_CREDITO">A CREDITO</option>
-          </select>
-        </div>
-        <div id="sale-items" class="space-y-2"></div>
-        <div class="flex justify-between items-center">
-          <button id="add-sale-item" type="button" class="px-3 py-2 border rounded">Agregar producto</button>
-          <div>Total: <span id="sale-total">0.00</span></div>
-        </div>
-        <div class="flex justify-end gap-2">
-          <button type="button" data-close-modal class="px-3 py-2 border rounded">Cancelar</button>
-          <button type="submit" class="px-3 py-2 bg-red-600 text-white rounded">Vender</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- CLIENTS -->
-  <div id="modal-clients" class="modal" aria-hidden="true">
-    <div class="content">
-      <div class="flex justify-between items-center pb-2 border-b">
-        <h4 class="text-lg font-semibold">Clientes (A CREDITO)</h4>
-        <button data-close-modal class="text-xl">✕</button>
-      </div>
-      <div class="p-3">
-        <div class="flex gap-2 mb-3">
-          <input id="client-name" placeholder="Nuevo cliente (nombre)" class="flex-1 px-3 py-2 border rounded bg-white">
-          <button id="add-client" class="px-3 py-2 bg-green-600 text-white rounded">Agregar</button>
-        </div>
-        <div id="clients-list" class="space-y-2 max-h-80 overflow-auto"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- REPORTS -->
-  <div id="modal-reports" class="modal" aria-hidden="true">
-    <div class="content">
-      <div class="flex justify-between items-center pb-2 border-b">
-        <h4 class="text-lg font-semibold">Reportes</h4>
-        <button data-close-modal class="text-xl">✕</button>
-      </div>
-      <div class="p-3">
-        <div class="flex gap-2 mb-3">
-          <button id="tab-sales-day" class="px-3 py-2 bg-indigo-600 text-white rounded">Ventas (día)</button>
-          <button id="tab-sales-range" class="px-3 py-2 border rounded">Ventas por rango</button>
-          <button id="tab-inventory" class="px-3 py-2 border rounded">Inventario</button>
-        </div>
-
-        <div id="tab-content-day" class="tab-content">
-          <div class="grid grid-cols-2 gap-2 mb-3">
-            <div><label class="text-xs">Fecha</label><input id="report-day-date" type="date" class="w-full px-2 py-2 border rounded"></div>
-            <div class="flex items-end gap-2">
-              <button id="btn-generate-day" class="px-3 py-2 bg-indigo-600 text-white rounded">Vista</button>
-              <button id="btn-download-day" class="px-3 py-2 bg-gray-800 text-white rounded">Descargar PDF (Reporte del dia)</button>
-              <button id="btn-print-day" class="px-3 py-2 border rounded">Imprimir</button>
-            </div>
-          </div>
-          <div id="report-preview-day" class="bg-white p-2 rounded max-h-80 overflow-auto"></div>
-        </div>
-
-        <div id="tab-content-range" class="tab-content hidden">
-          <div class="grid grid-cols-2 gap-2 mb-3">
-            <div><label class="text-xs">Desde</label><input id="report-from" type="date" class="w-full px-2 py-2 border rounded"></div>
-            <div><label class="text-xs">Hasta</label><input id="report-to" type="date" class="w-full px-2 py-2 border rounded"></div>
-          </div>
-          <div class="flex gap-2 mb-3 justify-end">
-            <button id="btn-generate-range" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar vista</button>
-            <button id="btn-download-range" class="px-3 py-2 bg-gray-800 text-white rounded">Generar PDF (A4)</button>
-            <button id="btn-print-range" class="px-3 py-2 border rounded">Imprimir</button>
-          </div>
-          <div id="report-preview-range" class="bg-white p-2 rounded max-h-80 overflow-auto"></div>
-        </div>
-
-        <div id="tab-content-inv" class="tab-content hidden">
-          <div class="flex gap-2 mb-3 justify-end">
-            <button id="btn-generate-inv" class="px-3 py-2 bg-indigo-600 text-white rounded">Generar inventario</button>
-            <button id="btn-download-inv" class="px-3 py-2 bg-gray-800 text-white rounded">Generar PDF (A4)</button>
-            <button id="btn-print-inv" class="px-3 py-2 border rounded">Imprimir</button>
-          </div>
-          <div id="report-preview-inv" class="bg-white p-2 rounded max-h-80 overflow-auto"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- LOGIN -->
-  <div id="modal-login" class="modal visible" aria-hidden="false" style="background:linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.6));">
-    <div class="content" style="max-width:480px">
-      <div class="p-4">
-        <h2 class="text-xl font-semibold mb-2">Ingresar — TiendaSmart</h2>
-        <p class="text-sm text-gray-500 mb-4">Usuario: <strong>LIZ</strong> — Contraseña: <strong>MAGALY</strong></p>
-        <form id="form-login" class="space-y-3">
-          <input id="login-user" placeholder="Usuario" class="w-full px-3 py-3 rounded border" autofocus />
-          <input id="login-pass" placeholder="Contraseña" type="password" class="w-full px-3 py-3 rounded border" />
-          <div class="flex gap-2">
-            <button type="submit" class="flex-1 px-4 py-3 bg-blue-600 text-white rounded font-semibold">Entrar</button>
-            <button type="button" id="login-guest" class="flex-1 px-4 py-3 border rounded">Demo</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
+</div>
 
 <!-- SCRIPT -->
 <script>
-/* ====== CONFIG FIREBASE (OPCIONAL) ======
-  Para habilitar sincronización entre usuarios pega aquí tu firebaseConfig:
+/* ----------------------------
+  CONFIG FIREBASE (OPCIONAL)
+  Pega tu firebaseConfig aquí para habilitar CLOUD sync.
+  Ejemplo:
   const FIREBASE_CONFIG = {
     apiKey: "...",
     authDomain: "...",
@@ -356,22 +362,21 @@
     messagingSenderId: "...",
     appId: "..."
   };
-  Si lo dejas en null o undefined, la app funcionará en LOCAL (IndexedDB).
-*/
-const FIREBASE_CONFIG = null; // <-- pega tu config aquí si quieres SYNC
+---------------------------- */
+const FIREBASE_CONFIG = null; // <-- pega tu configuración si deseas sincronizar
 
 // ----------------- Helpers -----------------
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const uid = () => 'id-' + Math.random().toString(36).slice(2,9);
 const money = v => Number(v||0).toFixed(2);
-const todayYMD = ()=>{ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-function debounce(fn,t=180){ let to; return (...a)=>{ clearTimeout(to); to=setTimeout(()=>fn(...a),t); }; }
+const todayYMD = ()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+function debounce(fn,t=150){ let to; return (...a)=>{ clearTimeout(to); to=setTimeout(()=>fn(...a),t); }; }
 
-// IndexedDB simple wrapper
-const DB_NAME='TiendaSmartDB', DB_VERSION=11;
+// IndexedDB wrapper
+const DB_NAME='TiendaSmartDB', DB_VERSION=12;
 let db;
-function openDB(){ return new Promise((res,rej)=>{ const req = indexedDB.open(DB_NAME, DB_VERSION); req.onupgradeneeded = e => {
+function openDB(){ return new Promise((res,rej)=>{ const req=indexedDB.open(DB_NAME,DB_VERSION); req.onupgradeneeded = e => {
   const idb = e.target.result;
   if(!idb.objectStoreNames.contains('products')) idb.createObjectStore('products',{keyPath:'id'});
   if(!idb.objectStoreNames.contains('sales')) idb.createObjectStore('sales',{keyPath:'id'});
@@ -380,19 +385,19 @@ function openDB(){ return new Promise((res,rej)=>{ const req = indexedDB.open(DB
   if(!idb.objectStoreNames.contains('responsibles')) idb.createObjectStore('responsibles',{keyPath:'date'});
 }; req.onsuccess = e => { db = e.target.result; res(db); }; req.onerror = e => rej(e); }); }
 const store = (name,mode='readonly') => db.transaction(name, mode).objectStore(name);
-const put = (name,item) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').put(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
-const add = (name,item) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').add(item); rq.onsuccess=()=>res(item); rq.onerror=e=>rej(e); });
-const all = (name) => new Promise((res,rej)=>{ const rq=store(name,'readonly').getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=e=>rej(e); });
-const get = (name,key) => new Promise((res,rej)=>{ const rq=store(name,'readonly').get(key); rq.onsuccess=()=>res(rq.result); rq.onerror=e=>rej(e); });
-const del = (name,key) => new Promise((res,rej)=>{ const rq=store(name,'readwrite').delete(key); rq.onsuccess=()=>res(); rq.onerror=e=>rej(e); });
+const put = (name, item) => new Promise((res,rej)=>{ const rq = store(name,'readwrite').put(item); rq.onsuccess = ()=> res(item); rq.onerror = e => rej(e); });
+const add = (name, item) => new Promise((res,rej)=>{ const rq = store(name,'readwrite').add(item); rq.onsuccess = ()=> res(item); rq.onerror = e => rej(e); });
+const all = (name) => new Promise((res,rej)=>{ const rq = store(name,'readonly').getAll(); rq.onsuccess = ()=> res(rq.result || []); rq.onerror = e => rej(e); });
+const get = (name,key) => new Promise((res,rej)=>{ const rq = store(name,'readonly').get(key); rq.onsuccess = ()=> res(rq.result); rq.onerror = e => rej(e); });
+const del = (name,key) => new Promise((res,rej)=>{ const rq = store(name,'readwrite').delete(key); rq.onsuccess = ()=> res(); rq.onerror = e => rej(e); });
 
 // Auth
-const AUTH_USER = 'LIZ', AUTH_PASS = 'MAGALY', AUTH_KEY='ts_user';
+const AUTH_USER='LIZ', AUTH_PASS='MAGALY', AUTH_KEY='ts_user';
 function isAuthenticated(){ return !!localStorage.getItem(AUTH_KEY); }
-function setAuthenticated(name){ localStorage.setItem(AUTH_KEY,name); $('#current-user').textContent=name; $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); }
+function setAuthenticated(u){ localStorage.setItem(AUTH_KEY,u); $('#current-user').textContent = u; $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); }
 function clearAuth(){ localStorage.removeItem(AUTH_KEY); $('#current-user').classList.add('hidden'); $('#btn-logout').classList.add('hidden'); }
 
-$('#form-login').addEventListener('submit', e=>{
+$('#form-login').addEventListener('submit', e => {
   e.preventDefault();
   const u = $('#login-user').value.trim(), p = $('#login-pass').value;
   if(u === AUTH_USER && p === AUTH_PASS){ setAuthenticated(u); closeLogin(); initApp(); } else alert('Credenciales inválidas');
@@ -401,77 +406,89 @@ $('#login-guest').addEventListener('click', ()=>{ setAuthenticated('GUEST'); clo
 $('#btn-logout').addEventListener('click', ()=>{ if(confirm('Cerrar sesión?')){ clearAuth(); location.reload(); }});
 function closeLogin(){ const m = $('#modal-login'); m.classList.remove('visible'); m.setAttribute('aria-hidden','true'); }
 
-// Modal manager (detiene cámara si scanner cerrado)
-const backdrop = $('#backdrop'); let currentModal=null;
-function showModal(id){ if(!isAuthenticated() && id!=='modal-login') return showLogin(); if(currentModal && currentModal!==id) closeModal(currentModal); const modal = $('#'+id); if(!modal) return; modal.classList.add('visible'); modal.setAttribute('aria-hidden','false'); backdrop.classList.remove('hidden'); currentModal=id; setTimeout(()=>{ const el = modal.querySelector('input,button,select,textarea'); if(el) el.focus(); },60); }
-async function closeModal(id){ const modal = $('#'+id); if(!modal) return; if(modal.classList.contains('scanner-modal')) await stopCamera(); modal.classList.remove('visible'); modal.setAttribute('aria-hidden','true'); currentModal=null; backdrop.classList.add('hidden'); }
+// modal manager
+const backdrop = $('#backdrop'); let currentModal = null;
+function showModal(id){ if(!isAuthenticated() && id !== 'modal-login') return showLogin(); if(currentModal && currentModal !== id) closeModal(currentModal); const m = $('#'+id); if(!m) return; m.classList.add('visible'); m.setAttribute('aria-hidden','false'); backdrop.classList.remove('hidden'); currentModal = id; setTimeout(()=>{ const el = m.querySelector('input, button, select, textarea'); if(el) el.focus(); },60); }
+async function closeModal(id){ const m = $('#'+id); if(!m) return; if(m.classList.contains('scanner-modal')) await stopCamera(); m.classList.remove('visible'); m.setAttribute('aria-hidden','true'); currentModal = null; backdrop.classList.add('hidden'); }
 function showLogin(){ const m = $('#modal-login'); m.classList.add('visible'); m.setAttribute('aria-hidden','false'); backdrop.classList.remove('hidden'); }
 
-// State
+// state
 const STATE = { products:[], sales:[], customers:[], responsibles:[] };
 
-// Fuse index for fast search
-let fuseIndex = null;
-function rebuildFuse(){
-  const list = STATE.products.map(p => ({ id: p.id, name: p.name, barcode: p.barcode||'', category: p.category||'' }));
-  fuseIndex = new Fuse(list, { keys:['name','barcode','category'], threshold:0.32, includeScore:true, minMatchCharLength:2 });
+// Fuse indices
+let fuseMain = null, fuseQuick = null;
+function rebuildFuses(){
+  const list = STATE.products.map(p=> ({ id:p.id, name:p.name, barcode:p.barcode||'', category:p.category||'' }));
+  fuseMain = new Fuse(list, { keys:['name','barcode','category'], threshold:0.35, minMatchCharLength:2 });
+  fuseQuick = new Fuse(list, { keys:['name','barcode'], threshold:0.30, minMatchCharLength:1 });
 }
 
-// Refresh all
+// refresh all
 async function refreshAll(){
   STATE.products = await all('products');
   STATE.sales = await all('sales');
   STATE.customers = await all('customers');
   STATE.responsibles = await all('responsibles');
-  rebuildFuse();
+  rebuildFuses();
   renderInventory();
   renderIncomeSelects();
   renderQuickSelect();
   renderClients();
   updateCharts();
   updateResponsibleBanner();
-  // if cloud active, will be handled separately
 }
 
-// Render inventory (mobile)
-function renderInventory(q=''){
-  const out = $('#inventory-list'); out.innerHTML='';
-  const text = (q||'').trim().toLowerCase();
+/* ----------------------
+   INVENTORY RENDER
+   ---------------------- */
+const inventoryList = $('#inventory-list');
+function renderInventory(filter = ''){
+  inventoryList.innerHTML = '';
+  const q = (filter||'').trim();
   let list = STATE.products.slice();
-  if(text){
-    // use fuse for performance
-    if(fuseIndex && text.length>0){
-      const r = fuseIndex.search(text, { limit: 300 });
-      const ids = r.map(x=>x.item.id);
-      list = ids.map(id => STATE.products.find(p=>p.id===id)).filter(Boolean);
-    } else {
-      list = list.filter(p => p.name.toLowerCase().includes(text) || (p.barcode||'').includes(text));
+
+  if(q.length){
+    // 1) fast substring exact matches (startsWith or contains) prioritized
+    const qLower = q.toLowerCase();
+    const starts = list.filter(p=> p.name.toLowerCase().startsWith(qLower) || (p.barcode||'').includes(q));
+    const contains = list.filter(p=> !starts.includes(p) && (p.name.toLowerCase().includes(qLower) || (p.category||'').toLowerCase().includes(qLower) || (p.barcode||'').includes(q)));
+    list = starts.concat(contains);
+    // 2) if still empty or short, use fuse as fallback
+    if(list.length < 1 && fuseMain) {
+      const r = fuseMain.search(q, { limit: 250 });
+      list = r.map(x => STATE.products.find(p=>p.id === x.item.id)).filter(Boolean);
     }
   }
+
   for(const p of list){
     const low = (p.stock||0) <= 5;
-    const div = document.createElement('div'); div.className='bg-white rounded-lg p-3 shadow flex justify-between items-center';
-    div.innerHTML = `<div>
-        <div class="font-medium">${p.name}${low? ' <span style="color:#b91c1c;font-weight:600"> • STOCK BAJO</span>':''}</div>
-        <div class="text-xs text-gray-500">${p.category||''} • ${p.barcode||''}</div>
+    const card = document.createElement('div'); card.className = 'bg-white rounded-lg p-3 shadow flex justify-between items-center';
+    card.innerHTML = `
+      <div>
+        <div class="font-medium">${escapeHtml(p.name)}${low ? ' <span style="color:#b91c1c;font-weight:600"> • STOCK BAJO</span>':''}</div>
+        <div class="text-xs text-gray-500">${escapeHtml(p.category||'')} • ${escapeHtml(p.barcode||'')}</div>
         <div class="text-sm text-gray-700 mt-1">S/ ${money(p.price)} · Stock: ${p.stock||0}</div>
       </div>
       <div class="flex flex-col gap-2">
         <button class="px-3 py-2 bg-red-500 text-white rounded sell-btn" data-id="${p.id}">Vender</button>
         <button class="px-3 py-2 border rounded income-btn" data-id="${p.id}">+Stock</button>
         <button class="px-3 py-2 border rounded edit-btn" data-id="${p.id}">Editar</button>
-      </div>`;
-    out.appendChild(div);
+      </div>
+    `;
+    inventoryList.appendChild(card);
   }
-  $$('.sell-btn').forEach(b=>b.onclick = ()=> quickSellPrompt(b.dataset.id));
-  $$('.income-btn').forEach(b=>b.onclick = ()=> openIncomeFor(b.dataset.id));
-  $$('.edit-btn').forEach(b=>b.onclick = ()=> openProductModal(STATE.products.find(x=>x.id===b.dataset.id)));
+
+  $$('.sell-btn').forEach(b => b.onclick = ()=> quickSellPrompt(b.dataset.id));
+  $$('.income-btn').forEach(b => b.onclick = ()=> openIncomeFor(b.dataset.id));
+  $$('.edit-btn').forEach(b => b.onclick = ()=> openProductModal(STATE.products.find(x=>x.id===b.dataset.id)));
 }
 
-// PRODUCT modal
+/* ----------------------
+   PRODUCT modal
+   ---------------------- */
 $('#open-add-product').addEventListener('click', ()=> openProductModal());
 function openProductModal(product){
-  $('#form-product').reset(); $('#product-id').value='';
+  $('#form-product').reset(); $('#product-id').value = '';
   if(product){
     $('#product-id').value = product.id;
     $('#product-name').value = product.name;
@@ -496,24 +513,24 @@ $('#form-product').addEventListener('submit', async e=>{
   };
   await put('products', prod);
   await refreshAll();
-  // push to cloud if enabled
   if(cloudEnabled) pushProductsToCloud();
   closeModal('modal-product');
 });
 
-// INCOME
+/* ----------------------
+   INCOME
+   ---------------------- */
 function renderIncomeSelects(){ const sel = $('#income-product'); if(!sel) return; sel.innerHTML=''; STATE.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} — Stock: ${p.stock||0}`; sel.appendChild(o); }); }
 function openIncomeFor(productId){ renderIncomeSelects(); $('#income-product').value = productId; showModal('modal-income'); }
 $('#form-income').addEventListener('submit', async e => { e.preventDefault(); const pid = $('#income-product').value; const qty = Number($('#income-qty').value)||0; const p = STATE.products.find(x=>x.id===pid); p.stock = (p.stock||0) + qty; await put('products', p); await add('movements', { id: uid(), type:'income', productId:pid, qty, date: new Date().toISOString() }); await refreshAll(); if(cloudEnabled) pushProductsToCloud(); closeModal('modal-income'); });
 
-// SALES detailed & quick
-function addSaleItemRow(productId=''){
-  const row=document.createElement('div'); row.className='grid grid-cols-12 gap-2 items-center';
-  row.innerHTML = `<select class="col-span-6 px-2 py-1 border sale-product"></select><input type="number" class="col-span-2 px-2 py-1 border sale-qty" value="1" min="1"><input type="number" step="0.01" class="col-span-2 px-2 py-1 border sale-price" placeholder="Precio"><button type="button" class="col-span-2 px-2 py-1 border sale-remove">Quitar</button>`;
-  $('#sale-items').appendChild(row); fillSaleRow(row, productId);
-}
+/* ----------------------
+   SALES (detailed + quick)
+   ---------------------- */
+// Sale form helpers (detailed sale)
+function addSaleItemRow(productId=''){ const row=document.createElement('div'); row.className='grid grid-cols-12 gap-2 items-center'; row.innerHTML = `<select class="col-span-6 px-2 py-1 border sale-product"></select><input type="number" class="col-span-2 px-2 py-1 border sale-qty" value="1" min="1"><input type="number" step="0.01" class="col-span-2 px-2 py-1 border sale-price" placeholder="Precio"><button type="button" class="col-span-2 px-2 py-1 border sale-remove">Quitar</button>`; $('#sale-items').appendChild(row); fillSaleRow(row, productId); }
 function fillSaleRow(row, productId){
-  const sel = row.querySelector('.sale-product'); sel.innerHTML=''; STATE.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent = `${p.name} (stock ${p.stock||0})`; sel.appendChild(o); });
+  const sel = row.querySelector('.sale-product'); sel.innerHTML=''; STATE.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); });
   if(productId) sel.value = productId;
   const price = row.querySelector('.sale-price'); const qty = row.querySelector('.sale-qty');
   sel.onchange = ()=>{ const p = STATE.products.find(x=>x.id===sel.value); price.value = p ? p.price : ''; updateSaleTotal(); };
@@ -521,7 +538,7 @@ function fillSaleRow(row, productId){
   row.querySelector('.sale-remove').onclick = ()=>{ row.remove(); updateSaleTotal(); };
 }
 $('#add-sale-item').addEventListener('click', ()=> addSaleItemRow());
-function updateSaleTotal(){ let t=0; document.querySelectorAll('#sale-items > div').forEach(r=>{ const q=Number(r.querySelector('.sale-qty').value)||0; const p=Number(r.querySelector('.sale-price').value)||0; t+= q*p; }); $('#sale-total').textContent = money(t); }
+function updateSaleTotal(){ let t=0; document.querySelectorAll('#sale-items > div').forEach(r=>{ const q=Number(r.querySelector('.sale-qty').value)||0; const p=Number(r.querySelector('.sale-price').value)||0; t += q*p; }); $('#sale-total').textContent = money(t); }
 $('#form-sale').addEventListener('submit', async e=>{
   e.preventDefault();
   const customer = $('#sale-customer').value.trim(); const payment = $('#sale-payment').value;
@@ -539,50 +556,53 @@ $('#form-sale').addEventListener('submit', async e=>{
   await refreshAll(); if(cloudEnabled) pushSalesToCloud(); closeModal('modal-sale');
 });
 
-// QUICK SALE
+/* ----------------------
+   QUICK SALE improved search & UX
+   ---------------------- */
 $('#open-quick-sale').addEventListener('click', ()=> { renderQuickSelect(); showModal('modal-quick-sale'); });
-function renderQuickSelect(){
-  const sel = $('#quick-product'); sel.innerHTML=''; STATE.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); });
-  updateQuickTotal();
-  rebuildQuickFuse();
-}
-$('#quick-search').addEventListener('input', debounce(function(){
-  const q = this.value.trim();
-  showQuickSuggestions(q);
-  if(!q) return;
-  // if the input is numeric and matches barcode, try to match
-  if(/^\d{6,}$/.test(q)){
-    const p = STATE.products.find(p => (p.barcode||'').replace(/\D/g,'').endsWith(q) || (p.barcode||'')===q);
-    if(p) $('#quick-product').value = p.id;
-  }
-  updateQuickTotal();
-}, 140));
+function renderQuickSelect(){ const sel = $('#quick-product'); sel.innerHTML=''; STATE.products.forEach(p=>{ const o=document.createElement('option'); o.value=p.id; o.textContent=`${p.name} (stock ${p.stock||0})`; sel.appendChild(o); }); updateQuickTotal(); rebuildQuickFuse(); }
 $('#quick-product').addEventListener('change', updateQuickTotal);
 $('#quick-qty').addEventListener('input', updateQuickTotal);
 function updateQuickTotal(){ const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||0; const p = STATE.products.find(x=>x.id===pid); $('#quick-total').textContent = money(p ? p.price * qty : 0); }
 
 let quickFuse = null;
-function rebuildQuickFuse(){
-  const list = STATE.products.map(p=> ({ id:p.id, name:p.name, barcode:p.barcode||'' }));
-  quickFuse = new Fuse(list, { keys:['name','barcode'], threshold:0.32, minMatchCharLength:1 });
-}
-function showQuickSuggestions(q){
-  const box = $('#quick-suggestions'); box.classList.add('hidden'); box.innerHTML='';
-  if(!q || !quickFuse) return;
-  const results = quickFuse.search(q, { limit: 8 });
-  if(!results || results.length===0) return;
-  for(const r of results){
-    const p = STATE.products.find(pp=>pp.id===r.item.id);
-    const div = document.createElement('div'); div.className='suggestion-item'; div.textContent = `${p.name} — ${p.barcode||''}`; div.onclick = ()=>{ $('#quick-product').value = p.id; $('#quick-search').value = ''; box.classList.add('hidden'); updateQuickTotal(); };
-    box.appendChild(div);
+function rebuildQuickFuse(){ const list = STATE.products.map(p => ({ id: p.id, name: p.name, barcode: p.barcode || '' })); quickFuse = new Fuse(list, { keys:['name','barcode'], threshold:0.3, minMatchCharLength:1 }); }
+
+$('#quick-search').addEventListener('input', debounce(function(){
+  const q = this.value.trim();
+  showQuickSuggestions(q);
+  // if an exact barcode typed, auto-select
+  if(/^\d{6,}$/.test(q)){
+    const p = STATE.products.find(p => (p.barcode||'').replace(/\D/g,'').endsWith(q) || (p.barcode||'') === q);
+    if(p) $('#quick-product').value = p.id;
   }
+  updateQuickTotal();
+},120));
+
+function showQuickSuggestions(q){
+  const box = $('#quick-suggestions'); box.innerHTML=''; box.classList.add('hidden');
+  if(!q) return;
+  // 1) startsWith and contains prioritized
+  const qLower = q.toLowerCase();
+  const starts = STATE.products.filter(p => p.name.toLowerCase().startsWith(qLower) || (p.barcode||'').includes(q)).slice(0,8);
+  let items = starts;
+  if(items.length < 1 && quickFuse){
+    const res = quickFuse.search(q, { limit: 10 });
+    items = res.map(r => STATE.products.find(p=>p.id===r.item.id)).filter(Boolean);
+  }
+  if(items.length===0) return;
+  items.forEach(p=>{
+    const div = document.createElement('div'); div.className='suggestion-item'; div.innerHTML = `<div class="font-medium">${p.name}</div><div class="text-xs text-gray-500">${p.barcode||''} • ${p.category||''}</div>`;
+    div.onclick = ()=>{ $('#quick-product').value = p.id; $('#quick-search').value = ''; box.classList.add('hidden'); updateQuickTotal(); };
+    box.appendChild(div);
+  });
   box.classList.remove('hidden');
 }
 
+// quick cart
 const quickCart = [];
 $('#quick-add-cart').addEventListener('click', function(){
-  const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||1; const p = STATE.products.find(x=>x.id===pid); if(!p) return alert('Selecciona un producto');
-  quickCart.push({ productId: pid, qty, price: p.price }); renderQuickCart();
+  const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||1; const p = STATE.products.find(x=>x.id===pid); if(!p) return alert('Selecciona un producto'); quickCart.push({ productId: pid, qty, price: p.price }); renderQuickCart();
 });
 function renderQuickCart(){ const el = $('#quick-cart'); el.innerHTML=''; quickCart.forEach((it,idx)=>{ const p = STATE.products.find(x=>x.id===it.productId); const d=document.createElement('div'); d.className='flex justify-between items-center'; d.innerHTML = `<div>${p.name} x ${it.qty}</div><div>${money(it.qty*it.price)} <button data-idx="${idx}" class="ml-2 text-sm text-red-600 btn-remove-quick">Quitar</button></div>`; el.appendChild(d); }); $$('.btn-remove-quick').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); }); }
 $('#form-quick-sale').addEventListener('submit', async function(e){
@@ -601,7 +621,9 @@ $('#form-quick-sale').addEventListener('submit', async function(e){
   quickCart.length = 0; await refreshAll(); if(cloudEnabled) pushSalesToCloud(); closeModal('modal-quick-sale');
 });
 
-// CLIENTS
+/* ----------------------
+   CLIENTS
+   ---------------------- */
 $('#open-clients').addEventListener('click', ()=> showModal('modal-clients'));
 $('#add-client').addEventListener('click', async ()=> {
   const name = $('#client-name').value.trim(); if(!name) return alert('Ingresa nombre'); const existing = await get('customers', name).catch(()=>null);
@@ -610,12 +632,14 @@ $('#add-client').addEventListener('click', async ()=> {
 async function renderClients(){
   const el = $('#clients-list'); el.innerHTML=''; const clients = STATE.customers || [];
   if(!clients.length) el.innerHTML = '<div class="text-sm text-gray-600">No hay clientes registrados.</div>';
-  for(const c of clients){ const d = document.createElement('div'); d.className='p-2 border rounded bg-white flex justify-between items-center'; d.innerHTML = `<div><div class="font-medium">${c.name}</div><div class="text-xs text-gray-500">Saldo: S/ ${money(c.balance||0)}</div></div><div class="flex gap-2"><button data-name="${c.name}" class="px-3 py-2 border rounded btn-abono">Abono</button><button data-name="${c.name}" class="px-3 py-2 bg-green-600 text-white rounded btn-saldar">Saldar</button></div>`; el.appendChild(d); }
-  $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = await get('customers', name); const newBal = (c.balance||0) - amt; await put('customers', { name, balance: newBal < 0 ? 0 : newBal, lastPayment:new Date().toISOString() }); alert('Abono registrado'); await refreshAll(); if(cloudEnabled) pushCustomersToCloud(); });
+  for(const c of clients){ const d=document.createElement('div'); d.className='p-2 border rounded bg-white flex justify-between items-center'; d.innerHTML = `<div><div class="font-medium">${c.name}</div><div class="text-xs text-gray-500">Saldo: S/ ${money(c.balance||0)}</div></div><div class="flex gap-2"><button data-name="${c.name}" class="px-3 py-2 border rounded btn-abono">Abono</button><button data-name="${c.name}" class="px-3 py-2 bg-green-600 text-white rounded btn-saldar">Saldar</button></div>`; el.appendChild(d); }
+  $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = await get('customers', name); const newBal = (c.balance||0) - amt; await put('customers', { name, balance: newBal < 0 ? 0 : newBal, lastPayment: new Date().toISOString() }); alert('Abono registrado'); await refreshAll(); if(cloudEnabled) pushCustomersToCloud(); });
   $$('.btn-saldar').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; if(!confirm(`¿Saldar cuenta de ${name}? Esto pondrá su saldo a 0.`)) return; await put('customers',{ name, balance:0, lastPayment:new Date().toISOString() }); alert('Cuenta saldada'); await refreshAll(); if(cloudEnabled) pushCustomersToCloud(); });
 }
 
-// RESPONSIBLE
+/* ----------------------
+   RESPONSIBLE one-per-day
+   ---------------------- */
 $('#save-responsible').addEventListener('click', async ()=>{
   const date = $('#responsible-date').value; const name = $('#responsible-name').value.trim();
   if(!date) return alert('Selecciona fecha'); const existing = await get('responsibles', date).catch(()=>null);
@@ -624,7 +648,9 @@ $('#save-responsible').addEventListener('click', async ()=>{
 });
 async function updateResponsibleBanner(){ const today = todayYMD(); $('#responsible-date').value = today; const r = await get('responsibles', today).catch(()=>null); if(r && r.name){ $('#responsible-display').textContent = `${r.name} (${today})`; $('#responsible-name').value = r.name; } else { $('#responsible-display').textContent = 'Sin encargado asignado para hoy'; $('#responsible-name').value = ''; } }
 
-// CHARTS
+/* ----------------------
+   CHARTS
+   ---------------------- */
 let chartSales, chartStock;
 function updateCharts(){
   try{
@@ -637,7 +663,9 @@ function updateCharts(){
   }catch(e){ console.warn('updateCharts', e); }
 }
 
-// REPORTS HTML builders and PDF functions (A4)
+/* ----------------------
+   REPORTS & PDF (A4) - reutilizables
+   ---------------------- */
 async function buildDailyReportHTML(date){
   const allSales = await all('sales');
   const daySales = allSales.filter(s => new Date(s.date).toISOString().slice(0,10) === date).sort((a,b)=>a.date.localeCompare(b.date));
@@ -652,566 +680,5 @@ async function buildDailyReportHTML(date){
   }
   const r = await get('responsibles', date).catch(()=>null); const responsibleName = r && r.name ? r.name : '';
   const creditRows = creditSales.map(s=>{ const t=new Date(s.date).toLocaleTimeString(); const items = s.items.map(it=>{ const p=STATE.products.find(pp=>pp.id===it.productId); return `${p? p.name : it.productId} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>'); return `<tr><td style="padding:6px;border-bottom:1px solid #eee">${t}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.id}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.customerName||'-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.responsible||'-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.paymentType||'A_CREDITO'}</td><td style="padding:6px;border-bottom:1px solid #eee">${items}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(s.total)}</td></tr>`; }).join('');
-  const html = `<div style="padding:8mm;font-family:Arial,Helvetica,sans-serif;color:#111"><div style="display:flex;justify-content:space-between"><div><h1 style="margin:0;font-size:18px">MINIMARKET LA ESQUINA DEL AHORRO</h1><div style="font-size:12px">Reporte del dia: <strong>${date}</strong></div></div><div style="font-size:12px;text-align:right">Generado: ${new Date().toLocaleString()}<br>Encargado: ${responsibleName || '-'}</div></div><hr style="margin:8px 0"><h3 style="margin-bottom:6px">Ventas del día</h3><table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas para esta fecha</td></tr>'}</tbody></table><div style="text-align:right;font-weight:bold;margin-bottom:12px">Total (día): S/ ${money(total)}</div><hr style="margin:8px 0"><h3 style="margin-bottom:6px">Ventas por cobrar (A CREDITO)</h3><table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead><tbody>${creditRows.length ? creditRows : '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas por cobrar</td></tr>'}</tbody></table><div style="font-size:11px;color:#666;margin-top:10px">Reporte generado por TiendaSmart — MINIMARKET LA ESQUINA DEL AHORRO</div></div>`;
-  return html;
-}
-
-async function generateDailyPDF(date){
-  if(!date) return alert('Selecciona fecha');
-  const html = await buildDailyReportHTML(date);
-  const wrapper = document.createElement('div'); wrapper.style.width='1123px'; wrapper.style.background='#fff'; wrapper.innerHTML = html; document.body.appendChild(wrapper);
-  try{
-    const scale = 3;
-    const canvas = await html2canvas(wrapper, { scale, useCORS:true, logging:false, windowWidth: wrapper.scrollWidth, windowHeight: wrapper.scrollHeight });
-    const imgData = canvas.toDataURL('image/png',1.0);
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('p','mm','a4');
-    const pageWidthMM = 210, pageHeightMM = 297, marginMM = 10;
-    const usableWidthMM = pageWidthMM - marginMM*2;
-    const imgWidthPx = canvas.width;
-    const pxToMm = usableWidthMM / imgWidthPx;
-    const imgHeightMM = canvas.height * pxToMm;
-    if(imgHeightMM <= (pageHeightMM - marginMM*2)){
-      pdf.addImage(imgData,'PNG',marginMM,marginMM,usableWidthMM,imgHeightMM);
-    } else {
-      const pxPerPage = Math.floor((pageHeightMM - marginMM*2) / pxToMm);
-      let remainingHeight = canvas.height; let position=0; let page=0;
-      while(remainingHeight>0){
-        const sliceHeight = Math.min(pxPerPage, remainingHeight);
-        const tmpCanvas = document.createElement('canvas'); tmpCanvas.width = canvas.width; tmpCanvas.height = sliceHeight;
-        const tctx = tmpCanvas.getContext('2d'); tctx.fillStyle='#fff'; tctx.fillRect(0,0,tmpCanvas.width,tmpCanvas.height); tctx.drawImage(canvas, 0, position, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
-        const sliceData = tmpCanvas.toDataURL('image/png');
-        const sliceHeightMM = sliceHeight * pxToMm;
-        if(page>0) pdf.addPage();
-        pdf.addImage(sliceData,'PNG',marginMM,marginMM,usableWidthMM,sliceHeightMM);
-        remainingHeight -= sliceHeight; position += sliceHeight; page++;
-      }
-    }
-    const filename = `Reporte del dia ${date}.pdf`;
-    pdf.save(filename);
-  }catch(err){ console.error('PDF error',err); alert('Error generando PDF - prueba imprimir o reducir escala'); }
-  wrapper.remove();
-}
-
-// General wrapper PDF generator used por otros reportes
-async function generatePDFfromHTMLString(htmlString, filename){
-  const wrapper = document.createElement('div'); wrapper.style.width='1123px'; wrapper.style.background='#fff'; wrapper.innerHTML = htmlString; document.body.appendChild(wrapper);
-  try{
-    const scale = 3;
-    const canvas = await html2canvas(wrapper, { scale, useCORS:true, logging:false });
-    const imgData = canvas.toDataURL('image/png',1.0);
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('p','mm','a4');
-    const pageWidthMM = 210, pageHeightMM = 297, marginMM = 10;
-    const usableWidthMM = pageWidthMM - marginMM*2;
-    const imgWidthPx = canvas.width;
-    const pxToMm = usableWidthMM / imgWidthPx;
-    const imgHeightMM = canvas.height * pxToMm;
-    if(imgHeightMM <= (pageHeightMM - marginMM*2)){
-      pdf.addImage(imgData,'PNG',marginMM,marginMM,usableWidthMM,imgHeightMM);
-    } else {
-      const pxPerPage = Math.floor((pageHeightMM - marginMM*2) / pxToMm);
-      let remainingHeight = canvas.height; let position=0; let page=0;
-      while(remainingHeight>0){
-        const sliceHeight = Math.min(pxPerPage, remainingHeight);
-        const tmpCanvas = document.createElement('canvas'); tmpCanvas.width = canvas.width; tmpCanvas.height = sliceHeight;
-        const tctx = tmpCanvas.getContext('2d'); tctx.fillStyle='#fff'; tctx.fillRect(0,0,tmpCanvas.width,tmpCanvas.height); tctx.drawImage(canvas, 0, position, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
-        const sliceData = tmpCanvas.toDataURL('image/png');
-        const sliceHeightMM = sliceHeight * pxToMm;
-        if(page>0) pdf.addPage();
-        pdf.addImage(sliceData,'PNG',marginMM,marginMM,usableWidthMM,sliceHeightMM);
-        remainingHeight -= sliceHeight; position += sliceHeight; page++;
-      }
-    }
-    pdf.save(filename);
-  }catch(err){ console.error('PDF wrapper error',err); alert('Error generando PDF'); }
-  wrapper.remove();
-}
-
-// Bind report UI
-$('#tab-sales-day').addEventListener('click', ()=> showReportTab('day'));
-$('#tab-sales-range').addEventListener('click', ()=> showReportTab('range'));
-$('#tab-inventory').addEventListener('click', ()=> showReportTab('inv'));
-function showReportTab(name){
-  $('#tab-content-day').classList.toggle('hidden', name!=='day');
-  $('#tab-content-range').classList.toggle('hidden', name!=='range');
-  $('#tab-content-inv').classList.toggle('hidden', name!=='inv');
-  $('#tab-sales-day').classList.toggle('bg-indigo-600', name==='day');
-  $('#tab-sales-range').classList.toggle('bg-indigo-600', name==='range');
-  $('#tab-inventory').classList.toggle('bg-indigo-600', name==='inv');
-}
-$('#btn-generate-day').addEventListener('click', async ()=> {
-  const date = $('#report-day-date').value || todayYMD();
-  const html = await buildDailyReportHTML(date);
-  $('#report-preview-day').innerHTML = html;
-});
-$('#btn-download-day').addEventListener('click', async ()=> {
-  const date = $('#report-day-date').value || todayYMD();
-  await generateDailyPDF(date);
-});
-$('#btn-print-day').addEventListener('click', async ()=> {
-  const date = $('#report-day-date').value || todayYMD();
-  const html = await buildDailyReportHTML(date);
-  printHTML(html, `Reporte del dia ${date}`);
-});
-
-// Range
-$('#btn-generate-range').addEventListener('click', async ()=> {
-  const from = $('#report-from').value, to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango');
-  const html = await buildRangeReportHTML(from,to); $('#report-preview-range').innerHTML = html;
-});
-$('#btn-download-range').addEventListener('click', async ()=> {
-  const from = $('#report-from').value, to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango');
-  const html = await buildRangeReportHTML(from,to);
-  await generatePDFfromHTMLString(html, `Reporte_Ventas_${from}_a_${to}.pdf`);
-});
-$('#btn-print-range').addEventListener('click', async ()=> {
-  const from = $('#report-from').value, to = $('#report-to').value; if(!from||!to) return alert('Selecciona rango');
-  const html = await buildRangeReportHTML(from,to);
-  printHTML(html, `Reporte ${from} a ${to}`);
-});
-
-// Inventory report
-$('#btn-generate-inv').addEventListener('click', async ()=> { const html = await buildInventoryReportHTML(); $('#report-preview-inv').innerHTML = html; });
-$('#btn-download-inv').addEventListener('click', async ()=> { const html = await buildInventoryReportHTML(); await generatePDFfromHTMLString(html, `Reporte_Inventario_${new Date().toISOString().slice(0,10)}.pdf`); });
-$('#btn-print-inv').addEventListener('click', async ()=> { const html = await buildInventoryReportHTML(); printHTML(html, 'Reporte de Inventario'); });
-
-async function buildRangeReportHTML(from,to){
-  const allSales = await all('sales');
-  const list = allSales.filter(s=>{ const d = new Date(s.date).toISOString().slice(0,10); return d>=from && d<=to; }).sort((a,b)=>a.date.localeCompare(b.date));
-  let rows=''; let total=0;
-  for(const s of list){
-    total += Number(s.total||0);
-    const d = new Date(s.date).toLocaleString();
-    const payment = s.paymentType || (s.paid ? 'EFECTIVO' : 'A_CREDITO');
-    const items = s.items.map(it=>{ const p = STATE.products.find(x=>x.id===it.productId); return `${p? p.name : it.productId} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>');
-    rows += `<tr><td style="padding:6px;border-bottom:1px solid #eee">${d}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.id}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.customerName||'-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${s.responsible||'-'}</td><td style="padding:6px;border-bottom:1px solid #eee">${payment}</td><td style="padding:6px;border-bottom:1px solid #eee">${items}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(s.total)}</td></tr>`;
-  }
-  const html = `<div style="padding:8mm;font-family:Arial,Helvetica,sans-serif;color:#111"><div style="display:flex;justify-content:space-between"><div><h2 style="margin:0">MINIMARKET LA ESQUINA DEL AHORRO</h2><div style="font-size:12px">Reporte por rango</div></div><div style="text-align:right;font-size:12px">Periodo: ${from} → ${to}<br>Generado: ${new Date().toLocaleString()}</div></div><hr style="margin:8px 0"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Fecha</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody></table><div style="text-align:right;font-weight:bold;margin-top:8px">Total periodo: S/ ${money(total)}</div></div>`;
-  return html;
-}
-
-async function buildInventoryReportHTML(){
-  const products = await all('products');
-  let rows = '', low=0;
-  products.sort((a,b)=>a.name.localeCompare(b.name));
-  for(const p of products){ if((p.stock||0)<=5) low++; rows += `<tr><td style="padding:6px;border-bottom:1px solid #eee">${p.name}</td><td style="padding:6px;border-bottom:1px solid #eee">${p.category||''}</td><td style="padding:6px;border-bottom:1px solid #eee">${p.barcode||''}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">${p.stock||0}</td><td style="padding:6px;border-bottom:1px solid #eee;text-align:right">S/ ${money(p.price)}</td></tr>`; }
-  const html = `<div style="padding:8mm;font-family:Arial,Helvetica,sans-serif;color:#111"><div style="display:flex;justify-content:space-between"><div><h2 style="margin:0">MINIMARKET LA ESQUINA DEL AHORRO</h2><div style="font-size:12px">Reporte de inventario</div></div><div style="text-align:right;font-size:12px">Generado: ${new Date().toLocaleString()}</div></div><hr style="margin:8px 0"><div style="margin-bottom:8px">Productos: ${products.length} • Stocks bajos: ${low}</div><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Nombre</th><th style="background:#f3f4f6;padding:6px;text-align:left">Categoría</th><th style="background:#f3f4f6;padding:6px;text-align:left">Código</th><th style="background:#f3f4f6;padding:6px;text-align:right">Stock</th><th style="background:#f3f4f6;padding:6px;text-align:right">Precio</th></tr></thead><tbody>${rows || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#666">No hay productos</td></tr>'}</tbody></table></div>`;
-  return html;
-}
-
-// print helper
-function printHTML(html, title='Reporte'){
-  const win = window.open('','_blank','noopener,noreferrer');
-  if(!win) return alert('Permite ventanas emergentes o usa "Generar PDF"');
-  win.document.open();
-  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:Arial,Helvetica,sans-serif;margin:10mm} table{width:100%;border-collapse:collapse} th{background:#f3f4f6;padding:6px;text-align:left} td{padding:6px;border-bottom:1px solid #eee}</style></head><body>${html}</body></html>`);
-  win.document.close(); win.focus(); setTimeout(()=>win.print(),700);
-}
-
-/* ================ CSV Import/Export (products) ================ */
-/* Format: id,name,category,price,barcode,stock,createdAt  (CSV header must match) */
-
-// Export CSV
-$('#btn-export-csv').addEventListener('click', async ()=>{
-  const products = await all('products');
-  // CSV header
-  const headers = ['id','name','category','price','barcode','stock','createdAt'];
-  const rows = [headers.join(',')];
-  for(const p of products){
-    const vals = headers.map(h => {
-      const v = p[h] === undefined || p[h] === null ? '' : String(p[h]).replace(/"/g,'""');
-      return `"${v}"`;
-    });
-    rows.push(vals.join(','));
-  }
-  const csv = rows.join('\r\n');
-  const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = `inventario_${new Date().toISOString().slice(0,10)}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-});
-
-// Import CSV (reads same format as export)
-$('#btn-import-csv').addEventListener('click', ()=> $('#file-import').click());
-$('#file-import').addEventListener('change', async e=>{
-  const f = e.target.files[0]; if(!f) return;
-  const text = await f.text(); parseCSVImport(text);
-  e.target.value = '';
-});
-function parseCSVImport(text){
-  // simple CSV parser for the exact format exported (quoted fields)
-  const lines = text.split(/\r?\n/).filter(l=>l.trim()!=='');
-  if(lines.length < 2) return alert('CSV vacío o inválido');
-  const header = lines[0].trim().split(',').map(h => h.replace(/(^"|"$)/g,'').trim());
-  const expected = ['id','name','category','price','barcode','stock','createdAt'];
-  // accept same order or any order if headers match
-  if(header.length !== expected.length || expected.some(h=> !header.includes(h) )) return alert('Formato CSV inválido. Encabezado debe ser: ' + expected.join(','));
-  const idx = header.reduce((acc,h,i)=> (acc[h]=i,acc), {});
-  const records = [];
-  for(let i=1;i<lines.length;i++){
-    // split by comma but handle quoted
-    const row = splitCSVLine(lines[i]);
-    if(row.length < header.length) continue;
-    const rec = {};
-    for(const k of expected){
-      let val = row[idx[k]] || '';
-      val = val.replace(/^"|"$/g,'').replace(/""/g,'"');
-      rec[k] = val;
-    }
-    // normalize types
-    rec.price = Number(rec.price) || 0;
-    rec.stock = Number(rec.stock) || 0;
-    if(!rec.id) rec.id = uid();
-    if(!rec.createdAt) rec.createdAt = new Date().toISOString();
-    records.push(rec);
-  }
-  // confirm import (will upsert)
-  if(!confirm(`Importar ${records.length} productos y actualizar inventario local? Esto sobrescribirá productos con el mismo id.`)) return;
-  Promise.all(records.map(r => put('products', r))).then(async ()=>{
-    await refreshAll();
-    if(cloudEnabled) pushProductsToCloud();
-    alert('Importación completada');
-  }).catch(err=>{ console.error('import err',err); alert('Error al importar'); });
-}
-function splitCSVLine(line){
-  // Basic CSV line splitter supporting quoted fields
-  const res = []; let cur=''; let inQuotes=false;
-  for(let i=0;i<line.length;i++){
-    const ch=line[i];
-    if(ch === '"' ){ if(inQuotes && line[i+1] === '"'){ cur += '"'; i++; } else { inQuotes = !inQuotes; } continue; }
-    if(ch === ',' && !inQuotes){ res.push(cur); cur=''; continue; }
-    cur += ch;
-  }
-  res.push(cur);
-  return res;
-}
-
-/* ================ Scanner ================== */
-// We'll reuse the prior strategy (BarcodeDetector -> OpenCV preproc -> Quagga fallback)
-let cvReady=false, awaitingCv=false;
-if(window.cv && cv['onRuntimeInitialized']){ awaitingCv = true; cv['onRuntimeInitialized'] = ()=>{ cvReady=true; awaitingCv=false; console.info('OpenCV listo'); }; } else if(window.cv){ cvReady=true; }
-
-const video = $('#video'); let videoStream=null, currentVideoTrack=null;
-let detectionLoop=false, quaggaActive=false, readBuffer=[];
-const READ_CONFIRM = 4, READ_WINDOW_MS = 2200;
-let overlayCanvas = $('#overlay-canvas'), overlayCtx = overlayCanvas ? overlayCanvas.getContext('2d') : null;
-function resizeOverlay(){ overlayCanvas = $('#overlay-canvas'); if(!overlayCanvas) return; overlayCanvas.width = video.clientWidth; overlayCanvas.height = video.clientHeight; overlayCtx = overlayCanvas.getContext('2d'); }
-function clearOverlay(){ if(!overlayCtx) resizeOverlay(); overlayCtx && overlayCtx.clearRect(0,0,overlayCanvas.width, overlayCanvas.height); }
-function pushRead(code){ const now = Date.now(); readBuffer = readBuffer.filter(r=> now - r.t < READ_WINDOW_MS); readBuffer.push({ code, t: now }); const last = readBuffer.slice(-READ_CONFIRM); if(last.length >= READ_CONFIRM && last.every(x=> x.code === last[0].code)) return last[0].code; return null; }
-async function startCameraHighRes(){
-  try{
-    const constraints = { audio:false, video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1920 }, height:{ ideal:1080 } } };
-    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-    video.srcObject = videoStream; currentVideoTrack = videoStream.getVideoTracks()[0];
-    const caps = currentVideoTrack.getCapabilities ? currentVideoTrack.getCapabilities() : {};
-    if(caps && caps.torch) $('#toggle-torch').classList.remove('hidden'); else $('#toggle-torch').classList.add('hidden');
-    await video.play(); resizeOverlay();
-  }catch(err){ console.warn('camera fail',err); alert('No se pudo acceder a la cámara. Revisa permisos o usa https/localhost.'); throw err; }
-}
-async function captureProcessedFrame(){
-  const w = video.videoWidth || 1280, h = video.videoHeight || 720;
-  const canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
-  const ctx = canvas.getContext('2d'); ctx.filter = 'contrast(140%) brightness(105%) saturate(115%)'; ctx.drawImage(video,0,0,w,h);
-  if(cvReady){
-    try{
-      let src = cv.imread(canvas);
-      let gray = new cv.Mat(); cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-      let blurred = new cv.Mat(); cv.bilateralFilter(gray, blurred, 9, 75, 75, cv.BORDER_DEFAULT);
-      let clahe = new cv.Mat();
-      try{ let claheObj = new cv.CLAHE(3.0, new cv.Size(8,8)); claheObj.apply(blurred, clahe); claheObj.delete(); }catch(e){ cv.equalizeHist(blurred, clahe); }
-      let thresh = new cv.Mat(); cv.adaptiveThreshold(clahe, thresh, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 47, 10);
-      let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3,3)); cv.morphologyEx(thresh, thresh, cv.MORPH_CLOSE, kernel);
-      let out = new cv.Mat(); cv.cvtColor(thresh, out, cv.COLOR_GRAY2RGBA); cv.imshow(canvas, out);
-      src.delete(); gray.delete(); blurred.delete(); clahe.delete(); thresh.delete(); kernel.delete(); out.delete();
-      const bitmap = await createImageBitmap(canvas); return bitmap;
-    }catch(err){ console.warn('opencv processing',err); return await createImageBitmap(canvas); }
-  } else {
-    return await createImageBitmap(canvas);
-  }
-}
-function computeROI(bitmap){ const bw = bitmap.width, bh = bitmap.height; const w = Math.floor(bw*0.6), h = Math.floor(bh*0.28); const sx = Math.floor((bw-w)/2), sy = Math.floor((bh-h)/2); return { sx, sy, sw: w, sh: h }; }
-
-async function startBarcodeDetection(){
-  if(!isAuthenticated()) return showLogin();
-  $('#scanned-code').value=''; readBuffer=[];
-  if(awaitingCv) while(awaitingCv) await new Promise(r=>setTimeout(r,100));
-  try{
-    if('BarcodeDetector' in window){
-      const detector = new BarcodeDetector({ formats: ['ean_13','code_128','upc_e','upc_a','ean_8'] });
-      await startCameraHighRes();
-      detectionLoop = true;
-      while(detectionLoop){
-        if(!video || video.readyState < 2){ await new Promise(r=>setTimeout(r,100)); continue; }
-        try{
-          const bitmap = await captureProcessedFrame();
-          const roi = computeROI(bitmap);
-          const cropped = await createImageBitmap(bitmap, roi.sx, roi.sy, roi.sw, roi.sh);
-          const barcodes = await detector.detect(cropped);
-          clearOverlay(); drawROI(roi);
-          if(barcodes && barcodes.length>0){
-            const candidate = (barcodes[0].rawValue || '').trim();
-            const confirmed = pushRead(candidate);
-            if(confirmed){ $('#scanned-code').value = confirmed; showConfirmation(confirmed); await new Promise(r=>setTimeout(r,800)); }
-          }
-          bitmap.close(); cropped.close();
-        }catch(err){
-          console.warn('BarcodeDetector loop err',err); detectionLoop=false; fallbackQuagga(); break;
-        }
-        await new Promise(r=>setTimeout(r,80));
-      }
-      return;
-    } else {
-      fallbackQuagga();
-    }
-  }catch(err){ console.warn('startBarcodeDetection',err); fallbackQuagga(); }
-}
-function drawROI(roi){ if(!overlayCtx) resizeOverlay(); const sx = roi.sx * (overlayCanvas.width / (video.videoWidth||1)); const sy = roi.sy * (overlayCanvas.height / (video.videoHeight||1)); const sw = roi.sw * (overlayCanvas.width / (video.videoWidth||1)); const sh = roi.sh * (overlayCanvas.height / (video.videoHeight||1)); overlayCtx.strokeStyle='rgba(0,255,100,0.9)'; overlayCtx.lineWidth=3; overlayCtx.strokeRect(sx,sy,sw,sh); }
-function showConfirmation(text){ if(!overlayCtx) resizeOverlay(); overlayCtx.font='20px monospace'; overlayCtx.fillStyle='rgba(0,0,0,0.6)'; const x=10,y=30; const w = overlayCtx.measureText(text).width + 20; overlayCtx.fillRect(x,y-22,w,28); overlayCtx.fillStyle='white'; overlayCtx.fillText(text,x+8,y); }
-
-function fallbackQuagga(){
-  startCameraHighRes().then(()=>{
-    if(!window.Quagga) return alert('Quagga no disponible');
-    quaggaActive = true;
-    Quagga.init({
-      inputStream:{ name:'Live', type:'LiveStream', target:'#video', constraints:{ facingMode:'environment', width:1280, height:720 } },
-      locator:{ patchSize:'large', halfSample:false },
-      decoder:{ readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader'] },
-      locate:true
-    }, err=>{ if(err){ console.error('Quagga init',err); return; } Quagga.start(); });
-    Quagga.onProcessed(result=>{
-      clearOverlay();
-      if(!result) return;
-      if(result.boxes) result.boxes.filter(b=>b!==result.box).forEach(b=> drawPath(b,'rgba(255,255,255,0.2)'));
-      if(result.box) drawPath(result.box,'lime');
-    });
-    Quagga.onDetected(data=>{
-      const code = data && data.codeResult && data.codeResult.code;
-      if(code){ const confirmed = pushRead(code); if(confirmed){ $('#scanned-code').value = confirmed; try{ Quagga.stop(); }catch(e){} } }
-    });
-    function drawPath(path,color){ if(!overlayCtx) resizeOverlay(); overlayCtx.strokeStyle=color; overlayCtx.lineWidth=3; overlayCtx.beginPath(); overlayCtx.moveTo(path[0].x,path[0].y); for(let i=1;i<path.length;i++) overlayCtx.lineTo(path[i].x,path[i].y); overlayCtx.closePath(); overlayCtx.stroke(); }
-  }).catch(e=>console.warn('quagga camera fail',e));
-}
-
-async function stopCamera(){ detectionLoop=false; if(quaggaActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} quaggaActive=false; } if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); video.srcObject = null; videoStream=null; currentVideoTrack=null; clearOverlay(); readBuffer=[]; }
-
-$('#open-scan').addEventListener('click', ()=> { if(!isAuthenticated()) return showLogin(); showModal('modal-scan'); startBarcodeDetection().catch(()=>{}); });
-$('#stop-camera').addEventListener('click', async ()=> stopCamera());
-$('#toggle-torch').addEventListener('click', async ()=> { if(!currentVideoTrack) return alert('Cámara no activada'); try{ const caps = currentVideoTrack.getCapabilities(); if(!caps.torch) return alert('Linterna no soportada'); await currentVideoTrack.applyConstraints({ advanced:[{ torch:true }] }); }catch(e){ console.warn(e); alert('Linterna no soportada'); } });
-$('#fill-product').addEventListener('click', ()=> {
-  const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado');
-  const p = findProductByCode(code); if(p) openProductModal(p); else { $('#product-barcode').value = code; openProductModal(); }
-});
-$('#quick-sell-detected').addEventListener('click', async ()=> {
-  const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado');
-  const p = findProductByCode(code);
-  if(!p){ if(!confirm('Producto no encontrado. ¿Crear nuevo?')) return; $('#product-barcode').value = code; openProductModal(); return; }
-  const qty = Number(prompt('Cantidad a vender (rápido):','1'))||1;
-  const payment = (prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO','EFECTIVO') || 'EFECTIVO').toUpperCase();
-  let customer = null; if(payment === 'A_CREDITO') customer = prompt('Nombre del cliente:') || null;
-  p.stock = (p.stock||0) - qty; await put('products', p); await add('movements', { id: uid(), type:'sale', productId: p.id, qty, date: new Date().toISOString() });
-  const total = qty * p.price; const date = new Date().toISOString();
-  const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD();
-  const respObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (respObj && respObj.name) ? respObj.name : ($('#responsible-name').value.trim()||'');
-  await add('sales', { id: uid(), items:[{ productId: p.id, qty, price: p.price }], total, date, customerName: customer, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName });
-  if(payment === 'A_CREDITO' && customer){ const existing = await get('customers', customer).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customer, balance: prev + total, lastSale: date }); }
-  alert('Venta rápida registrada'); await refreshAll(); if(cloudEnabled) pushSalesToCloud();
-});
-
-// find product by barcode or last digits
-function findProductByCode(code){
-  const norm = (code||'').replace(/\D/g,'');
-  let p = STATE.products.find(x => (x.barcode||'') === code || (x.barcode||'').replace(/\D/g,'') === norm);
-  if(!p && norm.length>6) p = STATE.products.find(x => (x.barcode||'').replace(/\D/g,'').endsWith(norm));
-  return p;
-}
-
-// QUICK search suggestions (header search)
-const searchInput = $('#search'), suggestionsBox = $('#search-suggestions');
-searchInput.addEventListener('input', debounce(function(){
-  const q = this.value.trim();
-  showHeaderSuggestions(q);
-  renderInventory(q);
-},120));
-function showHeaderSuggestions(q){
-  suggestionsBox.innerHTML=''; suggestionsBox.classList.add('hidden');
-  if(!q || !fuseIndex) return;
-  const res = fuseIndex.search(q, { limit: 10 });
-  if(!res || res.length===0) return;
-  for(const r of res){
-    const p = STATE.products.find(pp=>pp.id===r.item.id);
-    if(!p) continue;
-    const div = document.createElement('div'); div.className='suggestion-item'; div.innerHTML = `<div class="font-medium">${p.name}</div><div class="text-xs text-gray-500">${p.barcode || ''} • ${p.category || ''}</div>`;
-    div.onclick = ()=>{ searchInput.value = p.name; suggestionsBox.classList.add('hidden'); renderInventory(p.name); window.scrollTo({ top:0, behavior:'smooth' }); };
-    suggestionsBox.appendChild(div);
-  }
-  suggestionsBox.classList.remove('hidden');
-}
-
-// Quick product selection in modal: connect header to quick-search suggestions
-$('#quick-search').addEventListener('keydown', e=>{
-  if(e.key === 'ArrowDown'){ const box = $('#quick-suggestions'); if(box) { const first = box.querySelector('.suggestion-item'); if(first) first.focus(); } }
-});
-
-// Quick find product for selection by typing direct
-// (already provided by quickFuse suggestions)
-
-// Quick sell from inventory
-async function quickSellPrompt(productId){
-  const qtyStr = prompt('Cantidad a vender (rápido):','1'); if(!qtyStr) return;
-  const qty = Math.max(1, Number(qtyStr));
-  const payment = (prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO','EFECTIVO') || 'EFECTIVO').toUpperCase();
-  let customerName = null; if(payment === 'A_CREDITO') customerName = prompt('Nombre del cliente:') || null;
-  const prod = STATE.products.find(p=>p.id===productId); if(!prod) return alert('Producto no encontrado');
-  prod.stock = (prod.stock||0) - qty; await put('products', prod);
-  await add('movements', { id: uid(), type:'sale', productId, qty, date:new Date().toISOString() });
-  const total = qty * prod.price; const date = new Date().toISOString();
-  const respDate = ($('#responsible-date').value) ? $('#responsible-date').value : todayYMD();
-  const respObj = await get('responsibles', respDate).catch(()=>null); const responsibleName = (respObj && respObj.name) ? respObj.name : ($('#responsible-name').value.trim()||'');
-  await add('sales', { id: uid(), items:[{ productId, qty, price: prod.price }], total, date, customerName, paid: (payment!=='A_CREDITO'), paymentType: payment, responsible: responsibleName });
-  if(payment === 'A_CREDITO' && customerName){ const existing = await get('customers', customerName).catch(()=>null); const prev = existing && existing.balance ? existing.balance : 0; await put('customers', { name: customerName, balance: prev + total, lastSale: date }); }
-  await refreshAll(); if(cloudEnabled) pushSalesToCloud();
-}
-
-// ----------------- SYNC (Firebase Realtime DB) optional -----------------
-let cloudEnabled = false;
-let firebaseApp = null, firebaseDB = null;
-async function enableCloud(config){
-  if(!config) return alert('No hay configuración de Firebase. Pega tu firebaseConfig en el archivo.');
-  try{
-    firebaseApp = firebase.initializeApp(config);
-    firebaseDB = firebase.database();
-    $('#mode-label').textContent = 'CLOUD';
-    cloudEnabled = true;
-    $('#btn-sync-toggle').textContent = 'Desactivar sincronización';
-    startCloudListener();
-    // push local to cloud initially (resolve conflicts you may want other logic)
-    await pushProductsToCloud();
-    await pushSalesToCloud();
-    await pushCustomersToCloud();
-    await pushResponsiblesToCloud();
-    alert('Sincronización activada (Realtime Firebase).');
-  }catch(err){ console.error('firebase init err',err); alert('Error inicializando Firebase'); }
-}
-$('#btn-sync-toggle').addEventListener('click', async ()=>{
-  if(cloudEnabled){
-    cloudEnabled = false; firebaseApp = null; firebaseDB=null; $('#mode-label').textContent='LOCAL'; $('#btn-sync-toggle').textContent='Activar sincronización'; alert('Sincronización desactivada (ahora en LOCAL).'); return;
-  }
-  if(!FIREBASE_CONFIG) return alert('Pega tu FIREBASE_CONFIG en el archivo para activar sincronización.');
-  await enableCloud(FIREBASE_CONFIG);
-});
-
-// Cloud listener: listen to /products, /sales, /customers, /responsibles and mirror to local
-function startCloudListener(){
-  if(!firebaseDB) return;
-  const refP = firebaseDB.ref('/tiendaSmart/products');
-  refP.on('value', async snapshot=>{
-    const val = snapshot.val() || {};
-    // overwrite local products with cloud version
-    // keys are ids
-    try{
-      // optional strategy: merge or replace; here we replace local with cloud
-      const prods = Object.values(val).map(p=>p);
-      // clear local store and add cloud values
-      // (for simplicity, just put each product)
-      for(const p of prods){ await put('products', p); }
-      await refreshAll();
-    }catch(e){ console.warn('cloud products sync error',e); }
-  });
-
-  const refS = firebaseDB.ref('/tiendaSmart/sales');
-  refS.on('value', async snapshot=>{
-    const val = snapshot.val() || {};
-    const sales = Object.values(val).map(s=>s);
-    for(const s of sales){ await put('sales', s); }
-    await refreshAll();
-  });
-
-  const refC = firebaseDB.ref('/tiendaSmart/customers');
-  refC.on('value', async snapshot=>{
-    const val = snapshot.val() || {};
-    const customers = Object.values(val).map(c=>c);
-    for(const c of customers){ await put('customers', c); }
-    await refreshAll();
-  });
-
-  const refR = firebaseDB.ref('/tiendaSmart/responsibles');
-  refR.on('value', async snapshot=>{
-    const val = snapshot.val() || {};
-    const ress = Object.values(val).map(r=>r);
-    for(const r of ress){ await put('responsibles', r); }
-    await refreshAll();
-  });
-}
-
-// push local to cloud (simple overwrite)
-async function pushProductsToCloud(){
-  if(!cloudEnabled || !firebaseDB) return;
-  const products = await all('products');
-  const map = {}; products.forEach(p=> map[p.id] = p);
-  firebaseDB.ref('/tiendaSmart/products').set(map).catch(e=>console.warn('push products err',e));
-}
-async function pushSalesToCloud(){
-  if(!cloudEnabled || !firebaseDB) return;
-  const sales = await all('sales'), map={}; sales.forEach(s=> map[s.id] = s);
-  firebaseDB.ref('/tiendaSmart/sales').set(map).catch(e=>console.warn('push sales err',e));
-}
-async function pushCustomersToCloud(){
-  if(!cloudEnabled || !firebaseDB) return;
-  const customers = await all('customers'), map={}; customers.forEach(c=> map[c.name] = c);
-  firebaseDB.ref('/tiendaSmart/customers').set(map).catch(e=>console.warn('push customers err',e));
-}
-async function pushResponsiblesToCloud(){
-  if(!cloudEnabled || !firebaseDB) return;
-  const resps = await all('responsibles'), map={}; resps.forEach(r=> map[r.date] = r);
-  firebaseDB.ref('/tiendaSmart/responsibles').set(map).catch(e=>console.warn('push responsibles err',e));
-}
-
-// ----------------- Init: seed and startup -----------------
-async function initApp(){
-  await openDB();
-  const products = await all('products');
-  if(products.length === 0){
-    const seed = [
-      { id: uid(), name: 'Coca Cola 500ml', category: 'Bebidas', price: 10.99, barcode: '7758753103282', stock: 48, createdAt: new Date().toISOString() },
-      { id: uid(), name: 'Agua San Luis 625ml', category: 'Bebidas', price: 3.50, barcode: '7752482381011', stock: 32, createdAt: new Date().toISOString() }
-    ];
-    for(const p of seed) await put('products', p);
-  }
-  await refreshAll();
-  const today = todayYMD(); const r = await get('responsibles', today).catch(()=>null);
-  if(!r){ const name = prompt(`No hay encargado registrado para hoy (${today}). Ingresa su nombre (opcional):`); if(name !== null && name.trim() !== '') await put('responsibles', { date: today, name: name.trim() }); }
-  updateResponsibleBanner();
-  showReportTab('day');
-  $('#search').addEventListener('input', debounce(e => renderInventory(e.target.value), 100));
-  // auto enable cloud if FIREBASE_CONFIG provided? NO: user must click to enable. But if you want auto-enable, uncomment:
-  // if(FIREBASE_CONFIG) enableCloud(FIREBASE_CONFIG);
-  window.addEventListener('resize', ()=>{ try{ resizeOverlay(); }catch(e){} });
-}
-
-// On load: if already logged set user
-if(isAuthenticated()){
-  const u = localStorage.getItem(AUTH_KEY); $('#current-user').textContent = u; $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); closeLogin(); initApp();
-}
-
-// small helper: when closing modal with [data-close-modal]
-document.addEventListener('click', e=>{
-  const btn = e.target.closest('[data-close-modal]');
-  if(!btn) return;
-  const modal = btn.closest('.modal'); if(!modal) return;
-  closeModal(modal.id);
-});
-
-// Utility to show product in edit from quick-scan
-function openProductModalByBarcode(barcode){ const p = STATE.products.find(x=> (x.barcode||'') === barcode || (x.barcode||'').replace(/\D/g,'') === barcode.replace(/\D/g,'')); if(p) openProductModal(p); else { $('#product-barcode').value = barcode; openProductModal(); } }
-
-// Small UI hook: close suggestion boxes when clicking outside
-document.addEventListener('click', e=>{
-  if(!e.target.closest('.suggestions') && !e.target.closest('#search') && !e.target.closest('#quick-search')){ $('#search-suggestions').classList.add('hidden'); $('#quick-suggestions').classList.add('hidden'); }
-});
-
-/* ============== END ============== */
-
-</script>
-</body>
-</html>
+  const html = `<div style="padding:8mm;font-family:Arial,Helvetica,sans-serif;color:#111"><div style="display:flex;justify-content:space-between"><div><h1 style="margin:0;font-size:18px">MINIMARKET LA ESQUINA DEL AHORRO</h1><div style="font-size:12px">Reporte del dia: <strong>${date}</strong></div></div><div style="font-size:12px;text-align:right">Generado: ${new Date().toLocaleString()}<br>Encargado: ${responsibleName || '-'}</div></div><hr style="margin:8px 0"><h3 style="margin-bottom:6px">Ventas del día</h3><table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas para esta fecha</td></tr>'}</tbody></table><div style="text-align:right;font-weight:bold;margin-bottom:12px">Total (día): S/ ${money(total)}</div><hr style="margin:8px 0"><h3 style="margin-bottom:6px">Ventas por cobrar (A CREDITO)</h3><table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead><tbody>${creditRows.length ? creditRows : '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas por cobrar</td></tr>'}</tbody></table><div style="font-size:11px;color:#666;margin-top:10px">Reporte generado por TiendaSmart — MINIMARK
 
