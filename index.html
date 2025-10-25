@@ -8,7 +8,6 @@
 <!-- Tailwind (CDN para prototipo) -->
 <script src="https://cdn.tailwindcss.com"></script>
 
-<!-- Fuse.js opcional (no usado en substring simple) -->
 <!-- SheetJS para XLSX import/export -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
@@ -22,116 +21,121 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-<!-- Firebase compat SDK (usamos compat por simplicidad) -->
+<!-- Firebase compat SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
 <style>
-  html,body{height:100%;-webkit-user-select:none;user-select:none;margin:0;font-family:Inter,system-ui,Arial;}
-  :root{--bg:#f3f4f6;--card:#fff;}
-  body{background:var(--bg);display:flex;justify-content:center;padding:12px;}
-  .app{width:980px;max-width:98vw;background:var(--card);border-radius:10px;padding:12px 14px 100px 14px;box-shadow:0 10px 30px rgba(2,6,23,0.08)}
-  @media(max-width:640px){ .app{padding:10px;border-radius:0;width:100vw;height:100vh;overflow:auto} }
-  .bottom-bar{position:fixed;left:0;right:0;bottom:0;background:#ffffff;display:flex;gap:8px;padding:10px;justify-content:space-around;box-shadow:0 -6px 18px rgba(2,6,23,0.06)}
-  .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:60;padding:12px}
-  .modal.visible{display:flex}
-  .modal .card{width:100%;max-width:820px;background:#fff;border-radius:10px;box-shadow:0 18px 50px rgba(2,6,23,0.12);overflow:hidden}
-  .scan-guide{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:66%;height:28%;border:2px dashed rgba(255,255,255,0.6);border-radius:8px;pointer-events:none}
-  #overlay-canvas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
-  .suggestions{position:absolute;background:white;border:1px solid #e5e7eb;width:100%;max-height:220px;overflow:auto;z-index:80;border-radius:6px}
-  .suggestion-item{padding:8px 10px;cursor:pointer}
-  .suggestion-item:hover{background:#f3f4f6}
+  :root{ --bg:#f3f4f6; --card:#fff; --muted:#6b7280; }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial; background:var(--bg); -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;}
+  /* mobile-first: full viewport app */
+  .app{width:100vw; height:100vh; max-width:100%; display:flex; flex-direction:column; gap:8px; padding:12px; box-sizing:border-box;}
+  .topbar{display:flex; align-items:center; justify-content:space-between; gap:8px;}
+  .top-left{display:flex; gap:10px; align-items:center;}
+  .responsible{padding:10px; background:var(--card); border-radius:10px; box-shadow:0 6px 20px rgba(2,6,23,0.06); display:flex; justify-content:space-between; align-items:center;}
+  .content{flex:1; overflow:auto; padding-bottom:120px;}
+  .bottom-bar{position:fixed; left:0; right:0; bottom:0; padding:10px; background:linear-gradient(0deg, rgba(255,255,255,0.98), rgba(255,255,255,0.95)); box-shadow:0 -8px 20px rgba(2,6,23,0.07); display:flex; gap:8px; justify-content:space-around; z-index:60;}
+  .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:80; padding:12px;}
+  .modal.visible{display:flex;}
+  .card{width:100%; max-width:900px; background:var(--card); border-radius:10px; box-shadow:0 20px 60px rgba(2,6,23,0.12); overflow:hidden;}
+  .scan-guide{position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:66%; height:28%; border:2px dashed rgba(255,255,255,0.6); border-radius:8px; pointer-events:none;}
+  #overlay-canvas{position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none;}
+  .suggestions{position:absolute; background:white; border:1px solid #e5e7eb; width:100%; max-height:220px; overflow:auto; z-index:140; border-radius:6px;}
+  .suggestion-item{padding:8px 10px; cursor:pointer;}
+  .suggestion-item:hover{background:#f3f4f6;}
   @media print{
-    body *{visibility:hidden}
-    .print-area, .print-area *{visibility:visible}
-    .print-area{position:absolute;left:0;top:0}
+    body *{visibility:hidden;}
+    .print-area, .print-area *{visibility:visible;}
+    .print-area{position:absolute; left:0; top:0;}
   }
+  .small-muted{font-size:12px;color:var(--muted);}
+  /* keep UI fixed scale mobile-like (no zoom) */
 </style>
 </head>
 <body>
   <div class="app" role="application" aria-label="TiendaSmart">
-    <header class="flex items-center justify-between mb-4">
-      <div class="flex items-center gap-3">
-        <div class="w-12 h-12 rounded-lg bg-gradient-to-r from-green-400 to-blue-500 flex items-center justify-center text-white shadow">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h2l.4 2M7 13h10l-1.2 6H6L5 13z"/></svg>
+    <div class="topbar">
+      <div class="top-left">
+        <div style="width:44px;height:44px;border-radius:8px;background:linear-gradient(90deg,#10b981,#3b82f6);display:flex;align-items:center;justify-content:center;color:white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path d="M3 3h2l.4 2M7 13h10l-1.2 6H6L5 13z"/></svg>
         </div>
         <div>
-          <div class="text-sm font-semibold">MINIMARKET LA ESQUINA DEL AHORRO</div>
-          <div class="text-xs text-gray-500">TiendaSmart — GitHub Pages + Firestore</div>
+          <div style="font-weight:700;font-size:14px">MINIMARKET LA ESQUINA DEL AHORRO</div>
+          <div class="small-muted">TiendaSmart — GitHub Pages + Firestore</div>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <div id="status-cloud" class="text-xs text-gray-600">Cloud: <strong id="cloud-label">desconectado</strong></div>
-        <div id="current-user" class="hidden px-3 py-1 rounded text-sm bg-indigo-600 text-white"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <div class="small-muted">Cloud: <strong id="cloud-label">desconectado</strong></div>
+        <div id="current-user" class="hidden px-3 py-1 rounded text-sm bg-indigo-600 text-white">USER</div>
         <button id="btn-logout" class="hidden px-3 py-2 border rounded text-sm">Cerrar</button>
         <button id="btn-open-reports" class="px-3 py-2 border rounded text-sm">Reportes</button>
       </div>
-    </header>
+    </div>
 
-    <!-- responsable -->
-    <div class="mb-3 p-3 rounded shadow-sm bg-white flex items-center justify-between">
+    <div class="responsible" role="region" aria-label="Encargado del día">
       <div>
-        <div class="text-xs text-gray-600">Encargado del día</div>
-        <div id="responsible-display" class="font-medium">—</div>
+        <div class="small-muted">Encargado del día</div>
+        <div id="responsible-display" style="font-weight:600">—</div>
       </div>
-      <div class="flex gap-2 items-center">
-        <input id="responsible-date" type="date" class="px-2 py-1 rounded border bg-white">
-        <input id="responsible-name" placeholder="Nombre encargado" class="px-2 py-1 rounded border w-40 bg-white">
-        <button id="save-responsible" class="px-3 py-1 bg-indigo-600 text-white rounded">Guardar</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="responsible-date" type="date" class="px-2 py-2 rounded border bg-white" />
+        <input id="responsible-name" placeholder="Nombre encargado" class="px-2 py-2 rounded border w-40 bg-white" />
+        <button id="save-responsible" class="px-3 py-2 bg-indigo-600 text-white rounded">Guardar</button>
       </div>
     </div>
 
-    <div class="mb-3 flex gap-2">
-      <input id="search" type="search" placeholder="Buscar producto o código..." class="flex-1 px-4 py-3 rounded-lg shadow-sm border bg-white" />
-      <button id="btn-add-product" class="px-4 py-3 bg-green-500 text-white rounded-lg">+ Producto</button>
-      <button id="btn-open-scan" class="px-4 py-3 bg-yellow-500 text-white rounded-lg">Escanear</button>
-      <button id="btn-open-quick" class="px-4 py-3 bg-red-600 text-white rounded-lg">Venta</button>
+    <div class="content">
+      <div style="display:flex;gap:8px;margin:12px 0;">
+        <input id="search" type="search" placeholder="Buscar producto o código..." class="flex-1 px-4 py-3 rounded-lg shadow-sm border bg-white" autocomplete="off" />
+        <button id="btn-add-product" class="px-4 py-3 bg-green-500 text-white rounded-lg">+ Producto</button>
+        <button id="btn-open-scan" class="px-4 py-3 bg-yellow-500 text-white rounded-lg">Escanear</button>
+        <button id="btn-open-quick" class="px-4 py-3 bg-red-600 text-white rounded-lg">Venta</button>
+      </div>
+
+      <div id="inventory-list" class="space-y-3"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px">
+        <div class="bg-white rounded-lg p-3 shadow"><canvas id="chart-sales" height="140"></canvas></div>
+        <div class="bg-white rounded-lg p-3 shadow"><canvas id="chart-stock" height="140"></canvas></div>
+      </div>
+
+      <div style="margin-top:12px;background:var(--card);padding:10px;border-radius:8px;box-shadow:0 8px 30px rgba(2,6,23,0.04);font-size:12px;color:var(--muted)">
+        <strong>Nota:</strong> la app sincroniza automáticamente con Firestore en <code>MODO DE PREODUCCIÓN / DATOS</code> → campo <code>MAGALY</code>.
+      </div>
     </div>
 
-    <div id="inventory-list" class="space-y-3 mb-6"></div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <div class="bg-white rounded-lg p-3 shadow"><canvas id="chart-sales" height="140"></canvas></div>
-      <div class="bg-white rounded-lg p-3 shadow"><canvas id="chart-stock" height="140"></canvas></div>
-    </div>
-
-    <div class="mt-4 bg-white p-3 rounded shadow text-xs text-gray-600">
-      <div><strong>Atención:</strong> la app sincroniza con Firestore en / <code>MODO DE PREODUCCIÓN / DATOS</code> → campo <code>MAGALY</code>. Asegúrate de reglas y backups.</div>
+    <!-- bottom anchored -->
+    <div class="bottom-bar">
+      <div style="display:flex;gap:8px;width:100%;max-width:980px;justify-content:space-around;">
+        <button id="btn-import-xlsx" class="px-3 py-2 bg-gray-800 text-white rounded">Importar Excel</button>
+        <input id="file-xlsx" type="file" accept=".xlsx,.xls" class="hidden" />
+        <button id="btn-export-xlsx" class="px-3 py-2 border rounded">Exportar Excel</button>
+        <button id="btn-sync-toggle" class="px-3 py-2 bg-indigo-600 text-white rounded">Cloud automático</button>
+        <button id="btn-open-clients" class="px-3 py-2 bg-indigo-700 text-white rounded">Clientes</button>
+      </div>
     </div>
   </div>
 
-  <!-- bottom (anchored) -->
-  <div class="bottom-bar">
-    <div class="flex gap-2 w-full max-w-5xl justify-between px-4">
-      <button id="btn-import-xlsx" class="px-3 py-2 bg-gray-800 text-white rounded">Importar Excel</button>
-      <input id="file-xlsx" type="file" accept=".xlsx,.xls" class="hidden" />
-      <button id="btn-export-xlsx" class="px-3 py-2 border rounded">Exportar Excel</button>
-      <button id="btn-sync-toggle" class="px-3 py-2 bg-indigo-600 text-white rounded">Activar Cloud</button>
-      <button id="btn-open-clients" class="px-3 py-2 bg-indigo-700 text-white rounded">Clientes</button>
-    </div>
-  </div>
-
-  <!-- ====== MODALES ====== -->
-
-  <!-- PRODUCT modal -->
+  <!-- MODALES (Product, Scan, Quick Sale, Clients, Reports, Login) -->
+  <!-- Product -->
   <div id="modal-product" class="modal" aria-hidden="true">
     <div class="card p-4">
-      <div class="flex justify-between items-center border-b pb-2 mb-3">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding-bottom:8px;margin-bottom:8px;">
         <h3 class="font-semibold">Producto</h3>
         <button data-close class="text-xl">✕</button>
       </div>
-      <form id="form-product" class="space-y-2">
+      <form id="form-product" class="space-y-2 px-2 pb-4">
         <input type="hidden" id="product-id" />
         <input id="product-name" placeholder="Nombre" required class="w-full px-3 py-2 border rounded" />
-        <div class="flex gap-2">
+        <div style="display:flex;gap:8px;">
           <input id="product-category" placeholder="Categoría" class="flex-1 px-3 py-2 border rounded" />
           <input id="product-price" placeholder="Precio" type="number" step="0.01" class="w-28 px-3 py-2 border rounded" />
         </div>
-        <div class="flex gap-2">
+        <div style="display:flex;gap:8px;">
           <input id="product-barcode" placeholder="Código de barras" class="flex-1 px-3 py-2 border rounded" />
           <input id="product-stock" placeholder="Stock" type="number" class="w-28 px-3 py-2 border rounded" />
         </div>
-        <div class="flex gap-2 justify-end">
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
           <button type="button" data-close class="px-4 py-2 border rounded">Cancelar</button>
           <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded">Guardar</button>
         </div>
@@ -139,24 +143,24 @@
     </div>
   </div>
 
-  <!-- SCANNER modal -->
+  <!-- Scanner -->
   <div id="modal-scan" class="modal" aria-hidden="true">
     <div class="card">
-      <div class="bg-black p-2 text-white flex justify-between items-center">
+      <div style="background:#000;color:white;padding:10px;display:flex;justify-content:space-between;align-items:center;">
         <div class="font-semibold">Escáner</div>
         <div>
           <button id="btn-toggle-torch" class="px-2 py-1 rounded hidden">🔦</button>
           <button data-close class="text-xl">✕</button>
         </div>
       </div>
-      <div id="video-wrap" class="relative" style="height:50vh;background:#000">
+      <div id="video-wrap" style="position:relative;height:50vh;background:#000;">
         <video id="video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover"></video>
         <canvas id="overlay-canvas"></canvas>
         <div class="scan-guide"></div>
       </div>
-      <div class="p-3">
-        <input id="scanned-code" class="w-full px-3 py-2 border rounded mb-2" placeholder="Código detectado">
-        <div class="flex gap-2">
+      <div style="padding:10px;background:#fff;display:flex;flex-direction:column;gap:8px;">
+        <input id="scanned-code" class="w-full px-3 py-2 border rounded" placeholder="Código detectado">
+        <div style="display:flex;gap:8px;">
           <button id="btn-fill-product" class="flex-1 px-3 py-2 bg-indigo-600 text-white rounded">Buscar/Editar</button>
           <button id="btn-quick-sell" class="flex-1 px-3 py-2 bg-red-600 text-white rounded">Vender</button>
           <button id="btn-stop-camera" class="px-3 py-2 border rounded">Detener</button>
@@ -165,24 +169,24 @@
     </div>
   </div>
 
-  <!-- QUICK SALE modal -->
+  <!-- Quick sale -->
   <div id="modal-quick" class="modal" aria-hidden="true">
     <div class="card p-3">
-      <div class="flex justify-between items-center border-b pb-2 mb-3">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding-bottom:8px;margin-bottom:8px;">
         <h3 class="font-semibold">Venta rápida</h3>
         <button data-close class="text-xl">✕</button>
       </div>
-      <form id="form-quick" class="space-y-2 relative">
-        <div class="relative">
+      <form id="form-quick" class="space-y-2 relative px-2 pb-3">
+        <div style="position:relative;">
           <input id="quick-search" placeholder="Buscar por letras o código..." class="w-full px-3 py-2 border rounded" autocomplete="off" />
           <div id="quick-suggestions" class="suggestions hidden"></div>
         </div>
-        <div class="flex gap-2">
+        <div style="display:flex;gap:8px;">
           <select id="quick-product" class="flex-1 px-3 py-2 border rounded"></select>
           <input id="quick-qty" type="number" value="1" min="1" class="w-24 px-3 py-2 border rounded" />
         </div>
-        <div class="flex gap-2 items-center">
-          <label class="text-sm">Pago</label>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <label class="small-muted">Pago</label>
           <select id="quick-payment" class="px-3 py-2 rounded border">
             <option value="EFECTIVO">EFECTIVO</option>
             <option value="YAPE">YAPE</option>
@@ -190,9 +194,9 @@
           </select>
           <input id="quick-customer" placeholder="Nombre cliente (si A CREDITO)" class="flex-1 px-3 py-2 border rounded" />
         </div>
-        <div class="flex items-center justify-between">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
           <div>Total: <span id="quick-total">0.00</span></div>
-          <div class="flex gap-2">
+          <div style="display:flex;gap:8px;">
             <button type="button" id="quick-add" class="px-3 py-2 border rounded">Agregar</button>
             <button type="submit" class="px-3 py-2 bg-red-600 text-white rounded">Cobrar</button>
           </div>
@@ -205,15 +209,15 @@
     </div>
   </div>
 
-  <!-- CLIENTS modal -->
+  <!-- Clients -->
   <div id="modal-clients" class="modal" aria-hidden="true">
     <div class="card p-3">
-      <div class="flex justify-between items-center border-b pb-2 mb-3">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding-bottom:8px;margin-bottom:8px;">
         <h3 class="font-semibold">Clientes (A CREDITO)</h3>
         <button data-close class="text-xl">✕</button>
       </div>
-      <div>
-        <div class="flex gap-2 mb-3">
+      <div style="padding:8px;">
+        <div style="display:flex;gap:8px;margin-bottom:8px;">
           <input id="client-name" placeholder="Nuevo cliente" class="flex-1 px-3 py-2 border rounded" />
           <button id="btn-add-client" class="px-3 py-2 bg-green-600 text-white rounded">Agregar</button>
         </div>
@@ -222,35 +226,37 @@
     </div>
   </div>
 
-  <!-- REPORTS modal -->
+  <!-- Reports -->
   <div id="modal-reports" class="modal" aria-hidden="true">
     <div class="card p-3">
-      <div class="flex justify-between items-center border-b pb-2 mb-3">
+      <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee;padding-bottom:8px;margin-bottom:8px;">
         <h3 class="font-semibold">Reportes</h3>
         <button data-close class="text-xl">✕</button>
       </div>
-      <div class="space-y-2">
-        <div class="flex gap-2">
-          <input id="report-date" type="date" class="px-3 py-2 border rounded" />
-          <button id="btn-preview-day" class="px-3 py-2 bg-indigo-600 text-white rounded">Ver</button>
-          <button id="btn-download-day" class="px-3 py-2 bg-gray-800 text-white rounded">Descargar PDF</button>
-          <button id="btn-print-day" class="px-3 py-2 border rounded">Imprimir</button>
+      <div style="padding:8px;">
+        <div style="display:flex;gap:8px;align-items:end;">
+          <div style="flex:1"><label class="small-muted">Fecha</label><input id="report-date" type="date" class="w-full px-3 py-2 border rounded" /></div>
+          <div style="display:flex;gap:8px;">
+            <button id="btn-preview-day" class="px-3 py-2 bg-indigo-600 text-white rounded">Vista</button>
+            <button id="btn-download-day" class="px-3 py-2 bg-gray-800 text-white rounded">Descargar PDF (Ventas + Inventario)</button>
+            <button id="btn-print-day" class="px-3 py-2 border rounded">Imprimir</button>
+          </div>
         </div>
-        <div id="report-preview" class="max-h-72 overflow-auto bg-white p-2 rounded text-sm"></div>
+        <div id="report-preview" class="max-h-72 overflow-auto bg-white p-2 rounded text-sm mt-3"></div>
       </div>
     </div>
   </div>
 
-  <!-- LOGIN modal (visible initially) -->
+  <!-- Login -->
   <div id="modal-login" class="modal visible" aria-hidden="false" style="background:linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.6));">
     <div class="card p-4" style="max-width:480px">
       <div>
         <h2 class="text-xl font-semibold mb-2">Ingresar — TiendaSmart</h2>
-        <p class="text-sm text-gray-500 mb-4">Usuario: <strong>LIZ</strong> — Contraseña: <strong>MAGALY</strong></p>
+        <p class="small-muted mb-4">Usuario: <strong>LIZ</strong> — Contraseña: <strong>MAGALY</strong></p>
         <form id="form-login" class="space-y-3">
           <input id="login-user" placeholder="Usuario" class="w-full px-3 py-3 rounded border" autofocus />
           <input id="login-pass" placeholder="Contraseña" type="password" class="w-full px-3 py-3 rounded border" />
-          <div class="flex gap-2">
+          <div style="display:flex;gap:8px;">
             <button type="submit" class="flex-1 px-4 py-3 bg-blue-600 text-white rounded font-semibold">Entrar</button>
             <button type="button" id="login-guest" class="flex-1 px-4 py-3 border rounded">Demo</button>
           </div>
@@ -260,9 +266,9 @@
   </div>
 
 <script>
-/* ========================
-   CONFIG FIREBASE (Pega tu bloque aquí)
-   ======================== */
+/* ===========================
+   FIREBASE CONFIG (your block)
+   =========================== */
 const firebaseConfig = {
   apiKey: "AIzaSyBh2WHinnQeRD9fsmdEMJ9zkNVJNcixzS4",
   authDomain: "jhonatan-7ca7d.firebaseapp.com",
@@ -271,18 +277,18 @@ const firebaseConfig = {
   messagingSenderId: "248102422749",
   appId: "1:248102422749:web:097c4e553e610d27dff334"
 };
-/* ========================
-   FIN CONFIG
-   ======================== */
+/* ===========================
+   END CONFIG
+   =========================== */
 
-/* ---------- Helpers ---------- */
+/* Utilities */
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const uid = () => 'id-' + Math.random().toString(36).slice(2,9);
 const money = v => Number(v||0).toFixed(2);
 const todayYMD = ()=>{ const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
-/* ---------- App state ---------- */
+/* App state */
 let STATE = { products: [], sales: [], customers: [], responsibles: [] };
 let cloudEnabled = false;
 let db = null;
@@ -290,56 +296,72 @@ const COLLECTION = "MODO DE PREODUCCIÓN";
 const DOC_ID = "DATOS";
 const FIELD = "MAGALY";
 
-/* ---------- INIT FIREBASE ---------- */
-function initFirebase(){
+/* ---------- FIREBASE (automatic) ---------- */
+function initFirebaseAuto(){
   try{
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
-    console.info('Firebase inicializado');
-    // listener a documento centralizado
     const docRef = db.collection(COLLECTION).doc(DOC_ID);
+
+    // create doc if not exists, then listen
+    docRef.get().then(snap=>{
+      if(!snap.exists){
+        docRef.set({ [FIELD]: { products:[], sales:[], customers:[], responsibles:[] } }).then(()=> console.info('Documento creado en Firestore'));
+      } else {
+        const remote = snap.data() && snap.data()[FIELD];
+        if(remote){
+          // merge remote into local initially
+          STATE.products = remote.products || [];
+          STATE.sales = remote.sales || [];
+          STATE.customers = remote.customers || [];
+          STATE.responsibles = remote.responsibles || [];
+          renderInventory();
+          renderQuickSelect();
+          renderClients();
+          updateCharts();
+          updateResponsibleBanner();
+        }
+      }
+    }).catch(e=> console.warn('get doc err', e));
+
+    // realtime
     docRef.onSnapshot(snap => {
-      const data = snap.exists ? snap.data()[FIELD] : null;
-      if(data){
-        // merge remote into local STATE (overwrite)
-        STATE.products = data.products || [];
-        STATE.sales = data.sales || [];
-        STATE.customers = data.customers || [];
-        STATE.responsibles = data.responsibles || [];
+      const remote = snap.exists ? snap.data()[FIELD] : null;
+      if(remote){
+        // Overwrite local state with remote authoritative state
+        STATE.products = remote.products || [];
+        STATE.sales = remote.sales || [];
+        STATE.customers = remote.customers || [];
+        STATE.responsibles = remote.responsibles || [];
         renderInventory();
         renderQuickSelect();
         renderClients();
         updateCharts();
         updateResponsibleBanner();
         $('#cloud-label').textContent = 'conectado';
-      } else {
-        // if no doc, create empty
-        docRef.set({ [FIELD]: { products:[], sales:[], customers:[], responsibles:[]} }, { merge: true });
       }
     }, err => {
       console.warn('onSnapshot err', err);
       $('#cloud-label').textContent = 'error';
     });
+
     cloudEnabled = true;
     $('#cloud-label').textContent = 'conectado';
-    $('#btn-sync-toggle').textContent = 'Desactivar Cloud';
-  }catch(err){ console.error('Firebase init error', err); $('#cloud-label').textContent='error'; }
+    $('#btn-sync-toggle').textContent = 'Cloud: ON (tocar para OFF)';
+    console.info('Firebase inicializado (auto)');
+  }catch(err){
+    console.error('initFirebase err', err);
+    $('#cloud-label').textContent = 'error';
+  }
 }
 
-/* Guardar STATE en Firestore (escribe todo en FIELD) */
 async function pushStateToCloud(){
   if(!cloudEnabled || !db) return;
-  const docRef = db.collection(COLLECTION).doc(DOC_ID);
-  const payload = {
-    products: STATE.products,
-    sales: STATE.sales,
-    customers: STATE.customers,
-    responsibles: STATE.responsibles
-  };
   try{
-    await docRef.set({ [FIELD]: payload }, { merge: true });
-    console.info('Estado subido a cloud');
-  }catch(e){ console.warn('pushStateToCloud err', e); }
+    const docRef = db.collection(COLLECTION).doc(DOC_ID);
+    await docRef.set({ [FIELD]: STATE }, { merge: true });
+    console.info('Estado subido a Firestore');
+  }catch(e){ console.warn('push err', e); }
 }
 
 /* ---------- AUTH (simple) ---------- */
@@ -359,240 +381,158 @@ function closeLogin(){ $('#modal-login').classList.remove('visible'); $('#modal-
 
 /* ---------- Modal helpers ---------- */
 function openModal(id){ const m = $('#'+id); if(!m) return; m.classList.add('visible'); m.setAttribute('aria-hidden','false'); }
-function closeModalId(id){ const m = $('#'+id); if(!m) return; if(m.classList.contains('scanner-modal')) stopCamera(); m.classList.remove('visible'); m.setAttribute('aria-hidden','true'); }
+function closeModalId(id){ const m = $('#'+id); if(!m) return; if(m.id === 'modal-scan') stopCamera(); m.classList.remove('visible'); m.setAttribute('aria-hidden','true'); }
 document.addEventListener('click', e=>{ const b = e.target.closest('[data-close]'); if(b){ const modal = b.closest('.modal'); if(modal) closeModalId(modal.id); } });
 
-/* ---------- UI Render ---------- */
+/* ---------- Renders ---------- */
 function renderInventory(filter = ''){
-  const container = $('#inventory-list');
-  container.innerHTML = '';
+  const container = $('#inventory-list'); container.innerHTML = '';
   const q = (filter || '').trim().toLowerCase();
   let list = STATE.products.slice();
-  if(q){
-    list = list.filter(p => (p.name||'').toLowerCase().includes(q) || (p.barcode||'').includes(q));
-  }
+  if(q) list = list.filter(p => (p.name||'').toLowerCase().includes(q) || (p.barcode||'').includes(q));
   if(list.length === 0) container.innerHTML = '<div class="p-4 bg-white rounded shadow text-sm text-gray-600">No hay productos</div>';
   for(const p of list){
     const low = (p.stock||0) <= 5;
-    const card = document.createElement('div'); card.className='bg-white p-3 rounded shadow flex justify-between items-center';
-    card.innerHTML = `
-      <div>
-        <div class="font-medium">${escapeHtml(p.name)} ${low ? '<span style="color:#b91c1c;font-weight:600">• STOCK BAJO</span>':''}</div>
-        <div class="text-xs text-gray-500">${escapeHtml(p.category||'')} • ${escapeHtml(p.barcode||'')}</div>
-        <div class="text-sm text-gray-700 mt-1">S/ ${money(p.price)} · Stock: ${p.stock||0}</div>
+    const card = document.createElement('div'); card.className = 'bg-white p-3 rounded shadow flex justify-between items-center';
+    card.innerHTML = `<div>
+        <div style="font-weight:700">${escapeHtml(p.name)} ${low? '<span style="color:#b91c1c;font-weight:700">• STOCK BAJO</span>':''}</div>
+        <div class="small-muted">${escapeHtml(p.category||'')} • ${escapeHtml(p.barcode||'')}</div>
+        <div style="margin-top:6px">S/ ${money(p.price)} · Stock: ${p.stock||0}</div>
       </div>
-      <div class="flex flex-col gap-2">
+      <div style="display:flex;flex-direction:column;gap:8px">
         <button class="px-3 py-2 bg-red-500 text-white rounded sell-btn" data-id="${p.id}">Vender</button>
         <button class="px-3 py-2 border rounded income-btn" data-id="${p.id}">+Stock</button>
         <button class="px-3 py-2 border rounded edit-btn" data-id="${p.id}">Editar</button>
-      </div>
-    `;
+      </div>`;
     container.appendChild(card);
   }
   $$('.sell-btn').forEach(b=> b.onclick = ()=> quickSellPrompt(b.dataset.id));
   $$('.income-btn').forEach(b=> b.onclick = ()=> openIncome(b.dataset.id));
   $$('.edit-btn').forEach(b=> b.onclick = ()=> openProductModal(STATE.products.find(x=>x.id===b.dataset.id)));
 }
-
 function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* ---------- Product CRUD ---------- */
 $('#btn-add-product').addEventListener('click', ()=> openProductModal());
 function openProductModal(product){
-  $('#form-product').reset();
-  $('#product-id').value = '';
+  $('#form-product').reset(); $('#product-id').value = '';
   if(product){
-    $('#product-id').value = product.id;
-    $('#product-name').value = product.name;
-    $('#product-category').value = product.category||'';
-    $('#product-price').value = product.price||0;
-    $('#product-barcode').value = product.barcode||'';
-    $('#product-stock').value = product.stock||0;
+    $('#product-id').value = product.id; $('#product-name').value = product.name; $('#product-category').value = product.category||''; $('#product-price').value = product.price||0; $('#product-barcode').value = product.barcode||''; $('#product-stock').value = product.stock||0;
   }
   openModal('modal-product');
 }
 $('#form-product').addEventListener('submit', async e=>{
   e.preventDefault();
   const id = $('#product-id').value || uid();
-  const prod = {
-    id,
-    name: $('#product-name').value.trim(),
-    category: $('#product-category').value.trim(),
-    price: Number($('#product-price').value)||0,
-    barcode: $('#product-barcode').value.trim(),
-    stock: Number($('#product-stock').value)||0,
-    createdAt: new Date().toISOString()
-  };
-  // upsert in STATE
+  const prod = { id, name: $('#product-name').value.trim(), category: $('#product-category').value.trim(), price: Number($('#product-price').value)||0, barcode: $('#product-barcode').value.trim(), stock: Number($('#product-stock').value)||0, createdAt: new Date().toISOString() };
   const idx = STATE.products.findIndex(x=>x.id===id);
   if(idx >= 0) STATE.products[idx] = prod; else STATE.products.unshift(prod);
-  renderInventory();
-  renderQuickSelect();
+  renderInventory(); renderQuickSelect();
   await pushStateToCloud();
   closeModalId('modal-product');
 });
 
-/* ---------- INCOME (stock add) ---------- */
+/* ---------- Income ---------- */
 function openIncome(productId){
-  $('#income-product').value = productId; // not present - we will show simple prompt
-  const qtyStr = prompt('Cantidad a agregar (ingreso):','1');
-  if(!qtyStr) return;
+  const qtyStr = prompt('Cantidad a agregar (ingreso):','1'); if(!qtyStr) return;
   const qty = Math.max(1, Number(qtyStr));
   const p = STATE.products.find(x=>x.id===productId);
   if(!p) return alert('Producto no encontrado');
-  p.stock = (p.stock||0) + qty;
-  STATE.products = STATE.products.map(x=> x.id===p.id ? p : x);
-  addMovement({ id: uid(), type: 'income', productId: p.id, qty, date: new Date().toISOString() });
-  pushStateToCloud();
+  p.stock = (p.stock||0) + qty; STATE.products = STATE.products.map(x=> x.id===p.id ? p : x);
+  awaitPushSafe();
   renderInventory();
 }
+async function awaitPushSafe(){ try{ await pushStateToCloud(); }catch(e){ console.warn(e); } }
 
-/* ---------- Movements (simplified) ---------- */
-async function addMovement(mov){
-  // we keep movements inside sales/movements if needed, but here we record via sales array or movements array within STATE.sales or separate - for simplicity sales/movements stored in sales array with type.
-  // not required separately for basic reporting
-  return;
-}
-
-/* ---------- SALES quick & detailed (quick implemented) ---------- */
+/* ---------- SALES (quick) ---------- */
 let quickCart = [];
 function renderQuickSelect(){
   const sel = $('#quick-product'); sel.innerHTML = '';
   STATE.products.forEach(p=>{ const o = document.createElement('option'); o.value = p.id; o.textContent = `${p.name} (stock ${p.stock||0})`; sel.appendChild(o); });
   updateQuickTotal();
 }
-
 $('#btn-open-quick').addEventListener('click', ()=>{ renderQuickSelect(); openModal('modal-quick'); });
 
 $('#quick-search').addEventListener('input', (e)=>{
   const q = e.target.value.trim().toLowerCase();
   showQuickSuggestions(q);
-  // substring match -> choose first result automatically
   if(q.length >= 1){
     const found = STATE.products.find(p => p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q));
     if(found) $('#quick-product').value = found.id;
   }
   updateQuickTotal();
 });
-
 function showQuickSuggestions(q){
   const box = $('#quick-suggestions'); box.innerHTML=''; box.classList.add('hidden');
   if(!q) return;
   const results = STATE.products.filter(p => p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q)).slice(0,8);
   if(results.length===0) return;
   for(const p of results){
-    const d = document.createElement('div'); d.className = 'suggestion-item'; d.innerHTML = `<div class="font-medium">${p.name}</div><div class="text-xs text-gray-500">${p.barcode||''} • ${p.category||''}</div>`;
+    const d = document.createElement('div'); d.className='suggestion-item'; d.innerHTML = `<div style="font-weight:600">${p.name}</div><div class="small-muted">${p.barcode||''} • ${p.category||''}</div>`;
     d.onclick = ()=>{ $('#quick-product').value = p.id; $('#quick-suggestions').classList.add('hidden'); $('#quick-search').value = ''; updateQuickTotal(); };
     box.appendChild(d);
   }
   box.classList.remove('hidden');
 }
-
 $('#quick-product').addEventListener('change', updateQuickTotal);
 $('#quick-qty').addEventListener('input', updateQuickTotal);
-function updateQuickTotal(){
-  const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||0;
-  const p = STATE.products.find(x=>x.id===pid);
-  $('#quick-total').textContent = money(p ? p.price * qty : 0);
-}
+function updateQuickTotal(){ const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||0; const p = STATE.products.find(x=>x.id===pid); $('#quick-total').textContent = money(p ? p.price * qty : 0); }
+
 $('#quick-add').addEventListener('click', ()=>{
-  const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||1;
-  const p = STATE.products.find(x=>x.id===pid); if(!p) return alert('Selecciona producto');
-  quickCart.push({ productId: pid, qty, price: p.price });
-  renderQuickCart();
+  const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||1; const p = STATE.products.find(x=>x.id===pid); if(!p) return alert('Selecciona producto');
+  quickCart.push({ productId: pid, qty, price: p.price }); renderQuickCart();
 });
-function renderQuickCart(){
-  const el = $('#quick-cart'); el.innerHTML='';
-  quickCart.forEach((it,idx)=>{
-    const p = STATE.products.find(x=>x.id===it.productId);
-    const div = document.createElement('div'); div.className='flex justify-between items-center';
-    div.innerHTML = `<div>${p.name} x ${it.qty}</div><div>S/ ${money(it.qty*it.price)} <button data-idx="${idx}" class="text-sm text-red-600 btn-quick-remove ml-2">Quitar</button></div>`;
-    el.appendChild(div);
-  });
-  $$('.btn-quick-remove').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); });
-}
+function renderQuickCart(){ const el = $('#quick-cart'); el.innerHTML=''; quickCart.forEach((it,idx)=>{ const p = STATE.products.find(x=>x.id===it.productId); const d = document.createElement('div'); d.className='flex justify-between items-center'; d.innerHTML = `<div>${p.name} x ${it.qty}</div><div>S/ ${money(it.qty*it.price)} <button data-idx="${idx}" class="text-sm text-red-600 btn-qrem ml-2">Quitar</button></div>`; el.appendChild(d); }); $$('.btn-qrem').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); }); }
+
 $('#form-quick').addEventListener('submit', async e=>{
   e.preventDefault();
   if(quickCart.length===0) return alert('Agregar productos al carrito');
-  const customer = $('#quick-customer').value.trim();
-  const payment = $('#quick-payment').value;
-  // reduce stock & record sale
-  for(const it of quickCart){
-    const p = STATE.products.find(x=>x.id===it.productId);
-    if(p) p.stock = (p.stock||0) - it.qty;
-  }
+  const customer = $('#quick-customer').value.trim(); const payment = $('#quick-payment').value;
+  for(const it of quickCart){ const p = STATE.products.find(x=>x.id===it.productId); if(p) p.stock = (p.stock||0) - it.qty; }
   const total = quickCart.reduce((s,i)=>s + i.qty*i.price,0);
-  const sale = { id: uid(), items: quickCart.slice(), total, date: new Date().toISOString(), customerName: customer||null, paid: (payment !== 'A_CREDITO'), paymentType: payment, responsible: ($('#responsible-name').value.trim() || null) };
+  const sale = { id: uid(), items: quickCart.slice(), total, date: new Date().toISOString(), customerName: customer||null, paid: (payment !== 'A_CREDITO'), paymentType: payment, responsible: ($('#responsible-name').value.trim()||null) };
   STATE.sales.unshift(sale);
-  if(payment === 'A_CREDITO' && customer){
-    const existing = STATE.customers.find(c=>c.name === customer);
-    if(existing) existing.balance = (existing.balance||0) + total; else STATE.customers.push({ name: customer, balance: total, createdAt: new Date().toISOString() });
-  }
-  quickCart = [];
-  renderQuickCart();
-  renderInventory();
-  renderClients();
-  updateCharts();
+  if(payment === 'A_CREDITO' && customer){ const existing = STATE.customers.find(c=>c.name === customer); if(existing) existing.balance = (existing.balance||0) + total; else STATE.customers.push({ name: customer, balance: total, createdAt: new Date().toISOString() }); }
+  quickCart = []; renderQuickCart(); renderInventory(); renderClients(); updateCharts();
   await pushStateToCloud();
-  closeModalId('modal-quick');
-  alert('Venta registrada');
+  closeModalId('modal-quick'); alert('Venta registrada');
 });
 
-/* Quick sell from inventory button */
+/* ---------- Quick sell from product card ---------- */
 async function quickSellPrompt(productId){
   const qtyStr = prompt('Cantidad a vender (rápido):','1'); if(!qtyStr) return;
   const qty = Math.max(1, Number(qtyStr));
   const payment = (prompt('Tipo pago: EFECTIVO, YAPE o A_CREDITO','EFECTIVO') || 'EFECTIVO').toUpperCase();
   let customerName = null; if(payment === 'A_CREDITO') customerName = prompt('Nombre del cliente:') || null;
-  const prod = STATE.products.find(p=>p.id===productId); if(!prod) return alert('No encontrado');
-  prod.stock = (prod.stock||0) - qty;
-  STATE.products = STATE.products.map(x=> x.id===prod.id ? prod : x);
-  const total = qty * prod.price;
-  const sale = { id: uid(), items:[{productId: prod.id, qty, price: prod.price}], total, date: new Date().toISOString(), customerName: customerName||null, paid: (payment !== 'A_CREDITO'), paymentType: payment, responsible: ($('#responsible-name').value.trim()||null) };
-  STATE.sales.unshift(sale);
+  const p = STATE.products.find(x=>x.id===productId); if(!p) return alert('No encontrado');
+  p.stock = (p.stock||0) - qty; STATE.products = STATE.products.map(x=> x.id===p.id ? p : x);
+  const total = qty * p.price;
+  STATE.sales.unshift({ id: uid(), items:[{ productId: p.id, qty, price: p.price }], total, date: new Date().toISOString(), customerName: customerName||null, paid: (payment !== 'A_CREDITO'), paymentType: payment, responsible: ($('#responsible-name').value.trim()||null) });
   if(payment === 'A_CREDITO' && customerName){ const c = STATE.customers.find(x=>x.name===customerName); if(c) c.balance = (c.balance||0) + total; else STATE.customers.push({ name: customerName, balance: total, createdAt: new Date().toISOString() }); }
-  renderInventory(); renderClients(); updateCharts();
-  await pushStateToCloud();
+  renderInventory(); renderClients(); updateCharts(); await pushStateToCloud();
 }
 
 /* ---------- CLIENTS ---------- */
 $('#btn-open-clients').addEventListener('click', ()=> openModal('modal-clients'));
 $('#btn-add-client').addEventListener('click', async ()=>{
   const name = $('#client-name').value.trim(); if(!name) return alert('Ingresa nombre');
-  const existing = STATE.customers.find(c=>c.name === name);
-  if(existing) return alert('Cliente ya existe');
-  STATE.customers.push({ name, balance: 0, createdAt: new Date().toISOString() });
-  $('#client-name').value = '';
-  renderClients();
-  await pushStateToCloud();
+  const existing = STATE.customers.find(c=>c.name === name); if(existing) return alert('Cliente ya existe');
+  STATE.customers.push({ name, balance: 0, createdAt: new Date().toISOString() }); $('#client-name').value=''; renderClients(); await pushStateToCloud();
 });
-function renderClients(){
-  const el = $('#clients-list'); el.innerHTML = '';
-  if((STATE.customers||[]).length === 0) el.innerHTML = '<div class="text-sm text-gray-600">No hay clientes</div>';
-  for(const c of STATE.customers){
-    const d = document.createElement('div'); d.className = 'p-2 border rounded bg-white flex justify-between items-center';
-    d.innerHTML = `<div><div class="font-medium">${c.name}</div><div class="text-xs text-gray-500">Saldo: S/ ${money(c.balance||0)}</div></div><div class="flex gap-2"><button data-name="${c.name}" class="px-3 py-1 border btn-abono">Abono</button><button data-name="${c.name}" class="px-3 py-1 bg-green-600 text-white btn-saldar">Saldar</button></div>`;
-    el.appendChild(d);
-  }
-  $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name = b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = STATE.customers.find(x=>x.name===name); c.balance = Math.max(0, (c.balance||0) - amt); await pushStateToCloud(); renderClients(); });
-  $$('.btn-saldar').forEach(b=> b.onclick = async ()=>{ const name = b.dataset.name; if(!confirm(`Saldar cuenta de ${name}?`)) return; const c = STATE.customers.find(x=>x.name===name); c.balance = 0; await pushStateToCloud(); renderClients(); });
+function renderClients(){ const el = $('#clients-list'); el.innerHTML=''; if((STATE.customers||[]).length===0) el.innerHTML = '<div class="small-muted">No hay clientes</div>'; for(const c of STATE.customers){ const d = document.createElement('div'); d.className='p-2 border rounded bg-white flex justify-between items-center'; d.innerHTML = `<div><div style="font-weight:600">${c.name}</div><div class="small-muted">Saldo: S/ ${money(c.balance||0)}</div></div><div style="display:flex;gap:8px"><button data-name="${c.name}" class="px-3 py-1 border btn-abono">Abono</button><button data-name="${c.name}" class="px-3 py-1 bg-green-600 text-white btn-saldar">Saldar</button></div>`; el.appendChild(d); }
+  $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = STATE.customers.find(x=>x.name===name); c.balance = Math.max(0,(c.balance||0) - amt); await pushStateToCloud(); renderClients(); });
+  $$('.btn-saldar').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; if(!confirm(`Saldar cuenta de ${name}?`)) return; const c=STATE.customers.find(x=>x.name===name); c.balance=0; await pushStateToCloud(); renderClients(); });
 }
 
-/* ---------- RESPONSIBLE (uno por día) ---------- */
+/* ---------- RESPONSIBLE ---------- */
 $('#save-responsible').addEventListener('click', async ()=>{
   const date = $('#responsible-date').value; const name = $('#responsible-name').value.trim();
   if(!date) return alert('Selecciona fecha');
   const idx = STATE.responsibles.findIndex(r=>r.date === date);
   if(idx >= 0) STATE.responsibles[idx].name = name; else STATE.responsibles.push({ date, name });
-  await pushStateToCloud();
-  updateResponsibleBanner();
+  await pushStateToCloud(); updateResponsibleBanner();
 });
-function updateResponsibleBanner(){
-  const today = todayYMD();
-  $('#responsible-date').value = today;
-  const r = (STATE.responsibles || []).find(x=>x.date === today);
-  if(r && r.name){ $('#responsible-display').textContent = `${r.name} (${today})`; $('#responsible-name').value = r.name; } else { $('#responsible-display').textContent = 'Sin encargado asignado para hoy'; $('#responsible-name').value = ''; }
-}
+function updateResponsibleBanner(){ const today = todayYMD(); $('#responsible-date').value = today; const r = (STATE.responsibles||[]).find(x=>x.date===today); if(r && r.name){ $('#responsible-display').textContent = `${r.name} (${today})`; $('#responsible-name').value = r.name; } else { $('#responsible-display').textContent = 'Sin encargado asignado para hoy'; $('#responsible-name').value = ''; } }
 
 /* ---------- CHARTS ---------- */
 let chartSales, chartStock;
@@ -604,17 +544,16 @@ function updateCharts(){
     const top = (STATE.products||[]).slice().sort((a,b)=>b.stock - a.stock).slice(0,6);
     const ctxSt = $('#chart-stock').getContext('2d'); if(chartStock) chartStock.destroy();
     chartStock = new Chart(ctxSt, { type:'pie', data:{ labels: top.map(p=>p.name), datasets:[{ data: top.map(p=>p.stock) }] }, options:{ responsive:true }});
-  }catch(e){ console.warn(e); }
+  }catch(e){ console.warn('chart err', e); }
 }
 
-/* ---------- REPORTS PDF (A4) ---------- */
-async function buildDailyHTML(date){
+/* ---------- REPORTS (Ventas + Inventario in same PDF, font-size 12) ---------- */
+async function buildDailyWithInventoryHTML(date){
+  // Sales
   const daySales = (STATE.sales||[]).filter(s => s.date.slice(0,10) === date).sort((a,b)=>a.date.localeCompare(b.date));
   const creditSales = daySales.filter(s=> s.paymentType === 'A_CREDITO' || !s.paid);
-  const r = (STATE.responsibles||[]).find(x=>x.date === date);
-  const responsibleName = r ? r.name : '';
-  let rows = '';
-  let total = 0;
+  const r = (STATE.responsibles||[]).find(x=>x.date === date); const responsibleName = r ? r.name : '';
+  let rows = ''; let total = 0;
   for(const s of daySales){
     total += Number(s.total||0);
     const t = new Date(s.date).toLocaleTimeString();
@@ -623,38 +562,55 @@ async function buildDailyHTML(date){
     rows += `<tr><td style="padding:6px">${t}</td><td style="padding:6px">${s.id}</td><td style="padding:6px">${s.customerName||'-'}</td><td style="padding:6px">${s.responsible||'-'}</td><td style="padding:6px">${payment}</td><td style="padding:6px">${items}</td><td style="padding:6px;text-align:right">S/ ${money(s.total)}</td></tr>`;
   }
   const creditRows = creditSales.map(s=>{ const t = new Date(s.date).toLocaleTimeString(); const items = s.items.map(it=>{ const p = STATE.products.find(pp=>pp.id===it.productId); return `${p? p.name: it.productId} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>'); return `<tr><td style="padding:6px">${t}</td><td style="padding:6px">${s.id}</td><td style="padding:6px">${s.customerName||'-'}</td><td style="padding:6px">${s.responsible||'-'}</td><td style="padding:6px">${s.paymentType||'A_CREDITO'}</td><td style="padding:6px">${items}</td><td style="padding:6px;text-align:right">S/ ${money(s.total)}</td></tr>`; }).join('');
+
+  // Inventory table
+  const products = (STATE.products||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  let invRows = '';
+  for(const p of products){
+    invRows += `<tr><td style="padding:6px">${escapeHtml(p.name)}</td><td style="padding:6px">${escapeHtml(p.category||'')}</td><td style="padding:6px">${escapeHtml(p.barcode||'')}</td><td style="padding:6px;text-align:right">${p.stock||0}</td><td style="padding:6px;text-align:right">S/ ${money(p.price)}</td></tr>`;
+  }
+
   const html = `
-    <div style="font-family:Arial,Helvetica,sans-serif;color:#111;padding:8mm">
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <div><h1 style="margin:0;font-size:18px">MINIMARKET LA ESQUINA DEL AHORRO</h1><div style="font-size:12px">Reporte del dia: <strong>${date}</strong></div></div>
-        <div style="text-align:right;font-size:12px">Generado: ${new Date().toLocaleString()}<br>Encargado: ${responsibleName || '-'}</div>
+  <div style="font-family:Arial,Helvetica,sans-serif;color:#111;padding:8mm;font-size:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <h1 style="margin:0;font-size:18px">MINIMARKET LA ESQUINA DEL AHORRO</h1>
+        <div style="font-size:12px">Reporte del dia: <strong>${date}</strong></div>
       </div>
-      <hr style="margin:8px 0">
-      <h3 style="margin-bottom:6px">Ventas del día</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody>
-      </table>
-      <div style="text-align:right;font-weight:bold;margin-top:8px">Total (día): S/ ${money(total)}</div>
-      <hr style="margin:8px 0">
-      <h3 style="margin-bottom:6px">Ventas por cobrar (A CREDITO)</h3>
-      <table style="width:100%;border-collapse:collapse;font-size:12px">
-        <thead><tr><th style="background:#f3f4f6;padding:6px">Hora</th><th style="background:#f3f4f6;padding:6px">ID</th><th style="background:#f3f4f6;padding:6px">Cliente</th><th style="background:#f3f4f6;padding:6px">Encargado</th><th style="background:#f3f4f6;padding:6px">Pago</th><th style="background:#f3f4f6;padding:6px">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead>
-        <tbody>${creditRows.length ? creditRows : '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas por cobrar</td></tr>'}</tbody>
-      </table>
-      <div style="font-size:11px;color:#666;margin-top:10px">Reporte generado por TiendaSmart — MINIMARKET LA ESQUINA DEL AHORRO</div>
-    </div>`;
+      <div style="text-align:right;font-size:12px">Generado: ${new Date().toLocaleString()}<br>Encargado: ${responsibleName || '-'}</div>
+    </div>
+    <hr style="margin:8px 0">
+    <h3 style="margin-bottom:6px">Ventas del día</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody>
+    </table>
+    <div style="text-align:right;font-weight:bold;margin-top:8px">Total (día): S/ ${money(total)}</div>
+    <hr style="margin:8px 0">
+    <h3 style="margin-bottom:6px">Ventas por cobrar (A CREDITO)</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr><th style="background:#f3f4f6;padding:6px">Hora</th><th style="background:#f3f4f6;padding:6px">ID</th><th style="background:#f3f4f6;padding:6px">Cliente</th><th style="background:#f3f4f6;padding:6px">Encargado</th><th style="background:#f3f4f6;padding:6px">Pago</th><th style="background:#f3f4f6;padding:6px">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead>
+      <tbody>${creditRows.length ? creditRows : '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas por cobrar</td></tr>'}</tbody>
+    </table>
+
+    <hr style="margin:12px 0">
+    <h3 style="margin-bottom:6px">Reporte de Inventario</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Nombre</th><th style="background:#f3f4f6;padding:6px;text-align:left">Categoría</th><th style="background:#f3f4f6;padding:6px;text-align:left">Código</th><th style="background:#f3f4f6;padding:6px;text-align:right">Stock</th><th style="background:#f3f4f6;padding:6px;text-align:right">Precio</th></tr></thead>
+      <tbody>${invRows || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#666">No hay productos</td></tr>'}</tbody>
+    </table>
+    <div style="font-size:11px;color:#666;margin-top:10px">Reporte generado por TiendaSmart — MINIMARKET LA ESQUINA DEL AHORRO</div>
+  </div>`;
   return html;
 }
 
-async function downloadDailyPDF(date){
+async function downloadCombinedPDF(date){
   if(!date) return alert('Selecciona fecha');
-  const html = await buildDailyHTML(date);
-  // convert with html2canvas + jsPDF and pagination
+  const html = await buildDailyWithInventoryHTML(date);
   const wrapper = document.createElement('div'); wrapper.style.width='1123px'; wrapper.style.background='#fff'; wrapper.innerHTML = html; document.body.appendChild(wrapper);
   try{
-    const scale = 2.5;
-    const canvas = await html2canvas(wrapper, { scale, useCORS:true, logging:false, windowWidth:wrapper.scrollWidth, windowHeight:wrapper.scrollHeight });
+    const scale = 2.2;
+    const canvas = await html2canvas(wrapper, { scale, useCORS:true, logging:false, windowWidth: wrapper.scrollWidth, windowHeight: wrapper.scrollHeight });
     const imgData = canvas.toDataURL('image/png',1.0);
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p','mm','a4');
@@ -666,7 +622,7 @@ async function downloadDailyPDF(date){
       pdf.addImage(imgData,'PNG',margin,margin,usableW,imgHeightMM);
     } else {
       const pxPerPage = Math.floor((pageH - margin*2) / pxToMm);
-      let pos = 0, page=0, remaining = canvas.height;
+      let pos = 0, remaining = canvas.height, page=0;
       while(remaining > 0){
         const h = Math.min(pxPerPage, remaining);
         const tmp = document.createElement('canvas'); tmp.width = canvas.width; tmp.height = h;
@@ -685,24 +641,21 @@ async function downloadDailyPDF(date){
   wrapper.remove();
 }
 
-/* Bind report UI */
 $('#btn-open-reports').addEventListener('click', ()=> { $('#report-date').value = todayYMD(); openModal('modal-reports'); });
-$('#btn-preview-day').addEventListener('click', async ()=> { const d = $('#report-date').value || todayYMD(); const html = await buildDailyHTML(d); $('#report-preview').innerHTML = html; });
-$('#btn-download-day').addEventListener('click', async ()=> { const d = $('#report-date').value || todayYMD(); await downloadDailyPDF(d); });
-$('#btn-print-day').addEventListener('click', async ()=> { const d = $('#report-date').value || todayYMD(); const html = await buildDailyHTML(d); printHTML(html, `Reporte del dia ${d}`); });
+$('#btn-preview-day').addEventListener('click', async ()=> { const d = $('#report-date').value || todayYMD(); const html = await buildDailyWithInventoryHTML(d); $('#report-preview').innerHTML = html; });
+$('#btn-download-day').addEventListener('click', async ()=> { const d = $('#report-date').value || todayYMD(); await downloadCombinedPDF(d); });
+$('#btn-print-day').addEventListener('click', async ()=> { const d = $('#report-date').value || todayYMD(); const html = await buildDailyWithInventoryHTML(d); printHTML(html, `Reporte del dia ${d}`); });
 
-function printHTML(html, title='Reporte'){ const w = window.open('','_blank'); if(!w) return alert('Permite popups'); w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:Arial,Helvetica,sans-serif;margin:10mm} table{width:100%;border-collapse:collapse} th{background:#f3f4f6;padding:6px;text-align:left} td{padding:6px;border-bottom:1px solid #eee}</style></head><body>${html}</body></html>`); w.document.close(); w.focus(); setTimeout(()=>w.print(),700); }
+function printHTML(html, title='Reporte'){ const w = window.open('','_blank'); if(!w) return alert('Permite popups'); w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:Arial,Helvetica,sans-serif;margin:10mm;font-size:12px} table{width:100%;border-collapse:collapse} th{background:#f3f4f6;padding:6px;text-align:left} td{padding:6px;border-bottom:1px solid #eee}</style></head><body>${html}</body></html>`); w.document.close(); w.focus(); setTimeout(()=>w.print(),700); }
 
-/* ---------- IMPORT / EXPORT XLSX (SheetJS) ---------- */
-/* Columns fixed: name,category,price,barcode,stock */
-$('#btn-export-xlsx').addEventListener('click', async ()=>{
+/* ---------- XLSX import/export ---------- */
+$('#btn-export-xlsx').addEventListener('click', ()=>{
   const headers = ['name','category','price','barcode','stock'];
   const rows = STATE.products.map(p => ({ name: p.name, category: p.category||'', price: p.price||0, barcode: p.barcode||'', stock: p.stock||0 }));
   const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
   XLSX.writeFile(wb, `inventario_${new Date().toISOString().slice(0,10)}.xlsx`);
 });
-
 $('#btn-import-xlsx').addEventListener('click', ()=> $('#file-xlsx').click());
 $('#file-xlsx').addEventListener('change', async (e)=>{
   const f = e.target.files[0]; if(!f) return;
@@ -710,37 +663,20 @@ $('#file-xlsx').addEventListener('change', async (e)=>{
   const workbook = XLSX.read(data, { type: 'array' });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-  // validate columns
   if(json.length === 0) return alert('Hoja vacía');
   const keys = Object.keys(json[0]).map(k => k.toString().toLowerCase());
   const required = ['name','category','price','barcode','stock'];
   const missing = required.filter(r => !keys.includes(r));
   if(missing.length > 0) return alert('Formato inválido. Columnas requeridas: ' + required.join(', '));
   if(!confirm(`Importar ${json.length} productos (se actualizarán/crearán)?`)) return;
-  // upsert: use barcode as unique if id absent
   for(const row of json){
-    const name = row.name || '';
-    const category = row.category || '';
-    const price = Number(row.price) || 0;
-    const barcode = String(row.barcode || '').trim();
-    const stock = Number(row.stock) || 0;
-    // try match by barcode
+    const name = row.name || ''; const category = row.category || ''; const price = Number(row.price) || 0; const barcode = String(row.barcode || '').trim(); const stock = Number(row.stock) || 0;
     let existing = STATE.products.find(p => (p.barcode || '') === barcode && barcode !== '');
-    if(!existing && name){
-      // match by name
-      existing = STATE.products.find(p => p.name.toLowerCase() === name.toLowerCase());
-    }
-    if(existing){
-      existing.name = name; existing.category = category; existing.price = price; existing.barcode = barcode; existing.stock = stock;
-    } else {
-      STATE.products.push({ id: uid(), name, category, price, barcode, stock, createdAt: new Date().toISOString() });
-    }
+    if(!existing && name) existing = STATE.products.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if(existing){ existing.name = name; existing.category = category; existing.price = price; existing.barcode = barcode; existing.stock = stock; }
+    else STATE.products.push({ id: uid(), name, category, price, barcode, stock, createdAt: new Date().toISOString() });
   }
-  await pushStateToCloud();
-  renderInventory();
-  renderQuickSelect();
-  alert('Importación finalizada');
-  e.target.value = '';
+  await pushStateToCloud(); renderInventory(); renderQuickSelect(); alert('Importación finalizada'); e.target.value = '';
 });
 
 /* ---------- SCANNER (BarcodeDetector + Quagga fallback) ---------- */
@@ -750,21 +686,20 @@ const READ_CONFIRM = 3, WINDOW_MS = 2000;
 const overlay = $('#overlay-canvas'); let octx;
 
 function resizeOverlay(){ overlay.width = video.clientWidth; overlay.height = video.clientHeight; octx = overlay.getContext('2d'); }
-function clearOverlay(){ if(!octx) resizeOverlay(); octx && octx.clearRect(0,0,overlay.width, overlay.height); }
+function clearOverlay(){ if(!octx) resizeOverlay(); octx && octx.clearRect(0,0,overlay.width,overlay.height); }
 function pushRead(code){ const now = Date.now(); readBuffer = readBuffer.filter(r => now - r.t < WINDOW_MS); readBuffer.push({ code, t: now }); const last = readBuffer.slice(-READ_CONFIRM); if(last.length >= READ_CONFIRM && last.every(x=> x.code === last[0].code)) return last[0].code; return null; }
 
 async function startCameraHighRes(){
   const constraints = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio:false };
   videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-  video.srcObject = videoStream; currentTrack = videoStream.getVideoTracks()[0];
+  video.srcObject = videoStream; currentTrack = videoStream.getTracks()[0];
   await video.play(); resizeOverlay();
   const caps = currentTrack.getCapabilities ? currentTrack.getCapabilities() : {};
   if(caps && caps.torch) $('#btn-toggle-torch').classList.remove('hidden'); else $('#btn-toggle-torch').classList.add('hidden');
 }
 
 async function startDetection(){
-  $('#scanned-code').value = '';
-  readBuffer = [];
+  $('#scanned-code').value = ''; readBuffer = [];
   try{
     if('BarcodeDetector' in window){
       const detector = new BarcodeDetector({ formats: ['ean_13','code_128','upc_e','upc_a','ean_8'] });
@@ -774,29 +709,23 @@ async function startDetection(){
         if(!video || video.readyState < 2){ await new Promise(r=>setTimeout(r,100)); continue; }
         try{
           const canvas = document.createElement('canvas'); canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-          const ctx = canvas.getContext('2d'); ctx.drawImage(video,0,0,canvas.width, canvas.height);
+          const ctx = canvas.getContext('2d'); ctx.drawImage(video,0,0,canvas.width,canvas.height);
           const bitmap = await createImageBitmap(canvas);
           const roi = { sx: Math.floor(canvas.width*0.2), sy: Math.floor(canvas.height*0.36), sw: Math.floor(canvas.width*0.6), sh: Math.floor(canvas.height*0.28) };
           const cropped = await createImageBitmap(bitmap, roi.sx, roi.sy, roi.sw, roi.sh);
           const barcodes = await detector.detect(cropped);
           clearOverlay(); drawROI(roi);
-          if(barcodes && barcodes.length > 0){
-            const code = (barcodes[0].rawValue || '').trim();
-            const confirmed = pushRead(code);
-            if(confirmed){ $('#scanned-code').value = confirmed; showConfirmation(confirmed); await new Promise(r=>setTimeout(r,700)); }
-          }
+          if(barcodes && barcodes.length>0){ const code = (barcodes[0].rawValue||'').trim(); const confirmed = pushRead(code); if(confirmed){ $('#scanned-code').value = confirmed; showConfirmation(confirmed); await new Promise(r=>setTimeout(r,700)); } }
           bitmap.close(); cropped.close();
         }catch(err){ console.warn('detector loop err', err); detectionLoop=false; fallbackQuagga(); break; }
         await new Promise(r=>setTimeout(r,80));
       }
-    } else {
-      fallbackQuagga();
-    }
+    } else fallbackQuagga();
   }catch(err){ console.warn('startDetection err', err); fallbackQuagga(); }
 }
 
-function drawROI(roi){ if(!octx) resizeOverlay(); const scaleX = overlay.width / (video.videoWidth||1); const scaleY = overlay.height / (video.videoHeight||1); octx.strokeStyle='rgba(0,255,100,0.9)'; octx.lineWidth = 3; octx.strokeRect(roi.sx*scaleX, roi.sy*scaleY, roi.sw*scaleX, roi.sh*scaleY); }
-function showConfirmation(text){ if(!octx) resizeOverlay(); octx.font='20px monospace'; octx.fillStyle='rgba(0,0,0,0.6)'; const x=10,y=30, w=octx.measureText(text).width+20; octx.fillRect(x,y-22,w,28); octx.fillStyle='white'; octx.fillText(text,x+8,y); }
+function drawROI(roi){ if(!octx) resizeOverlay(); const scaleX = overlay.width / (video.videoWidth||1); const scaleY = overlay.height / (video.videoHeight||1); octx.strokeStyle='rgba(0,255,100,0.9)'; octx.lineWidth=3; octx.strokeRect(roi.sx*scaleX, roi.sy*scaleY, roi.sw*scaleX, roi.sh*scaleY); }
+function showConfirmation(text){ if(!octx) resizeOverlay(); octx.font='20px monospace'; octx.fillStyle='rgba(0,0,0,0.6)'; const x=10,y=30,w=octx.measureText(text).width+20; octx.fillRect(x,y-22,w,28); octx.fillStyle='white'; octx.fillText(text,x+8,y); }
 
 function fallbackQuagga(){
   startCameraHighRes().then(()=>{
@@ -806,67 +735,53 @@ function fallbackQuagga(){
       inputStream:{ name:'Live', type:'LiveStream', target:'#video', constraints:{ facingMode:'environment', width:1280, height:720 } },
       decoder:{ readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader'] },
       locate:true
-    }, err => { if(err) { console.error(err); return; } Quagga.start(); });
-    Quagga.onProcessed(result => { clearOverlay(); if(!result) return; if(result.boxes) result.boxes.filter(b=>b!==result.box).forEach(b=> drawBox(b,'rgba(255,255,255,0.2)')); if(result.box) drawBox(result.box,'lime'); });
-    Quagga.onDetected(data => { const code = data && data.codeResult && data.codeResult.code; if(code){ const confirmed = pushRead(code); if(confirmed){ $('#scanned-code').value = confirmed; try{ Quagga.stop(); }catch(e){} } } });
-    function drawBox(path, color){ if(!octx) resizeOverlay(); octx.strokeStyle=color; octx.lineWidth=3; octx.beginPath(); octx.moveTo(path[0].x, path[0].y); for(let i=1;i<path.length;i++) octx.lineTo(path[i].x, path[i].y); octx.closePath(); octx.stroke(); }
+    }, err=>{ if(err){ console.error('Quagga init',err); return; } Quagga.start(); });
+    Quagga.onProcessed(result=>{ clearOverlay(); if(!result) return; if(result.boxes) result.boxes.filter(b=>b!==result.box).forEach(b=> drawBox(b,'rgba(255,255,255,0.2)')); if(result.box) drawBox(result.box,'lime'); });
+    Quagga.onDetected(data=>{ const code = data && data.codeResult && data.codeResult.code; if(code){ const confirmed = pushRead(code); if(confirmed){ $('#scanned-code').value = confirmed; try{ Quagga.stop(); }catch(e){} } } });
+    function drawBox(path, color){ if(!octx) resizeOverlay(); octx.strokeStyle=color; octx.lineWidth=3; octx.beginPath(); octx.moveTo(path[0].x,path[0].y); for(let i=1;i<path.length;i++) octx.lineTo(path[i].x,path[i].y); octx.closePath(); octx.stroke(); }
   }).catch(e=>console.warn('quagga camera err', e));
 }
-
-async function stopCamera(){ detectionLoop = false; if(quaggaActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} quaggaActive=false; } if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); video.srcObject = null; videoStream = null; currentTrack = null; clearOverlay(); readBuffer=[]; }
+async function stopCamera(){ detectionLoop=false; if(quaggaActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} quaggaActive=false; } if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); video.srcObject=null; videoStream=null; currentTrack=null; clearOverlay(); readBuffer=[]; }
 
 $('#btn-open-scan').addEventListener('click', ()=>{ openModal('modal-scan'); startDetection().catch(()=>{}); });
 $('#btn-stop-camera').addEventListener('click', ()=> stopCamera());
 $('#btn-fill-product').addEventListener('click', ()=> { const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código'); const p = STATE.products.find(x=> (x.barcode||'') === code || ((x.barcode||'').replace(/\D/g,'') === code.replace(/\D/g,''))); if(p) openProductModal(p); else { $('#product-barcode').value = code; openProductModal(); } });
 $('#btn-quick-sell').addEventListener('click', async ()=> { const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código'); const p = STATE.products.find(x=> (x.barcode||'') === code || ((x.barcode||'').replace(/\D/g,'') === code.replace(/\D/g,''))); if(!p){ if(!confirm('Producto no encontrado. Crear nuevo?')) return; $('#product-barcode').value = code; openProductModal(); return; } const qty = Number(prompt('Cantidad a vender','1'))||1; const payment = (prompt('Pago: EFECTIVO/YAPE/A_CREDITO','EFECTIVO')||'EFECTIVO').toUpperCase(); let customer=null; if(payment==='A_CREDITO') customer = prompt('Nombre cliente:')||null; p.stock = (p.stock||0) - qty; STATE.products = STATE.products.map(x=> x.id===p.id ? p : x); const total = qty * p.price; STATE.sales.unshift({ id: uid(), items:[{productId:p.id,qty,price:p.price}], total, date: new Date().toISOString(), customerName: customer || null, paid: (payment !== 'A_CREDITO'), paymentType: payment, responsible: ($('#responsible-name').value.trim()||null) }); if(payment==='A_CREDITO' && customer){ const c = STATE.customers.find(x=>x.name===customer); if(c) c.balance = (c.balance||0) + total; else STATE.customers.push({ name: customer, balance: total, createdAt: new Date().toISOString() }); } await pushStateToCloud(); renderInventory(); alert('Venta registrada'); });
 
-/* ---------- SEARCH header ---------- */
+/* ---------- Search header ---------- */
 $('#search').addEventListener('input', (e)=>{ const q = e.target.value.trim(); renderInventory(q); });
 
-/* ---------- Utilities & start ---------- */
+/* ---------- UI init & autosync ---------- */
 function initUI(){
-  // close all modals by default
   $$('.modal').forEach(m=> m.classList.remove('visible'));
-  // open login if not auth
-  if(!isAuth()) $('#modal-login').classList.add('visible');
-  else { $('#modal-login').classList.remove('visible'); $('#current-user').textContent = localStorage.getItem(AUTH_KEY); $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); startApp(); }
-  // attach close buttons
-  $$('.modal').forEach(mod => mod.querySelectorAll('[data-close]').forEach(b=> b.onclick = ()=> closeModalId(mod.id)));
+  if(!isAuth()) $('#modal-login').classList.add('visible'); else { $('#modal-login').classList.remove('visible'); $('#current-user').textContent = localStorage.getItem(AUTH_KEY); $('#current-user').classList.remove('hidden'); $('#btn-logout').classList.remove('hidden'); startApp(); }
+  // close modals with Escape
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape') $$('.modal.visible').forEach(m=> closeModalId(m.id)); });
 }
 
-/* startApp: load local backup from localStorage if exists and then init firebase on demand */
+/* ---------- Start logic ---------- */
 async function startApp(){
-  // load local cached state if any (fallback)
-  try{
-    const cached = localStorage.getItem('tienda_local_backup');
-    if(cached){
-      const obj = JSON.parse(cached);
-      STATE = Object.assign(STATE, obj);
-    }
-  }catch(e){ console.warn('cache read err', e); }
-  renderInventory();
-  renderQuickSelect();
-  renderClients();
-  updateCharts();
-  updateResponsibleBanner();
-  // If user clicks sync toggle, initialize Firebase automatically
+  // load local backup
+  try{ const cached = localStorage.getItem('tienda_local_backup'); if(cached){ const obj = JSON.parse(cached); STATE = Object.assign(STATE, obj); } }catch(e){ console.warn('cache read err', e); }
+  renderInventory(); renderQuickSelect(); renderClients(); updateCharts(); updateResponsibleBanner();
+  // Auto-enable Firebase cloud
+  try{ initFirebaseAuto(); }catch(e){ console.warn('auto firebase err', e); }
 }
 
-$('#btn-sync-toggle').addEventListener('click', ()=>{
-  if(cloudEnabled){ cloudEnabled = false; $('#cloud-label').textContent = 'desconectado'; $('#btn-sync-toggle').textContent = 'Activar Cloud'; return; }
-  initFirebase();
+// toggle cloud button: turn off if on
+$('#btn-sync-toggle').addEventListener('click', ()=> {
+  if(cloudEnabled){ cloudEnabled=false; $('#cloud-label').textContent='desconectado'; $('#btn-sync-toggle').textContent='Cloud OFF (auto)'; alert('Cloud desactivado (local).'); }
+  else { initFirebaseAuto(); }
 });
 
-/* save a local backup periodically */
+/* save backup local periodically */
 setInterval(()=>{ try{ localStorage.setItem('tienda_local_backup', JSON.stringify(STATE)); }catch(e){} }, 10000);
 
-/* Escape: close modals and stop camera */
-document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ $$('.modal.visible').forEach(m=> closeModalId(m.id)); } });
+/* helper: safe push */
+async function safePush(){ try{ await pushStateToCloud(); }catch(e){ console.warn(e); } }
 
-/* On load init UI */
+/* launch UI */
 initUI();
-
-/* OPTIONAL: if user already authenticated previously, auto-start */
 if(isAuth()){ closeLogin(); startApp(); }
 </script>
 </body>
