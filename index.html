@@ -4,49 +4,54 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
   <title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart (Móvil)</title>
+  <!-- Tailwind (CDN por prototipo) -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Dependencias -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
   <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <!-- Firebase compat (rellena config más abajo) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
   <style>
-    :root{ --bg:#f3f4f6; --card:#fff; --muted:#6b7280; --accent:#06b6d4; }
-    html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);-webkit-user-select:none;user-select:none}
-    .app{min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
-    header.mobile-top{height:64px;display:flex;align-items:center;padding:6px 10px;gap:8px;background:linear-gradient(90deg,#06b6d4,#3b82f6);color:white}
-    header .brand{display:flex;gap:8px;align-items:center}
-    main.content{flex:1;overflow:auto;padding:8px;box-sizing:border-box}
-    .card{background:var(--card);border-radius:10px;padding:10px;box-shadow:0 6px 20px rgba(2,6,23,0.04);margin-bottom:8px;border:1px solid #e6e6e6}
-    .card-bordered{border:2px solid rgba(15,23,42,0.04)}
-    .search-row{display:flex;gap:8px}
-    .search-row input[type="search"]{flex:1;padding:10px;border-radius:12px;border:1px solid #d1d5db;background:white}
-    .big-btn{padding:10px;border-radius:10px;min-height:44px;font-weight:700;display:flex;align-items:center;justify-content:center}
+    :root{ --bg:#f3f4f6; --card:#fff; --muted:#6b7280; --accent:#0ea5a2; --danger:#ef4444; }
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);-webkit-user-select:none;user-select:none;}
+    .app{height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+    header.mobile-top{height:76px;display:flex;align-items:center;padding:8px 12px;gap:10px;background:linear-gradient(90deg,#06b6d4,#3b82f6);color:white;}
+    header .brand{display:flex;gap:10px;align-items:center}
+    main.content{flex:1;overflow:auto;padding:10px;box-sizing:border-box;}
+    .card{background:var(--card);border-radius:12px;padding:12px;box-shadow:0 6px 20px rgba(2,6,23,0.06);margin-bottom:10px;border:1px solid #e6e6e6;}
+    .search-row{display:flex;gap:8px;position:relative}
+    .search-row input[type="search"]{flex:1;padding:12px;border-radius:12px;border:1px solid #d1d5db;background:white}
+    .big-btn{padding:12px;border-radius:12px;min-height:48px;font-weight:700;display:flex;align-items:center;justify-content:center}
     .action-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
     .inventory-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;background:linear-gradient(180deg,#fff,#fafafa);border:1px solid #d1d5db;margin-bottom:8px}
     .inventory-item .meta{font-size:15px;font-weight:700}
     .inventory-item .sub{font-size:12px;color:var(--muted)}
-    .fixed-bottom{position:fixed;left:0;right:0;bottom:0;padding:8px;background:linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,255,255,0.98));box-shadow:0 -8px 30px rgba(2,6,23,0.06);display:flex;gap:8px;align-items:center;justify-content:space-between}
-    .fixed-bottom .btn{flex:1;margin:0 6px;padding:10px;border-radius:10px;text-align:center;border:1px solid #d1d5db;background:white}
+    .fixed-bottom{position:fixed;left:0;right:0;bottom:0;padding:10px;background:linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,255,255,0.98));box-shadow:0 -8px 30px rgba(2,6,23,0.06);display:flex;gap:8px;align-items:center;justify-content:space-between}
+    .fixed-bottom .btn{flex:1;margin:0 6px;padding:12px;border-radius:12px;text-align:center;border:1px solid #d1d5db;background:white}
     .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:12px;z-index:80;background:rgba(0,0,0,0.45)}
     .modal.visible{display:flex}
-    .modal .modal-card{width:100%;max-width:420px;border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+    .modal .modal-card{width:100%;max-width:420px;border-radius:12px;overflow:hidden}
     video#video{width:100%;height:100%;object-fit:cover;border-radius:6px}
     canvas#overlay-canvas{position:absolute;left:0;top:0;pointer-events:none}
     .suggestions{position:absolute;background:white;border:1px solid #e5e7eb;border-radius:8px;max-height:240px;overflow:auto;z-index:90;width:calc(100% - 24px)}
     .small-muted{font-size:12px;color:var(--muted)}
-    .bordered-element{border:1px solid #cbd5e1;border-radius:8px;padding:6px}
-    .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:80px;background:#111;color:white;padding:8px 14px;border-radius:8px;z-index:120;display:none}
-    .toast.show{display:block}
-    /* sticky footer for modals so Save is always visible */
-    .modal-footer{margin-top:auto;padding:10px;border-top:1px solid #eee;background:linear-gradient(180deg,rgba(255,255,255,0.98),rgba(255,255,255,0.98));display:flex;gap:8px}
-    @media(min-width:420px){ .app{max-width:420px;margin:0 auto} }
+    .bordered{border:1px solid #cbd5e1;border-radius:8px}
+    /* Mobile vertical fit: reduce paddings and use full height scroller */
+    @media(max-width:420px){
+      header.mobile-top{height:64px;padding:6px}
+      .card{padding:8px;border-radius:10px}
+      .big-btn{min-height:44px;padding:10px}
+    }
+    @media(min-width:420px){ .app{max-width:420px;margin:0 auto;} }
   </style>
 </head>
 <body>
   <div class="app" role="application" aria-label="TiendaSmart móvil">
+
+    <!-- TOP -->
     <header class="mobile-top">
       <div class="brand">
         <div style="width:44px;height:44px;border-radius:8px;background:linear-gradient(180deg,#10b981,#3b82f6);display:flex;align-items:center;justify-content:center;color:white">TS</div>
@@ -58,12 +63,13 @@
       <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
         <div id="cloud-label" class="small-muted" style="color:white">desconectado</div>
         <button id="btn-open-reports" class="big-btn bg-white text-slate-700">Reportes</button>
-        <button id="btn-sync-toggle" class="big-btn bg-black text-white" title="Sincronización Cloud">Cloud OFF</button>
       </div>
     </header>
 
+    <!-- MAIN -->
     <main class="content" id="app-content">
-      <div class="card card-bordered">
+
+      <div class="card bordered">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
           <div>
             <div class="small-muted">Encargado del día</div>
@@ -72,16 +78,16 @@
           <div style="display:flex;gap:8px;align-items:center">
             <input id="responsible-date" type="date" class="px-3 py-2 rounded border bg-white small-muted"/>
             <input id="responsible-name" placeholder="Nombre encargado" class="px-3 py-2 rounded border w-36" />
-            <!-- Guardar ahora visible dentro de la tarjeta -->
             <button id="save-responsible" class="bg-indigo-600 text-white px-3 py-2 rounded">Guardar</button>
           </div>
         </div>
       </div>
 
-      <div class="card card-bordered">
+      <div class="card bordered">
         <div class="search-row">
           <input id="search" type="search" placeholder="Buscar producto o código..." />
         </div>
+
         <div class="action-grid mt-3">
           <button id="btn-add-product" class="big-btn bg-green-500 text-white">+ Producto</button>
           <button id="btn-open-scan" class="big-btn bg-yellow-400 text-white">Escanear</button>
@@ -92,26 +98,30 @@
 
       <div id="inventory-list" class="mb-24"></div>
 
-      <div class="card small-muted">
-        La app sincroniza con Firestore en la colección <code>stores/{storeId}/</code>. (Rellena configuración Firebase en el código). Las ventas e inventario se mantienen localmente y se sincronizan cuando Cloud está activado.
+      <div class="card small-muted bordered">
+        <!-- Removed statistical images by design (user requested) -->
+        La app sincroniza con Firestore en <code>MODO DE PREODUCCIÓN / DATOS</code> → campo <code>MAGALY</code>. (Las ventas se guardan y sincronizan antes de generar reportes.)
       </div>
+
     </main>
 
+    <!-- bottom -->
     <div class="fixed-bottom">
       <button id="btn-import-xlsx" class="btn">Importar</button>
       <button id="btn-export-xlsx" class="btn">Exportar</button>
-      <button id="btn-open-tools" class="btn">Herramientas</button>
+      <button id="btn-sync-toggle" class="btn" style="background:#06b6d4;color:white">Cloud auto</button>
     </div>
     <input id="file-xlsx" type="file" accept=".xlsx,.xls" class="hidden" />
 
-    <!-- PRODUCT modal -->
+    <!-- MODALES -->
+    <!-- PRODUCT -->
     <div id="modal-product" class="modal" aria-hidden="true">
-      <div class="modal-card card p-0">
-        <div style="padding:12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #eee">
+      <div class="modal-card card p-3 bordered">
+        <div style="display:flex;justify-content:space-between;align-items:center">
           <div style="font-weight:700">Producto</div>
           <button data-close class="text-xl">✕</button>
         </div>
-        <form id="form-product" style="padding:12px;display:flex;flex-direction:column;gap:8px">
+        <form id="form-product" class="mt-3 space-y-2">
           <input type="hidden" id="product-id" />
           <input id="product-name" placeholder="Nombre" required class="w-full px-3 py-2 border rounded" />
           <div style="display:flex;gap:8px;">
@@ -122,296 +132,321 @@
             <input id="product-barcode" placeholder="Código de barras" class="flex-1 px-3 py-2 border rounded" />
             <input id="product-stock" placeholder="Stock" type="number" class="w-24 px-3 py-2 border rounded" />
           </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button data-close type="button" class="px-3 py-2 border rounded">Cancelar</button>
+            <!-- Save moved inside modal (visible) -->
+            <button id="btn-save-product" type="submit" class="px-3 py-2 bg-green-600 text-white rounded">Guardar</button>
+          </div>
         </form>
-        <div class="modal-footer">
-          <button data-close type="button" class="px-3 py-2 border rounded">Cancelar</button>
-          <button id="btn-save-product" type="button" class="px-3 py-2 bg-green-600 text-white rounded">Guardar</button>
+      </div>
+    </div>
+
+    <!-- QUICK SALE modal -->
+    <div id="modal-quick" class="modal" aria-hidden="true">
+      <div class="modal-card card p-3 bordered">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-weight:700">Venta Rápida</div>
+          <button data-close class="text-xl">✕</button>
+        </div>
+        <div class="mt-3 space-y-2">
+          <div style="display:flex;gap:8px;">
+            <input id="quick-barcode" placeholder="Escanear o buscar código" class="flex-1 px-3 py-2 border rounded" />
+            <button id="quick-scan-btn" class="px-3 py-2 bg-yellow-400 rounded">Escanear</button>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <input id="quick-qty" placeholder="Cant" type="number" value="1" class="w-24 px-3 py-2 border rounded" />
+            <button id="quick-sell-btn" class="px-3 py-2 bg-red-600 text-white rounded">Vender</button>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- SCAN modal -->
     <div id="modal-scan" class="modal" aria-hidden="true">
-      <div class="modal-card card p-0">
+      <div class="modal-card card p-0 bordered">
         <div style="background:#000;color:white;padding:12px;display:flex;justify-content:space-between;align-items:center">
-          <div>Escáner</div>
-          <button data-close class="text-xl" style="color:white">✕</button>
-        </div>
-        <div style="padding:10px;display:flex;flex-direction:column;gap:8px">
-          <div class="bordered-element" id="scanner-container" style="height:260px;position:relative">
-            <video id="video"></video>
-            <canvas id="overlay-canvas"></canvas>
-            <div id="scanner-status" class="small-muted mt-2">Presiona iniciar para activar la cámara (HTTPS requerido)</div>
+          <div style="font-weight:700">Escanear código</div>
+          <div>
+            <button id="scan-register" class="px-3 py-2 bg-green-600 text-white rounded mr-2" style="display:none">Registrar</button>
+            <button id="scan-close" data-close class="px-3 py-2 border rounded">Cerrar</button>
           </div>
-          <div style="display:flex;gap:8px">
-            <button id="btn-start-scan" class="px-3 py-2 bg-indigo-600 text-white rounded flex-1">Iniciar</button>
-            <button id="btn-stop-scan" class="px-3 py-2 border rounded flex-1">Detener</button>
-            <button id="btn-scan-search" class="px-3 py-2 border rounded flex-1">Buscar</button>
-          </div>
-          <div id="scan-result" style="display:none" class="bordered-element"></div>
         </div>
-        <div class="modal-footer">
-          <button data-close type="button" class="px-3 py-2 border rounded">Cerrar</button>
+        <div style="position:relative;height:320px;">
+          <video id="video"></video>
+          <canvas id="overlay-canvas"></canvas>
+        </div>
+        <div style="padding:10px;display:flex;gap:8px;align-items:center;justify-content:space-between">
+          <div class="small-muted">Al detectar un código puedes editar/registrar o vincular a una venta.</div>
+          <div>
+            <button id="btn-scan-find" class="px-3 py-2 bg-indigo-600 text-white rounded">Buscar</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- QUICK SALE modal -->
-    <div id="modal-quick" class="modal" aria-hidden="true">
-      <div class="modal-card card p-0">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;border-bottom:1px solid #eee">
-          <div style="font-weight:700">Venta Rápida</div>
-          <button data-close class="text-xl">✕</button>
-        </div>
-        <div style="padding:12px;display:flex;flex-direction:column;gap:8px">
-          <div class="mb-2 small-muted">Puedes escanear o buscar producto y vincularlo a la venta</div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input id="quick-barcode" placeholder="Código o buscar..." class="flex-1 px-3 py-2 border rounded" />
-            <button id="quick-scan-btn" class="px-3 py-2 bg-yellow-400 rounded">Escanear</button>
-            <button id="quick-search-btn" class="px-3 py-2 border rounded">Buscar</button>
-          </div>
-          <div id="quick-product-summary" style="margin-top:8px;display:none" class="bordered-element"></div>
-        </div>
-        <div class="modal-footer">
-          <button data-close type="button" class="px-3 py-2 border rounded">Cancelar</button>
-          <button id="btn-save-sale" class="px-3 py-2 bg-red-600 text-white rounded">Registrar Venta</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- REPORT modal -->
-    <div id="modal-reports" class="modal" aria-hidden="true">
-      <div class="modal-card card p-3" style="max-width:520px">
-        <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-weight:700">Reportes</div><button data-close class="text-xl">✕</button></div>
-        <div id="reports-content" style="margin-top:10px;max-height:60vh;overflow:auto"></div>
-      </div>
-    </div>
-
-    <div id="toast" class="toast"></div>
   </div>
 
   <script>
-    // Config: rellena con tu Firebase config y storeId. Ejemplo:
-    const FIREBASE_CONFIG = {
-      apiKey: "REPLACE_ME",
-      authDomain: "REPLACE_ME",
-      projectId: "REPLACE_ME",
-      // ...rest
-    }
-    const STORE_ID = 'MAGALY'; // colección: stores/MAGALY/inventory
+    // ---------- CONFIG: rellena con tu firebaseConfig antes de usar ----------
+    const firebaseConfig = {
+      // apiKey: "...",
+      // authDomain: "...",
+      // projectId: "...",
+      // storageBucket: "...",
+      // messagingSenderId: "...",
+      // appId: "..."
+    };
 
-    // Keys
-    const DB = { inventoryKey: 'ts_inventory_v3', salesKey: 'ts_sales_v3', responsibleKey: 'ts_responsible_v1' }
-
-    // Firestore
-    let firebaseApp = null; let db = null; let cloudEnabled = false; let listening = false;
-
-    function initFirebase(){
-      if(firebaseApp) return; try{ firebaseApp = firebase.initializeApp(FIREBASE_CONFIG); db = firebase.firestore(); console.log('Firebase initialized'); }
-      catch(e){ console.error('Firebase init error', e); }
+    // Quick guard: user must paste config
+    if (!firebaseConfig || !firebaseConfig.projectId) {
+      console.warn('Por favor pega tu firebaseConfig en la variable firebaseConfig del archivo antes de usar la sincronización Cloud.');
     }
 
-    function enableCloud(enable){
-      cloudEnabled = !!enable; document.getElementById('btn-sync-toggle').textContent = cloudEnabled ? 'Cloud ON' : 'Cloud OFF';
-      document.getElementById('cloud-label').textContent = cloudEnabled ? 'conectado' : 'desconectado';
-      if(cloudEnabled){ initFirebase(); startCloudListeners(); pushAllLocalToCloud(); }
-      else stopCloudListeners();
+    // Inicializar Firebase (compat)
+    try {
+      firebase.initializeApp(firebaseConfig);
+      var db = firebase.firestore();
+    } catch (e) {
+      console.warn('Firebase no inicializado. La app funcionará en modo local hasta que se agregue la configuración.');
     }
 
-    // Start real-time listeners (inventory and sales) -- merge remote changes into localStorage
-    function startCloudListeners(){
-      if(!db || listening) return; listening = true;
-      const invRef = db.collection('stores').doc(STORE_ID).collection('inventory');
-      const salesRef = db.collection('stores').doc(STORE_ID).collection('sales');
+    // ---------- Helpers ----------
+    const $ = (id) => document.getElementById(id);
+    const showModal = (id)=> document.getElementById(id).classList.add('visible');
+    const hideModal = (id)=> document.getElementById(id).classList.remove('visible');
 
-      invRef.onSnapshot(snapshot=>{
-        const inv = loadInventory();
-        snapshot.docChanges().forEach(change=>{
-          const doc = change.doc.data(); doc.id = change.doc.id;
-          if(change.type === 'removed'){
-            // remove from local
-            const idx = inv.findIndex(i=>i.id===doc.id); if(idx>=0) inv.splice(idx,1);
-          } else {
-            const idx = inv.findIndex(i=>i.id===doc.id);
-            if(idx>=0) inv[idx] = doc; else inv.push(doc);
-          }
-        });
-        saveInventory(inv); renderInventory();
-      }, err=>console.error('inv listener',err));
+    // Local cache for faster UI
+    let productsCache = {};
+    let unsubscribeInventory = null;
+    let autoSync = true;
 
-      salesRef.onSnapshot(snapshot=>{
-        const sales = loadSales();
-        snapshot.docChanges().forEach(change=>{
-          const doc = change.doc.data(); doc.id = change.doc.id;
-          if(change.type === 'removed'){ const idx=sales.findIndex(s=>s.id===doc.id); if(idx>=0) sales.splice(idx,1); }
-          else { const idx=sales.findIndex(s=>s.id===doc.id); if(idx>=0) sales[idx]=doc; else sales.push(doc); }
-        });
-        saveSales(sales); renderReports();
-      }, err=>console.error('sales listener',err));
+    // ---------- UI bindings ----------
+    document.addEventListener('click', (e)=>{ if (e.target.matches('[data-close]')) { e.target.closest('.modal').classList.remove('visible'); stopScanner(); } });
+
+    $('save-responsible').addEventListener('click', ()=>{
+      const name = $('responsible-name').value.trim(); const date = $('responsible-date').value;
+      if (name) { localStorage.setItem('responsible_name', name); localStorage.setItem('responsible_date', date); $('responsible-display').textContent = name + (date?(' • '+date):''); }
+    });
+    // Load responsible
+    if (localStorage.getItem('responsible_name')){
+      $('responsible-display').textContent = localStorage.getItem('responsible_name') + (localStorage.getItem('responsible_date')?(' • '+localStorage.getItem('responsible_date')):'');
     }
 
-    function stopCloudListeners(){ listening=false; /* can't easily detach without saved refs in compat; reload is cheap */ }
+    // Buttons
+    $('btn-add-product').addEventListener('click', ()=>{ openProductModal(); });
+    $('btn-open-scan').addEventListener('click', ()=>{ openScanModal(); });
+    $('btn-open-quick').addEventListener('click', ()=>{ showModal('modal-quick'); });
 
-    // Push local data to cloud (simple: overwrite docs by id)
-    async function pushAllLocalToCloud(){ if(!db) return; const inv=loadInventory(); const sales=loadSales();
-      const invRef = db.collection('stores').doc(STORE_ID).collection('inventory');
-      const salesRef = db.collection('stores').doc(STORE_ID).collection('sales');
-      try{
-        for(const it of inv){ const id = it.id || generateId(); await invRef.doc(String(id)).set(it); }
-        for(const s of sales){ const id = s.id || generateId(); await salesRef.doc(String(id)).set(s); }
-        console.log('Pushed local to cloud')
-      } catch(e){ console.error('pushAllLocalToCloud',e) }
+    // IMPORT / EXPORT
+    $('btn-import-xlsx').addEventListener('click', ()=> $('file-xlsx').click());
+    $('file-xlsx').addEventListener('change', handleXlsxFile);
+    $('btn-export-xlsx').addEventListener('click', exportProductsToXlsx);
+
+    // Sync toggle
+    $('btn-sync-toggle').addEventListener('click', ()=>{ autoSync = !autoSync; $('btn-sync-toggle').textContent = autoSync? 'Cloud auto' : 'Cloud OFF'; if (autoSync) startRealtimeInventory(); else stopRealtimeInventory(); });
+
+    // PRODUCT FORM
+    $('form-product').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const id = $('product-id').value || null;
+      const p = {
+        name: $('product-name').value.trim(),
+        category: $('product-category').value.trim(),
+        price: parseFloat($('product-price').value) || 0,
+        barcode: $('product-barcode').value.trim(),
+        stock: parseInt($('product-stock').value) || 0,
+        updatedAt: firebase && firebase.firestore ? firebase.firestore.FieldValue.serverTimestamp() : new Date()
+      };
+      try { await saveProductToFirestore(p, id); hideModal('modal-product'); } catch(err){ console.error(err); alert('Error al guardar producto: '+err.message); }
+    });
+
+    // Quick sale handlers
+    $('quick-scan-btn').addEventListener('click', ()=>{ openScanModal({forQuick:true}); });
+    $('quick-sell-btn').addEventListener('click', async ()=>{
+      const code = $('quick-barcode').value.trim(); const qty = parseInt($('quick-qty').value) || 1;
+      if (!code) return alert('Ingresa o escanea un código');
+      const prod = await findProductByBarcode(code);
+      if (!prod) return alert('Producto no encontrado; escanéalo y regístralo primero.');
+      await registerSale(prod, qty);
+      hideModal('modal-quick');
+    });
+
+    // Scan modal actions
+    let scanContext = {};
+    function openScanModal(opts={}){
+      scanContext = opts;
+      showModal('modal-scan');
+      startScanner();
+      $('scan-register').style.display = 'none';
     }
 
-    // Utilities
-    function loadInventory(){ try{return JSON.parse(localStorage.getItem(DB.inventoryKey) || '[]')}catch(e){return []} }
-    function saveInventory(arr){ localStorage.setItem(DB.inventoryKey, JSON.stringify(arr)); if(cloudEnabled) pushInventoryToCloud(arr); }
-    function loadSales(){ try{return JSON.parse(localStorage.getItem(DB.salesKey) || '[]')}catch(e){return []} }
-    function saveSales(arr){ localStorage.setItem(DB.salesKey, JSON.stringify(arr)); if(cloudEnabled) pushSalesToCloud(arr); }
-    function saveResponsible(obj){ localStorage.setItem(DB.responsibleKey, JSON.stringify(obj)) }
-    function loadResponsible(){ try{return JSON.parse(localStorage.getItem(DB.responsibleKey) || 'null')}catch(e){return null} }
-
-    function generateId(){ return 'id_'+Date.now()+Math.floor(Math.random()*9999) }
-
-    async function pushInventoryToCloud(arr){ if(!db) return; const invRef = db.collection('stores').doc(STORE_ID).collection('inventory');
-      try{ for(const it of arr){ const id = it.id || generateId(); await invRef.doc(String(id)).set(it); } } catch(e){console.error('pushInventoryToCloud',e)} }
-    async function pushSalesToCloud(arr){ if(!db) return; const salesRef = db.collection('stores').doc(STORE_ID).collection('sales');
-      try{ for(const s of arr){ const id = s.id || generateId(); await salesRef.doc(String(id)).set(s); } } catch(e){console.error('pushSalesToCloud',e)} }
-
-    // UI helpers
-    function showToast(msg, time=1600){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), time) }
-
-    document.addEventListener('DOMContentLoaded', ()=>{ bindUI(); renderInventory(); renderReports(); loadResponsibleToUI(); })
-
-    function bindUI(){
-      document.getElementById('btn-add-product').addEventListener('click', ()=>openProductModal())
-      document.getElementById('btn-open-scan').addEventListener('click', ()=>openModal('modal-scan'))
-      document.getElementById('btn-open-quick').addEventListener('click', ()=>openModal('modal-quick'))
-      document.getElementById('btn-open-reports').addEventListener('click', ()=>openModal('modal-reports'))
-
-      document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click', ()=>closeAllModals()))
-
-      document.getElementById('btn-save-product').addEventListener('click', ()=>{ saveProductFromForm(); closeAllModals(); })
-
-      document.getElementById('quick-search-btn').addEventListener('click', quickSearch)
-      document.getElementById('quick-scan-btn').addEventListener('click', ()=>{ openModal('modal-scan'); startScannerForQuick(); })
-      document.getElementById('btn-save-sale').addEventListener('click', saveQuickSale)
-
-      document.getElementById('btn-start-scan').addEventListener('click', startScanner)
-      document.getElementById('btn-stop-scan').addEventListener('click', stopScanner)
-      document.getElementById('btn-scan-search').addEventListener('click', ()=>{ const el = document.getElementById('scan-result'); if(el.dataset.code) manualScanSearch(el.dataset.code) })
-
-      document.getElementById('search').addEventListener('input', e=>{ const q=e.target.value.trim(); renderInventory(q) })
-
-      document.getElementById('btn-import-xlsx').addEventListener('click', ()=>document.getElementById('file-xlsx').click())
-      document.getElementById('file-xlsx').addEventListener('change', handleXlsxImport)
-      document.getElementById('btn-export-xlsx').addEventListener('click', exportXlsx)
-      document.getElementById('btn-sync-toggle').addEventListener('click', ()=>{ if(!cloudEnabled){ initFirebase(); enableCloud(true); } else enableCloud(false) })
-
-      document.getElementById('save-responsible').addEventListener('click', ()=>{ const d=document.getElementById('responsible-date').value; const n=document.getElementById('responsible-name').value.trim(); const obj={date:d,name:n}; saveResponsible(obj); document.getElementById('responsible-display').textContent = `${n} · ${d}`; showToast('Responsable guardado') })
-    }
-
-    // INVENTORY RENDER
-    function renderInventory(filter=''){
-      const list=document.getElementById('inventory-list'); list.innerHTML='';
-      const inv = loadInventory(); const q = (filter||'').toLowerCase();
-      const items = inv.filter(it=>!q || (it.name && it.name.toLowerCase().includes(q)) || (it.barcode && it.barcode.includes(q)) );
-      if(items.length===0){ list.innerHTML = '<div class="card">No se encontraron productos. Puedes <button id="empty-add" class="text-indigo-600">registrar uno</button>.</div>'
-        setTimeout(()=>{ const b=document.getElementById('empty-add'); if(b) b.addEventListener('click', ()=>openProductModal()) }, 30); return }
-      // render fast using fragment
-      const frag = document.createDocumentFragment();
-      for(const it of items){
-        const node = document.createElement('div'); node.className='inventory-item';
-        node.innerHTML = `<div>
-            <div class="meta">${escapeHtml(it.name||'—')}</div>
-            <div class="sub">${escapeHtml(it.category||'')} · stock: ${it.stock ?? 0} · ${it.barcode||'sin código'}</div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <button class="px-2 py-1 border rounded edit-btn">Editar</button>
-            <button class="px-2 py-1 bg-yellow-400 rounded sell-btn">Vender</button>
-          </div>`;
-        node.querySelector('.edit-btn').addEventListener('click', ()=>openProductModal(it))
-        node.querySelector('.sell-btn').addEventListener('click', ()=>openQuickWithProduct(it))
-        frag.appendChild(node)
+    $('btn-scan-find').addEventListener('click', async ()=>{
+      // take last detected code or value from quick modal
+      const code = scanContext.lastCode || prompt('Introduce código para buscar:');
+      if (!code) return;
+      const prod = await findProductByBarcode(code);
+      if (prod) { openProductModal(prod); hideModal('modal-scan'); stopScanner(); }
+      else { // allow direct register
+        openProductModal({barcode: code}); hideModal('modal-scan'); stopScanner();
       }
-      list.appendChild(frag)
+    });
+
+    $('scan-register').addEventListener('click', ()=>{
+      // opens registration prefilled with last code
+      openProductModal({barcode: scanContext.lastCode});
+      hideModal('modal-scan'); stopScanner();
+    });
+
+    $('scan-close').addEventListener('click', ()=>{ hideModal('modal-scan'); stopScanner(); });
+
+    // ---------- Firestore helpers ----------
+    async function saveProductToFirestore(product, id=null){
+      if (!db) { // fallback local storage
+        const key = 'local_products';
+        const list = JSON.parse(localStorage.getItem(key)||'[]');
+        if (id){ const idx = list.findIndex(x=>x.id===id); if (idx>=0) list[idx] = {...list[idx], ...product}; }
+        else { list.push({...product, id:'local-'+Date.now()}); }
+        localStorage.setItem(key, JSON.stringify(list)); renderInventory(list);
+        return;
+      }
+      if (id){ await db.collection('products').doc(id).set(product, {merge:true}); }
+      else{
+        // If barcode exists, update existing doc
+        if (product.barcode){
+          const q = await db.collection('products').where('barcode','==',product.barcode).limit(1).get();
+          if (!q.empty){ const doc = q.docs[0]; await doc.ref.set(product, {merge:true}); return; }
+        }
+        await db.collection('products').add(product);
+      }
     }
 
-    function escapeHtml(s){ if(!s) return ''; return String(s).replace(/[&"'<>]/g, c=>({"&":"&amp;","\"":"&quot;","'":"&#39;","<":"&lt;",">":"&gt;"})[c]) }
-
-    // PRODUCT modal logic
-    function openProductModal(product=null){ openModal('modal-product'); if(product){ document.getElementById('product-id').value = product.id || product.barcode || Date.now(); document.getElementById('product-name').value = product.name||''; document.getElementById('product-category').value = product.category||''; document.getElementById('product-price').value = product.price||''; document.getElementById('product-barcode').value = product.barcode||''; document.getElementById('product-stock').value = product.stock||0; } else { document.getElementById('product-id').value=''; document.getElementById('product-name').value=''; document.getElementById('product-category').value=''; document.getElementById('product-price').value=''; document.getElementById('product-barcode').value=''; document.getElementById('product-stock').value=0; } }
-
-    function saveProductFromForm(){
-      const inv = loadInventory();
-      const idField = document.getElementById('product-id').value || String(Date.now());
-      const item = { id: idField, name: document.getElementById('product-name').value.trim(), category: document.getElementById('product-category').value.trim(), price: parseFloat(document.getElementById('product-price').value) || 0, barcode: document.getElementById('product-barcode').value.trim(), stock: parseInt(document.getElementById('product-stock').value) || 0 }
-      const idx = inv.findIndex(i=>i.id===item.id || (i.barcode && i.barcode === item.barcode));
-      if(idx>=0) inv[idx] = item; else inv.push(item);
-      saveInventory(inv); renderInventory(); showToast('Producto guardado')
+    async function findProductByBarcode(barcode){
+      // check cache first
+      for (const id in productsCache){ if (productsCache[id].barcode === barcode) return {...productsCache[id], id}; }
+      if (!db) return null;
+      const q = await db.collection('products').where('barcode','==',barcode).limit(1).get();
+      if (q.empty) return null;
+      const d = q.docs[0]; return {...d.data(), id: d.id};
     }
 
-    // Quick sale
-    function openQuickWithProduct(product){ openModal('modal-quick'); document.getElementById('quick-barcode').value = product.barcode || product.id || ''; fillQuickProductSummary(product); }
-    function fillQuickProductSummary(product){ const s = document.getElementById('quick-product-summary'); if(!product){ s.style.display='none'; return } s.style.display='block'; s.innerHTML = `<div style="font-weight:700">${escapeHtml(product.name||'—')}</div><div class="small-muted">Precio: ${product.price||0} · Stock: ${product.stock||0} · Código: ${product.barcode||'—'}</div>`; document.getElementById('quick-barcode').dataset.linked = product.id || product.barcode || '' }
-
-    function quickSearch(){ const q=document.getElementById('quick-barcode').value.trim(); if(!q){ showToast('Ingrese código o nombre'); return } const inv = loadInventory(); const found = inv.find(i=> (i.barcode && i.barcode === q) || (i.id && i.id === q) || (i.name && i.name.toLowerCase()===q.toLowerCase()) ); if(found){ fillQuickProductSummary(found); showToast('Producto vinculado'); } else { if(confirm('Producto no encontrado. ¿Deseas registrar este código como nuevo producto?')){ openProductModal({ barcode: q, name: '', stock:0 }); } } }
-
-    function saveQuickSale(){ const q=document.getElementById('quick-barcode').value.trim(); if(!q){ showToast('Ingrese o escanee un producto'); return } const inv = loadInventory(); let product = inv.find(i=> (i.barcode && i.barcode === q) || (i.id && i.id === q) ); if(!product){ if(confirm('Producto no registrado. ¿Registrar ahora?')){ openProductModal({ barcode:q }); return } product = { id: 'unknown_'+Date.now(), name: q, price:0, barcode:q, stock:0 } }
-      const sales = loadSales(); const sale = { id: 'sale_'+Date.now(), productId: product.id, name: product.name, barcode: product.barcode, price: product.price||0, qty: 1, ts: new Date().toISOString() }
-      sales.push(sale); saveSales(sales);
-      if(product.stock!==undefined){ product.stock = Math.max(0,(product.stock||0)-1); const idx=inv.findIndex(i=>i.id===product.id); if(idx>=0) inv[idx]=product; saveInventory(inv); }
-      renderInventory(); renderReports(); closeAllModals(); showToast('Venta registrada') }
-
-    // REPORTS
-    function renderReports(){ const c=document.getElementById('reports-content'); const sales=loadSales(); if(!c) return; if(sales.length===0){ c.innerHTML='<div>No hay ventas registradas aún.</div>'; return } c.innerHTML = sales.slice().reverse().map(s=>`<div style="padding:8px;border-bottom:1px solid #eee"><div style="font-weight:700">${escapeHtml(s.name||'—')}</div><div class="small-muted">${s.qty} · ${s.barcode||''} · ${new Date(s.ts).toLocaleString()}</div></div>`).join('') }
-
-    // MODALS
-    function openModal(id){ document.getElementById(id).classList.add('visible'); document.getElementById(id).setAttribute('aria-hidden','false'); }
-    function closeAllModals(){ document.querySelectorAll('.modal.visible').forEach(m=>{ m.classList.remove('visible'); m.setAttribute('aria-hidden','true'); }); stopScanner(); quickScannerMode=false }
-
-    // SCANNER (Quagga) with options: Register, Search, Sell
-    let quaggaRunning = false; let quickScannerMode = false;
-    function startScanner(){ const status = document.getElementById('scanner-status'); if(!navigator.mediaDevices){ status.textContent='Tu navegador no soporta cámara.'; return } status.textContent='Iniciando cámara...'; try{ Quagga.init({ inputStream: { name: 'Live', type: 'LiveStream', target: document.getElementById('scanner-container'), constraints: { facingMode: 'environment' } }, decoder: { readers: ['ean_reader','upc_reader','code_128_reader','ean_8_reader'] }, locate: true }, function(err){ if(err){ console.error(err); status.textContent='Error iniciando escáner (revisa HTTPS o permisos)'; return } Quagga.start(); quaggaRunning=true; status.textContent='Escaneando...'; }); Quagga.onDetected(onBarcodeDetected); } catch(e){ console.error('startScanner',e); status.textContent='Error inicializando escáner'; } }
-    function stopScanner(){ if(quaggaRunning){ try{ Quagga.stop(); }catch(e){} quaggaRunning=false } }
-
-    function startScannerForQuick(){ quickScannerMode = true; openModal('modal-scan'); startScanner(); }
-
-    function onBarcodeDetected(result){ if(!result || !result.codeResult) return; const code = result.codeResult.code; if(window._lastDetected === code) return; window._lastDetected = code; setTimeout(()=>window._lastDetected=null,1200);
-      showToast('Código detectado: '+code,1200);
-      const inv = loadInventory(); const found = inv.find(i=>i.barcode===code || i.id===code);
-      // update scan-result panel
-      const panel = document.getElementById('scan-result'); panel.style.display='block'; panel.dataset.code = code; panel.innerHTML = `<div style="font-weight:700">Código: ${code}</div><div class="small-muted">${found ? ('Producto: '+found.name) : 'No encontrado'}</div><div style="margin-top:6px;display:flex;gap:6px"><button id="scan-reg-btn" class="px-2 py-1 bg-green-600 text-white rounded">Registrar</button><button id="scan-search-btn" class="px-2 py-1 border rounded">Buscar</button><button id="scan-sell-btn" class="px-2 py-1 bg-yellow-400 rounded">Vender</button></div>`;
-      // bind buttons
-      setTimeout(()=>{
-        document.getElementById('scan-reg-btn').addEventListener('click', ()=>{ stopScanner(); openProductModal({ barcode: code, name:'', stock:0 }); });
-        document.getElementById('scan-search-btn').addEventListener('click', ()=>{ stopScanner(); manualScanSearch(code); });
-        document.getElementById('scan-sell-btn').addEventListener('click', ()=>{ stopScanner(); if(found){ openQuickWithProduct(found); openModal('modal-quick'); } else { if(confirm('Producto no encontrado. ¿Registrar y vender?')) openProductModal({ barcode: code, name:'', stock:0 }); } });
-        if(quickScannerMode && found){ document.getElementById('quick-barcode').value = code; fillQuickProductSummary(found); quickScannerMode=false; closeAllModals(); openModal('modal-quick'); }
-      }, 100)
+    async function registerSale(product, qty=1){
+      const amount = (product.price||0) * qty;
+      if (!db){ // local fallback
+        const sales = JSON.parse(localStorage.getItem('local_sales')||'[]');
+        sales.push({productId: product.id||product.barcode, name: product.name, qty, amount, date: new Date().toISOString()});
+        localStorage.setItem('local_sales', JSON.stringify(sales)); alert('Venta registrada (local)'); return;
+      }
+      // transaction: reduce stock and write sale and update daily report
+      const productRef = db.collection('products').doc(product.id);
+      await db.runTransaction(async (tx)=>{
+        const doc = await tx.get(productRef);
+        const currentStock = (doc.exists && doc.data().stock) ? doc.data().stock : 0;
+        tx.update(productRef, {stock: currentStock - qty});
+        const saleRef = db.collection('sales').doc();
+        tx.set(saleRef, {productId: product.id, name: product.name, qty, amount, createdAt: firebase.firestore.FieldValue.serverTimestamp()});
+        const dateKey = new Date().toISOString().slice(0,10);
+        const reportRef = db.collection('reports').doc(dateKey);
+        tx.set(reportRef, { totalSales: firebase.firestore.FieldValue.increment(amount), totalItems: firebase.firestore.FieldValue.increment(qty) }, {merge:true});
+      });
+      alert('Venta registrada y reportada.');
     }
 
-    function manualScanSearch(code){ const inv = loadInventory(); const found = inv.find(i=>i.barcode===code || i.id===code); if(found){ fillQuickProductSummary(found); closeAllModals(); openModal('modal-quick'); } else { if(confirm('Código no encontrado. ¿Registrar producto?')) openProductModal({ barcode: code, name:'', stock:0 }); } }
+    // Realtime inventory
+    function startRealtimeInventory(){
+      if (!db) return loadInventoryFromLocal();
+      if (unsubscribeInventory) return; // already
+      unsubscribeInventory = db.collection('products').onSnapshot(snapshot=>{
+        productsCache = {};
+        const list = [];
+        snapshot.forEach(doc=>{ const d = doc.data(); d.id = doc.id; productsCache[doc.id] = d; list.push({...d, id: doc.id}); });
+        renderInventory(list);
+        $('cloud-label').textContent = 'conectado';
+      }, err=>{ console.error(err); $('cloud-label').textContent = 'error cloud'; });
+    }
+    function stopRealtimeInventory(){ if (unsubscribeInventory) { unsubscribeInventory(); unsubscribeInventory=null; } }
 
-    // IMPORT / EXPORT XLSX
-    function handleXlsxImport(e){ const f = e.target.files[0]; if(!f) return; const reader = new FileReader(); reader.onload = function(ev){ const data = new Uint8Array(ev.target.result); const workbook = XLSX.read(data, { type: 'array' }); // expect sheet 'inventory'
-        const sheet = workbook.Sheets[workbook.SheetNames[0]]; const rows = XLSX.utils.sheet_to_json(sheet); // map to inventory
-        const inv = loadInventory(); for(const r of rows){ const item = { id: r.id || r.barcode || generateId(), name: r.name || r.Nombre || '', category: r.category || r.Categoria || '', price: parseFloat(r.price||r.Precio||0)||0, barcode: String(r.barcode||r.Codigo||''), stock: parseInt(r.stock||r.Stock||0)||0 }; const idx = inv.findIndex(i=>i.id===item.id || (i.barcode && i.barcode===item.barcode)); if(idx>=0) inv[idx]=item; else inv.push(item); }
-        saveInventory(inv); renderInventory(); showToast('Importación completada'); if(cloudEnabled) pushAllLocalToCloud(); }
-      reader.readAsArrayBuffer(f); e.target.value=''; }
+    function loadInventoryFromLocal(){ const list = JSON.parse(localStorage.getItem('local_products')||'[]'); renderInventory(list); }
 
-    function exportXlsx(){ const inv = loadInventory(); const sales = loadSales(); const wb = XLSX.utils.book_new(); const ws1 = XLSX.utils.json_to_sheet(inv); const ws2 = XLSX.utils.json_to_sheet(sales); XLSX.utils.book_append_sheet(wb, ws1, 'inventory'); XLSX.utils.book_append_sheet(wb, ws2, 'sales'); const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'}); const blob = new Blob([wbout], {type:'application/octet-stream'}); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `ts_export_${Date.now()}.xlsx`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); showToast('Exportado XLSX'); }
+    function renderInventory(list){
+      const container = $('inventory-list'); container.innerHTML='';
+      list.forEach(p=>{
+        const el = document.createElement('div'); el.className='inventory-item bordered';
+        el.innerHTML = `<div><div class="meta">${p.name||'—'}</div><div class="sub">${p.category||''} • ${p.barcode||'—'}</div></div><div style="text-align:right"><div style="font-weight:700">S/${(p.price||0).toFixed(2)}</div><div class="sub">stock: ${p.stock||0}</div><div style="margin-top:6px"><button data-id="${p.id||''}" class="edit-btn px-2 py-1 border rounded">Editar</button> <button data-id="${p.id||''}" class="sell-btn px-2 py-1 bg-red-600 text-white rounded">Vender</button></div></div>`;
+        container.appendChild(el);
+      });
+      // attach handlers
+      container.querySelectorAll('.edit-btn').forEach(b=> b.addEventListener('click', async (ev)=>{
+        const id = ev.target.dataset.id; const prod = await loadProductById(id); openProductModal(prod);
+      }));
+      container.querySelectorAll('.sell-btn').forEach(b=> b.addEventListener('click', async (ev)=>{
+        const id = ev.target.dataset.id; const prod = await loadProductById(id); const qty = parseInt(prompt('Cantidad a vender', '1'))||1; if (prod) await registerSale(prod, qty);
+      }));
+    }
 
-    // Cloud push helpers already above
+    async function loadProductById(id){ if (!id) return null; if (productsCache[id]) return {...productsCache[id], id}; if (!db) return null; const d = await db.collection('products').doc(id).get(); if (!d.exists) return null; return {...d.data(), id:d.id}; }
 
-    // Load responsible into UI
-    function loadResponsibleToUI(){ const r = loadResponsible(); if(r){ document.getElementById('responsible-date').value = r.date || ''; document.getElementById('responsible-name').value = r.name || ''; document.getElementById('responsible-display').textContent = `${r.name||''} · ${r.date||''}` } }
+    // open product modal with optional prefill
+    function openProductModal(prefill={}){
+      $('product-id').value = prefill.id || '';
+      $('product-name').value = prefill.name || '';
+      $('product-category').value = prefill.category || '';
+      $('product-price').value = prefill.price || '';
+      $('product-barcode').value = prefill.barcode || '';
+      $('product-stock').value = prefill.stock || 0;
+      showModal('modal-product');
+    }
 
-    // small safe fallback if Quagga missing
-    if(typeof Quagga === 'undefined'){ console.warn('Quagga no disponible. El escáner solo funcionará si se carga correctamente.'); }
+    // ---------- SCANNER (QuaggaJS) ----------
+    function startScanner(){
+      if (!navigator.mediaDevices) return alert('Tu navegador no soporta la cámara.');
+      Quagga.init({ inputStream: { name: 'Live', type: 'LiveStream', target: document.querySelector('#modal-scan video'), constraints:{ facingMode: 'environment' } }, decoder: { readers: ["ean_reader","ean_8_reader","code_128_reader","upc_reader","upc_e_reader"] }, locate: true }, function(err) {
+        if (err) { console.error(err); return; }
+        Quagga.start();
+      });
+      Quagga.onDetected(handleDetected);
+    }
+    function stopScanner(){ try{ Quagga.offDetected(handleDetected); Quagga.stop(); }catch(e){}
+    }
+    function handleDetected(result){
+      const code = result.codeResult && result.codeResult.code;
+      if (!code) return;
+      scanContext.lastCode = code;
+      // show register option if not found
+      findProductByBarcode(code).then(p=>{
+        if (!p){ $('scan-register').style.display = 'inline-block'; }
+        else { $('scan-register').style.display = 'none'; }
+      });
+      // quick visual overlay: draw box
+      const canvas = document.getElementById('overlay-canvas'); const ctx = canvas.getContext('2d');
+      canvas.width = document.querySelector('#modal-scan video').videoWidth || 320; canvas.height = document.querySelector('#modal-scan video').videoHeight || 240;
+      if (result.box){ ctx.clearRect(0,0,canvas.width,canvas.height); ctx.strokeStyle='lime'; ctx.lineWidth=3; ctx.beginPath(); const b = result.box; ctx.moveTo(b[0][0], b[0][1]); for (let i=1;i<b.length;i++) ctx.lineTo(b[i][0], b[i][1]); ctx.closePath(); ctx.stroke(); }
+    }
 
-    // expose for debugging
-    window._ts = { loadInventory, saveInventory, loadSales, saveSales, enableCloud, initFirebase, pushAllLocalToCloud }
+    // ---------- XLSX import/export connected to Firestore ----------
+    async function handleXlsxFile(e){
+      const f = e.target.files[0]; if (!f) return; const data = await f.arrayBuffer(); const wb = XLSX.read(data); const ws = wb.Sheets[wb.SheetNames[0]]; const json = XLSX.utils.sheet_to_json(ws, {defval: ''});
+      // Expect columns: name, category, price, barcode, stock
+      for (const row of json){
+        const p = { name: row.name||row.Nombre||row.nombre, category: row.category||row.Categoria||'', price: parseFloat(row.price||row.Precio||0)||0, barcode: String(row.barcode||row.Codigo||row.codigo||''), stock: parseInt(row.stock||row.Stock||0)||0 };
+        try{ await saveProductToFirestore(p, null); }catch(err){ console.error('error import row', err); }
+      }
+      alert('Importación finalizada.');
+      e.target.value = '';
+    }
+
+    async function exportProductsToXlsx(){
+      if (!db){ // local export
+        const list = JSON.parse(localStorage.getItem('local_products')||'[]'); const ws = XLSX.utils.json_to_sheet(list); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Productos'); XLSX.writeFile(wb, 'productos.xlsx'); return;
+      }
+      const snap = await db.collection('products').get(); const arr = []; snap.forEach(d=> arr.push({ id:d.id, ...d.data() })); const ws = XLSX.utils.json_to_sheet(arr); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Productos'); XLSX.writeFile(wb, 'productos_firestone.xlsx');
+    }
+
+    // ---------- Boot ----------
+    function boot(){ if (db) startRealtimeInventory(); else loadInventoryFromLocal(); }
+    boot();
   </script>
+</body>
+</html>
+
 </body>
 </html>
