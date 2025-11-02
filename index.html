@@ -68,7 +68,6 @@
     </div>
 
     <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
-      <!-- Reportes visible y ordenado -->
       <button id="btn-open-reports" class="btn-big bg-white text-slate-700">Reportes</button>
       <div id="cloud-label" class="small-muted" style="color:white">desconectado</div>
     </div>
@@ -264,7 +263,7 @@
 <script>
 /* ================= FIREBASE CONFIG ================= */
 const firebaseConfig = {
-  apiKey: "AIzaSyBh2WHinnQeRD9fsmdEMJ9zkNVJNcixzS4",
+  apiKey: "AIzaSyBh2WHinnQeRD9fsmdEMj9zkNVJNcixzS4",
   authDomain: "jhonatan-7ca7d.firebaseapp.com",
   projectId: "jhonatan-7ca7d",
   storageBucket: "jhonatan-7ca7d.firebasestorage.app",
@@ -281,7 +280,7 @@ const money = v => Number(v||0).toFixed(2);
 const todayYMD = ()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
 /* State */
-let STATE = { products: [], sales: [], customers: [] }; // removed responsibles
+let STATE = { products: [], sales: [], customers: [] };
 let cloudEnabled = false, db = null;
 const COLLECTION = "MODO DE PREODUCCIÓN", DOC_ID = "DATOS", FIELD = "MAGALY";
 
@@ -400,8 +399,12 @@ $('#form-product').addEventListener('submit', async e=>{
   if(idx >= 0) STATE.products[idx] = prod; else STATE.products.unshift(prod);
   renderInventory(); renderQuickSelect(); saveLocalBackup(); await pushStateToCloud();
   const form = $('#form-product');
-  if(form && form._afterSave){ try{ form._afterSave(prod); }catch(e){} form._afterSave = null; }
+  // If there's a callback (e.g., we opened from scan and want to add to cart), call it
+  if(form && form._afterSave){ try{ form._afterSave(prod); }catch(e){ console.error(e); } form._afterSave = null; }
   closeModalId('modal-product');
+  showToast('Producto guardado correctamente', [], 2200);
+  // ensure camera is stopped if somehow still running
+  try{ await stopCamera(); }catch(e){}
 });
 
 /* Stock income */
@@ -520,7 +523,7 @@ $('#file-xlsx').addEventListener('change', async (e)=>{
   saveLocalBackup(); await pushStateToCloud(); renderInventory(); renderQuickSelect(); alert('Importación finalizada'); e.target.value = '';
 });
 
-/* ------------------ SCANNER (with toast + auto-close on add) ------------------ */
+/* ------------------ SCANNER (with toast + auto-close on add and register flow fixed) ------------------ */
 const video = $('#video'); let videoStream=null, currentTrack=null;
 let detectionLoop=false, quaggaActive=false, readBuffer=[];
 const READ_CONFIRM=3, WINDOW_MS=2000;
@@ -564,15 +567,21 @@ async function startDetection(){
               const found = STATE.products.find(x => (x.barcode||'') === confirmed || ((x.barcode||'').replace(/\D/g,'') === confirmed.replace(/\D/g,'')));
               if(found){
                 $('#scanned-product-name').textContent = found.name;
-                // show toast with Add action
                 showToast(`Detectado: ${found.name}`, [
                   { label: 'Añadir', onClick: () => { quickCart.push({ productId: found.id, qty: 1, price: found.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); stopCamera(); closeModalId('modal-scan'); showToast('Agregado al carrito y cámara detenida', [], 2500); } },
-                  { label: 'Cerrar', onClick: ()=> { /* just hide*/ } }
+                  { label: 'Cerrar', onClick: ()=> { /* just hide */ } }
                 ], 10000);
               } else {
                 $('#scanned-product-name').textContent = 'No registrado';
+                // **IMPORTANT CHANGE**: when user clicks "Registrar" we must CLOSE scanner, then OPEN product modal with barcode prefilled.
                 showToast(`Código no registrado: ${confirmed}`, [
-                  { label: 'Registrar', onClick: () => { openProductModal({ barcode: confirmed, name:'', category:'', price:0, stock:0 }, (saved)=>{ quickCart.push({ productId: saved.id, qty:1, price: saved.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); stopCamera(); closeModalId('modal-scan'); showToast('Registrado y agregado al carrito', [], 2500); }); } },
+                  { label: 'Registrar', onClick: () => {
+                      // ensure camera stopped and scan modal closed, then open product modal with callback
+                      (async ()=>{ try{ await stopCamera(); }catch(e){} closeModalId('modal-scan'); openProductModal({ barcode: confirmed, name:'', category:'', price:0, stock:0 }, (savedProd)=> {
+                        // afterSave callback: show confirmation (modal will be closed in submit handler)
+                        showToast('Producto registrado correctamente', [], 2200);
+                      }); })();
+                    } },
                   { label: 'Cerrar', onClick: ()=>{} }
                 ], 10000);
               }
@@ -601,7 +610,10 @@ function fallbackQuagga(){
       locate:true
     }, err => { if(err) { console.error(err); return; } Quagga.start(); });
     Quagga.onProcessed(result => { clearOverlay(); if(!result) return; if(result.boxes) result.boxes.filter(b=>b!==result.box).forEach(b=> drawBox(b,'rgba(255,255,255,0.2)')); if(result.box) drawBox(result.box,'lime'); });
-    Quagga.onDetected(data => { const code = data && data.codeResult && data.codeResult.code; if(code){ const confirmed = pushRead(code); if(confirmed){ $('#scanned-code').value = confirmed; const found = STATE.products.find(x => (x.barcode||'') === confirmed || ((x.barcode||'').replace(/\D/g,'') === confirmed.replace(/\D/g,''))); if(found){
+    Quagga.onDetected(data => { const code = data && data.codeResult && data.codeResult.code; if(code){ const confirmed = pushRead(code); if(confirmed){
+        $('#scanned-code').value = confirmed;
+        const found = STATE.products.find(x => (x.barcode||'') === confirmed || ((x.barcode||'').replace(/\D/g,'') === confirmed.replace(/\D/g,'')));
+        if(found){
           $('#scanned-product-name').textContent = found.name;
           showToast(`Detectado: ${found.name}`, [
             { label: 'Añadir', onClick: () => { quickCart.push({ productId: found.id, qty: 1, price: found.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); stopCamera(); closeModalId('modal-scan'); showToast('Agregado al carrito y cámara detenida', [], 2500); } },
@@ -610,10 +622,15 @@ function fallbackQuagga(){
         } else {
           $('#scanned-product-name').textContent = 'No registrado';
           showToast(`Código no registrado: ${confirmed}`, [
-            { label: 'Registrar', onClick: () => { openProductModal({ barcode: confirmed, name:'', category:'', price:0, stock:0 }, (saved)=>{ quickCart.push({ productId: saved.id, qty:1, price: saved.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); stopCamera(); closeModalId('modal-scan'); showToast('Registrado y agregado al carrito', [], 2500); }); } },
+            { label: 'Registrar', onClick: () => {
+                (async ()=>{ try{ await stopCamera(); }catch(e){} closeModalId('modal-scan'); openProductModal({ barcode: confirmed, name:'', category:'', price:0, stock:0 }, (savedProd)=> {
+                  showToast('Producto registrado correctamente', [], 2200);
+                }); })();
+              } },
             { label: 'Cerrar', onClick: ()=>{} }
           ], 10000);
-        } try{ Quagga.stop(); }catch(e){}
+        }
+        try{ Quagga.stop(); }catch(e){}
       } } });
     function drawBox(path,color){ if(!octx) resizeOverlay(); octx.strokeStyle=color; octx.lineWidth=3; octx.beginPath(); octx.moveTo(path[0].x,path[0].y); for(let i=1;i<path.length;i++) octx.lineTo(path[i].x,path[i].y); octx.closePath(); octx.stroke(); }
   }).catch(e=>console.warn('quagga camera err', e));
@@ -626,20 +643,34 @@ $('#btn-open-scan').addEventListener('click', ()=>{ openModal('modal-scan'); sta
 $('#btn-stop-camera').addEventListener('click', ()=> stopCamera());
 $('#btn-register-from-scan').addEventListener('click', ()=> {
   const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado');
-  openProductModal({ barcode: code, name:'', category:'', price:0, stock:0 }, null);
+  // NEW BEHAVIOR: stop camera, close scan modal, open product modal prefilled
+  (async ()=>{
+    try{ await stopCamera(); }catch(e){}
+    closeModalId('modal-scan');
+    openProductModal({ barcode: code, name:'', category:'', price:0, stock:0 }, (savedProd)=> {
+      // after save callback (the form submit already closes modal), show toast
+      showToast('Producto registrado correctamente', [], 2200);
+    });
+  })();
 });
 $('#btn-scan-add-to-quick').addEventListener('click', ()=> {
   const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado');
-  // if exists add; else open register and add after save
   const p = STATE.products.find(x => (x.barcode||'') === code || ((x.barcode||'').replace(/\D/g,'') === code.replace(/\D/g,'')));
   if(p){
     quickCart.push({ productId: p.id, qty:1, price: p.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); stopCamera(); closeModalId('modal-scan'); showToast('Agregado al carrito y cámara detenida', [], 2500);
   } else {
-    openProductModal({ barcode: code, name:'', category:'', price:0, stock:0 }, (saved)=>{ quickCart.push({ productId: saved.id, qty:1, price: saved.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); stopCamera(); closeModalId('modal-scan'); showToast('Registrado y agregado al carrito', [], 2500); });
+    // same flow: stop camera, open modal prefilled and after save add to cart
+    (async ()=>{
+      try{ await stopCamera(); }catch(e){}
+      closeModalId('modal-scan');
+      openProductModal({ barcode: code, name:'', category:'', price:0, stock:0 }, (savedProd)=> {
+        quickCart.push({ productId: savedProd.id, qty:1, price: savedProd.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); showToast('Registrado y agregado al carrito', [], 2200);
+      });
+    })();
   }
 });
 
-/* Quick modal scan button: open scanner (user will add via toast) */
+/* Quick modal scan button */
 $('#quick-scan-inside').addEventListener('click', ()=>{ openModal('modal-scan'); startDetection().catch(()=>{}); });
 
 /* Reports (reactivated) */
@@ -744,4 +775,3 @@ if(isAuth()){ $('#modal-login').classList.remove('visible'); startApp(); }
 </script>
 </body>
 </html>
-
