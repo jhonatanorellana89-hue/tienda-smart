@@ -1,770 +1,748 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>JHONATAN ORELLANA - Finanzas (Única DATA, sin Auth cliente)</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
+<title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart (Móvil)</title>
+
+<!-- Tailwind (prototipo) -->
+<script src="https://cdn.tailwindcss.com"></script>
+
+<!-- Dependencias -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
 <style>
-  :root{
-    --bg:#041018; --panel:#071421; --card:#0b1b26; --muted:#9fb1bd;
-    --accent:#00b894; --accent-2:#34ace0; --danger:#ff6b6b; --glass: rgba(255,255,255,0.02);
-    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#021018);color:#e6f6f6}
-  .phone-frame{width:100%;max-width:420px;margin:12px auto;border-radius:18px;overflow:hidden;background:linear-gradient(180deg,var(--panel),#04121a);box-shadow:0 20px 60px rgba(0,0,0,0.6);min-height:88vh;display:flex;flex-direction:column}
-  header.app-top{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:linear-gradient(90deg,rgba(255,255,255,0.02),transparent);border-bottom:1px solid rgba(255,255,255,0.02)}
+  :root{--bg:#f3f4f6;--card:#fff;--muted:#6b7280}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial;background:var(--bg);-webkit-user-select:none;user-select:none}
+  .app{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  header.mobile-top{height:76px;display:flex;align-items:center;gap:8px;padding:8px;background:linear-gradient(90deg,#06b6d4,#3b82f6);color:white;box-sizing:border-box}
   .brand{display:flex;gap:10px;align-items:center}
-  .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-weight:900;color:#001219;font-size:16px}
-  .title{font-weight:800;font-size:15px}
-  .subtitle{font-size:11px;color:var(--muted)}
-  .header-actions{display:flex;gap:8px;align-items:center}
-  .join-badge{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:10px;font-size:12px;color:var(--muted)}
-  .cloud-toggle{padding:6px 8px;border-radius:10px;border:0;font-weight:800;cursor:pointer}
-  .cloud-on{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#001}
-  .cloud-off{background:transparent;border:1px solid rgba(255,255,255,0.05);color:var(--muted)}
-  nav.bottom-nav{display:flex;gap:6px;padding:10px;justify-content:space-between;background:linear-gradient(180deg,transparent,rgba(255,255,255,0.01));border-top:1px solid rgba(255,255,255,0.02)}
-  nav.bottom-nav button{flex:1;background:transparent;border:0;color:var(--muted);padding:8px;border-radius:10px;font-weight:700}
-  nav.bottom-nav button.active{color:var(--accent);background:rgba(255,255,255,0.02)}
-  main.app-body{padding:12px;overflow:auto;flex:1}
-  .card{background:linear-gradient(180deg,var(--card),#06121a);border-radius:12px;padding:12px;margin-bottom:12px;box-shadow:0 6px 20px rgba(0,0,0,0.5)}
-  h2{margin:0;font-size:16px}
-  .muted{color:var(--muted);font-size:12px}
-  input,select,textarea{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.03);background:transparent;color:inherit;font-size:13px}
-  button.primary{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#001219;border:0;padding:8px 10px;border-radius:10px;cursor:pointer;font-weight:800}
-  button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:8px;color:var(--muted);cursor:pointer}
-  button.compact{padding:6px 8px;font-size:13px}
-  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
-  th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.02);text-align:left}
-  .right{text-align:right}
-  .danger{background:var(--danger);color:#1a0303;border:0;padding:8px 10px;border-radius:8px;cursor:pointer}
-  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;background:#071421;color:#d6f6ef;padding:12px;border-radius:10px;box-shadow:0 8px 26px rgba(0,0,0,0.6);display:none;z-index:120}
-  .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:140}
-  .modal{background:linear-gradient(180deg,#071421,#051017);padding:14px;border-radius:12px;max-width:420px;width:94%}
-  .small-muted{font-size:11px;color:var(--muted)}
-  @media (min-width:560px){ .phone-frame{max-width:420px} }
-  /* estilos para PDF (tamaños tipográficos pedidos) */
-  .report-title{font-size:12pt;font-weight:800}
-  .report-sub{font-size:11pt;font-weight:700}
-  .report-normal{font-size:10pt}
+  .brand .logo{width:44px;height:44px;border-radius:8px;background:linear-gradient(180deg,#10b981,#3b82f6);display:flex;justify-content:center;align-items:center}
+  .content{flex:1;overflow:auto;padding:10px}
+  .card{background:var(--card);border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 8px 18px rgba(2,6,23,0.05);border:1px solid #e6e6e6}
+  .search{display:flex;gap:8px}
+  input[type="search"], input, select {padding:12px;border-radius:10px;border:1px solid #ddd}
+  .actions-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .btn-big{padding:12px;border-radius:10px;text-align:center;font-weight:700}
+  .inventory-item{display:flex;justify-content:space-between;align-items:center;padding:10px;border-radius:10px;background:linear-gradient(180deg,#fff,#fafafa);border:1px solid #d1d5db;margin-bottom:8px}
+  .inventory-item .left{max-width:68%}
+  .inventory-item .meta{font-weight:700}
+  .inventory-item .sub{font-size:12px;color:var(--muted)}
+  .fixed-bottom{position:fixed;left:0;right:0;bottom:0;padding:10px;background:#fff;border-top:1px solid #e6e6e6;display:flex;gap:8px;justify-content:space-between}
+  .fixed-bottom .btn{flex:1;padding:12px;border-radius:10px;text-align:center;font-weight:700}
+  .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:12px;z-index:80}
+  .modal.visible{display:flex}
+  .modal .modal-card{width:100%;max-width:420px;border-radius:12px;overflow:hidden}
+  video#video{width:100%;height:100%;object-fit:cover;border-radius:6px}
+  canvas#overlay-canvas{position:absolute;left:0;top:0;pointer-events:none}
+  .suggestions{position:absolute;background:white;border:1px solid #e5e7eb;border-radius:8px;max-height:220px;overflow:auto;z-index:90;width:calc(100% - 24px)}
+  .small-muted{font-size:12px;color:var(--muted)}
+  /* Toast */
+  .toast-wrap{position:fixed;left:8px;right:8px;top:12px;display:flex;justify-content:center;pointer-events:none;z-index:1000}
+  .toast{pointer-events:auto;min-width:220px;background:#111;color:white;padding:10px 12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.25);display:flex;align-items:center;gap:10px}
+  .toast .msg{flex:1;font-weight:600}
+  .toast .actions{display:flex;gap:8px}
+  .toast button{background:transparent;border:1px solid rgba(255,255,255,0.2);color:white;padding:6px 8px;border-radius:8px;font-weight:700}
+  @media(min-width:420px){ .app{max-width:420px;margin:0 auto} }
 </style>
 </head>
 <body>
-  <div class="phone-frame" role="application" aria-label="App finanzas - vista móvil">
-    <header class="app-top">
-      <div class="brand">
-        <div class="logo">JO</div>
-        <div>
-          <div class="title">JHONATAN ORELLANA</div>
-          <div class="subtitle">Finanzas - UNA SOLA DATA</div>
-        </div>
+
+<div class="app" role="application">
+
+  <!-- HEADER -->
+  <header class="mobile-top">
+    <div class="brand">
+      <div class="logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="white" style="width:22px;height:22px"><path d="M3 3h2l.4 2M7 13h10l-1.2 6H6L5 13z"/></svg>
       </div>
-      <div class="header-actions">
-        <div id="org-join-display" class="join-badge">No vinculado</div>
-        <button id="btn-manage-join" class="ghost compact">Vincular</button>
-        <button id="btn-cloud-toggle" class="cloud-toggle cloud-off compact" title="Cloud ON/OFF">Cloud: OFF</button>
-        <div class="small-muted" id="session-info">Local</div>
+      <div style="line-height:1">
+        <div style="font-weight:800;font-size:14px">MINIMARKET LA ESQUINA DEL AHORRO</div>
+        <div class="small-muted" style="color:rgba(255,255,255,0.9)">TiendaSmart — Móvil</div>
       </div>
-    </header>
+    </div>
 
-    <main class="app-body" id="app-body">
-      <!-- Dashboard -->
-      <section id="view-dashboard" class="card">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <h2>Resumen</h2>
-            <div class="muted">Balance, bancos y alertas</div>
-          </div>
-          <div class="muted" id="month-label"></div>
-        </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <!-- Reportes visible y ordenado -->
+      <button id="btn-open-reports" class="btn-big bg-white text-slate-700">Reportes</button>
+      <div id="cloud-label" class="small-muted" style="color:white">desconectado</div>
+    </div>
+  </header>
 
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <div style="flex:1;background:var(--glass);padding:10px;border-radius:8px">
-            <div class="muted">Balance total</div>
-            <div id="balance" style="font-weight:800;font-size:18px;margin-top:6px">S/ 0.00</div>
-            <div id="flows" class="muted small"></div>
-          </div>
-          <div style="width:110px;background:var(--glass);padding:10px;border-radius:8px;text-align:center">
-            <div class="muted">Activos netos</div>
-            <div id="net-assets" style="font-weight:800;margin-top:6px">S/ 0.00</div>
-          </div>
-        </div>
+  <!-- CONTENT -->
+  <main class="content">
+    <div class="card">
+      <div class="search">
+        <input id="search" type="search" placeholder="Buscar producto o código..." />
+      </div>
+      <div class="actions-grid">
+        <button id="btn-add-product" class="btn-big bg-green-500 text-white">+ Producto</button>
+        <button id="btn-open-scan" class="btn-big bg-yellow-400 text-white">Escanear</button>
+        <button id="btn-open-quick" class="btn-big bg-red-600 text-white">Venta Rápida</button>
+        <button id="btn-open-clients" class="btn-big bg-indigo-700 text-white">Clientes</button>
+      </div>
+    </div>
 
-        <div class="card" style="margin-top:10px;padding:10px">
-          <div class="muted" style="margin-bottom:8px">Alertas</div>
-          <div id="alerts" class="small muted"></div>
-        </div>
-      </section>
+    <div id="inventory-list"></div>
 
-      <!-- Transactions -->
-      <section id="view-transactions" class="card" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <h2>Transacciones</h2>
-            <div class="muted">Cada transacción requiere cuenta y categoría</div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input id="search" placeholder="Buscar..." />
-            <button id="btn-add-transaction" class="primary compact">Agregar</button>
-          </div>
-        </div>
+    <div class="card small-muted">Sincroniza con Firestore: <code>MODO DE PREODUCCIÓN / DATOS / MAGALY</code></div>
+  </main>
 
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <div style="flex:1">
-            <label>Filtrar por cuenta</label>
-            <select id="filter-bank"><option value="">-- Todas --</option></select>
-          </div>
-          <div style="width:110px">
-            <label>Desde</label><input id="filter-from" placeholder="dd/mm/yyyy" />
-          </div>
-          <div style="width:110px">
-            <label>Hasta</label><input id="filter-to" placeholder="dd/mm/yyyy" />
-          </div>
-        </div>
-
-        <div style="margin-top:10px;overflow:auto">
-          <table id="tx-table">
-            <thead><tr><th>Fecha</th><th>Cuenta</th><th>Tipo</th><th>Cat.</th><th class="right">Monto</th><th>Acc.</th></tr></thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- Banks & Debts -->
-      <section id="view-banks" class="card" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>
-            <h2>Bancos & Deudas</h2>
-            <div class="muted">Cuentas vinculadas a transacciones y pasivos</div>
-          </div>
-          <div style="display:flex;gap:6px">
-            <button id="btn-add-bank" class="primary compact">Nueva cuenta</button>
-            <button id="btn-add-debt" class="ghost compact">Nueva deuda</button>
-          </div>
-        </div>
-
-        <div style="margin-top:10px">
-          <div id="banks-table"></div>
-        </div>
-
-        <div style="margin-top:10px">
-          <div id="debts-table"></div>
-        </div>
-      </section>
-
-      <!-- Categories -->
-      <section id="view-categories" class="card" style="display:none">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <div><h2>Categorías</h2><div class="muted">Crear y establecer límite mensual</div></div>
-          <div><button id="btn-new-category" class="primary compact">Nueva</button></div>
-        </div>
-        <div style="margin-top:10px">
-          <table id="categories-table"><thead><tr><th>Nombre</th><th class="right">Límite</th><th>Acc.</th></tr></thead><tbody></tbody></table>
-        </div>
-      </section>
-
-      <!-- Export -->
-      <section id="view-export" class="card" style="display:none">
-        <h2>Export / Import</h2>
-        <div class="muted" style="margin-top:6px">Exporta CSV, JSON o PDF (reporte)</div>
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-          <button id="export-csv" class="primary compact">CSV</button>
-          <button id="export-json" class="ghost compact">JSON</button>
-          <input id="import-file" type="file" accept=".csv,application/json" />
-          <button id="btn-import" class="primary compact">Importar</button>
-          <button id="export-pdf" class="primary compact">EXPORTAR REPORTE PDF</button>
-        </div>
-        <div style="margin-top:10px" class="muted small">Config Cloud API (desplegar Cloud Function):</div>
-        <div style="display:flex;gap:8px;margin-top:6px">
-          <input id="cloud-api" placeholder="CLOUD_API_BASE (https://...)" />
-          <input id="org-id-manual" placeholder="ORG_ID (opcional)" />
-        </div>
-      </section>
-    </main>
-
-    <nav class="bottom-nav">
-      <button data-view="dashboard" class="active">Resumen</button>
-      <button data-view="transactions">Transacciones</button>
-      <button data-view="banks">Bancos</button>
-      <button data-view="categories">Categorías</button>
-      <button data-view="export">Export</button>
-    </nav>
+  <!-- BOTTOM -->
+  <div class="fixed-bottom">
+    <button id="btn-import-xlsx" class="btn bg-gray-800 text-white">Importar</button>
+    <button id="btn-export-xlsx" class="btn border">Exportar</button>
+    <button id="btn-sync-toggle" class="btn bg-indigo-600 text-white">Cloud automático</button>
   </div>
 
-  <div class="modal-backdrop" id="modal-backdrop"><div class="modal" id="modal"></div></div>
-  <div class="toast" id="toast"></div>
+  <input id="file-xlsx" type="file" accept=".xlsx,.xls" class="hidden"/>
 
-  <!--
-    INSTRUCCIONES RÁPIDAS (3 pasos) para usar esta versión sin Auth cliente:
+  <!-- TOAST container -->
+  <div class="toast-wrap" id="toast-wrap" aria-live="polite"></div>
 
-    1) Despliega un endpoint de servidor (Cloud Function / Cloud Run / Express) que implemente:
-       - POST /join   body { joinCode }  -> valida joinCode contra organizations collection y devuelve { orgId, token }
-       - GET  /data?orgId=ID  header Authorization: Bearer TOKEN -> devuelve { data: {...} }
-       - POST /data  body { orgId, data } header Authorization: Bearer TOKEN -> guarda la única data
-       (Ejemplo de Cloud Function en comentario abajo dentro del HTML — cópialo y despliega).
-
-    2) En la app: pega la URL base de tu Cloud Function en el campo "CLOUD_API_BASE" dentro de la vista Export.
-       - También puedes poner el ORG_ID manual si ya lo conoces.
-       - Usa "Vincular" para pegar el JOIN CODE. El servidor devolverá un token de sesión que la app guardará local.
-
-    3) Establece reglas de Firestore que **bloqueen** accesos directos del cliente. EJEMPLO (muy seguro):
-       En la consola de Firestore => Reglas:
-         rules_version = '2';
-         service cloud.firestore {
-           match /databases/{database}/documents {
-             // Bloquear TODO desde cliente: solo el backend con Admin SDK (Cloud Function) puede modificar.
-             match /{document=**} {
-               allow read, write: if false;
-             }
-           }
-         }
-       -> Con esto, el único que puede leer/escribir es el servidor (Admin SDK). Muy importante.
-
-    NOTA: Más abajo (comentario) incluyo una Cloud Function ejemplo Node.js/Express lista para pegar.
-  -->
-
-  <!-- librerías -->
-  <script>
-    // html2pdf para export PDF (se carga dinámicamente)
-    (function(){ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js'; document.head.appendChild(s); })();
-  </script>
-
-  <script>
-  /**********************************************************************
-   *  SPA FINANZAS - SIN AUTH CLIENTE (usa BACKEND / CLOUD FUNCTION)
-   *  - guarda toda la info en una única estructura (state.singleData)
-   *  - Cloud ON/OFF: cuando Cloud ON y device vinculado -> sincroniza con backend
-   *  - backend (Cloud Function) debe validar joinCode y emitir token
-   **********************************************************************/
-
-  // ---------- UTIL ----------
-  const $ = (s,r=document)=> r.querySelector(s);
-  const $$ = (s,r=document)=> Array.from(r.querySelectorAll(s));
-  function fmtMoney(v){ v = Number(v)||0; return 'S/ ' + v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-  function parseDateDDMMYYYY(s){ if(!s) return null; const p=s.split('/'); if(p.length!==3) return null; const d=parseInt(p[0],10), m=parseInt(p[1],10)-1, y=parseInt(p[2],10); const dt=new Date(y,m,d); return isNaN(dt)?null:dt; }
-  function dateToDDMMYYYY(d){ if(!d) return ''; return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear(); }
-  function showToast(msg,important=false){ const t = $('#toast'); t.textContent = msg; t.style.display = 'block'; t.style.background = important ? 'linear-gradient(90deg,var(--danger),#ff9a9a)' : '#071421'; clearTimeout(window.__to); window.__to = setTimeout(()=> t.style.display='none', important?7000:3500); }
-
-  // ---------- ESTADO GLOBAL ----------
-  const STORAGE_KEY = 'jo_single_data_v2';
-  const SESSION_KEY = 'jo_session_v2'; // guarda token, orgId
-  const state = {
-    cloudOn: false,
-    apiBase: localStorage.getItem('jo_api_base') || '',
-    orgId: localStorage.getItem('jo_org_id') || '',
-    joinCode: localStorage.getItem('jo_join_code') || '',
-    session: JSON.parse(localStorage.getItem(SESSION_KEY) || 'null'), // { token, orgId, expiresAt }
-    singleData: {
-      transactions: [],
-      banks: [],
-      debts: [],
-      fixed: [],
-      savings: [],
-      categories: [],
-      meta: { createdAt:null, updatedAt:null }
-    }
-  };
-
-  // ---------- PERSISTENCIA LOCAL ----------
-  function persistLocal(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state.singleData)); }
-  function loadLocal(){ const raw = localStorage.getItem(STORAGE_KEY); if(!raw) return; try{ state.singleData = JSON.parse(raw); }catch(e){ console.error('parse local',e); } }
-
-  // ---------- BACKEND (Cloud) INTERFAZ ----------
-  // El backend expone:
-  // POST  /join  { joinCode }  -> { ok:true, orgId, token, expiresAt }
-  // GET   /data?orgId=ID  (Aut: Bearer token) -> { ok:true, data }
-  // POST  /data  { orgId, data } (Aut: Bearer token) -> { ok:true }
-  function cloudUrl(path){ const base = state.apiBase.trim(); if(!base) throw new Error('CLOUD_API_BASE no configurado'); return base.replace(/\/+$/,'') + '/' + path.replace(/^\/+/,''); }
-
-  async function cloudJoin(joinCode){
-    const url = cloudUrl('join');
-    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ joinCode }) });
-    const j = await res.json();
-    if(!res.ok || !j.ok) throw new Error(j?.error || 'Join failed');
-    // guardar sesión
-    state.session = { token: j.token, orgId: j.orgId, expiresAt: j.expiresAt || (Date.now()+1000*60*60) };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(state.session));
-    state.orgId = j.orgId;
-    localStorage.setItem('jo_org_id', state.orgId);
-    state.joinCode = joinCode;
-    localStorage.setItem('jo_join_code', joinCode);
-    showToast('Dispositivo vinculado (sesión guardada).');
-    updateSessionInfo();
-  }
-
-  async function cloudGetData(){
-    if(!state.session || !state.session.token) throw new Error('Sin sesión válida');
-    const url = cloudUrl('data?orgId=' + encodeURIComponent(state.session.orgId));
-    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + state.session.token } });
-    const j = await res.json();
-    if(!res.ok || !j.ok) throw new Error(j?.error || 'No data');
-    return j.data;
-  }
-
-  async function cloudSaveData(data){
-    if(!state.session || !state.session.token) throw new Error('Sin sesión válida');
-    const url = cloudUrl('data');
-    const res = await fetch(url, { method:'POST', headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + state.session.token }, body: JSON.stringify({ orgId: state.session.orgId, data }) });
-    const j = await res.json();
-    if(!res.ok || !j.ok) throw new Error(j?.error || 'Save failed');
-    return true;
-  }
-
-  function clearSession(){ state.session = null; localStorage.removeItem(SESSION_KEY); state.orgId = ''; localStorage.removeItem('jo_org_id'); state.joinCode = ''; localStorage.removeItem('jo_join_code'); updateSessionInfo(); }
-
-  // ---------- SYNC (Cloud ON/OFF) ----------
-  async function syncLoadFromCloudIfPossible(){
-    if(!state.cloudOn) return;
-    if(!state.apiBase) throw new Error('CLOUD_API_BASE no configurado');
-    if(!state.session) throw new Error('Dispositivo no vinculado (usa Vincular).');
-    try{
-      const remote = await cloudGetData();
-      state.singleData = Object.assign({ transactions:[], banks:[], debts:[], fixed:[], savings:[], categories:[], meta:{} }, remote || {});
-      persistLocal();
-      renderAll();
-      showToast('Datos cargados desde la nube.');
-    } catch(e){ console.warn(e); showToast('No se pudo cargar desde la nube: '+e.message, true); }
-  }
-
-  async function syncSaveToCloudIfPossible(){
-    if(!state.cloudOn) return;
-    if(!state.apiBase) throw new Error('CLOUD_API_BASE no configurado');
-    if(!state.session) throw new Error('Dispositivo no vinculado (usa Vincular).');
-    try{
-      await cloudSaveData(state.singleData);
-      showToast('Datos guardados en la nube.');
-    } catch(e){ console.warn(e); showToast('Guardado en nube falló: '+e.message, true); }
-  }
-
-  // ---------- CRUD operations that update state and sync ----------
-  async function pushAndMaybeSync(updateFn){
-    updateFn(state.singleData);
-    persistLocal();
-    renderAll();
-    if(state.cloudOn && state.session) {
-      try{ await syncSaveToCloudIfPossible(); } catch(e){ console.warn('sync save error', e); }
-    }
-  }
-
-  async function addCategory(cat){ cat.id = 'c_'+Date.now(); cat.createdAt = new Date().toISOString(); await pushAndMaybeSync(sd=>sd.categories.unshift(cat)); }
-  async function updateCategory(id,data){ await pushAndMaybeSync(sd=>{ sd.categories = sd.categories.map(c=> c.id===id ? Object.assign(c,data) : c); }); }
-  async function deleteCategory(id){ await pushAndMaybeSync(sd=>{ sd.categories = sd.categories.filter(c=>c.id!==id); }); }
-
-  async function addBank(bank){ bank.id = 'b_'+Date.now(); bank.createdAt = new Date().toISOString(); bank.balance = Number(bank.balance)||0; await pushAndMaybeSync(sd=>sd.banks.unshift(bank)); }
-  async function updateBank(bankId,data){ await pushAndMaybeSync(sd=>{ sd.banks = sd.banks.map(b=> b.id===bankId ? Object.assign(b,data) : b); }); }
-  async function deleteBank(bankId){ await pushAndMaybeSync(sd=>{ sd.banks = sd.banks.filter(b=>b.id!==bankId); }); }
-
-  async function addDebt(debt){ debt.id = 'd_'+Date.now(); debt.createdAt = new Date().toISOString(); debt.outstanding = Number(debt.outstanding)||0; await pushAndMaybeSync(sd=>sd.debts.unshift(debt)); }
-
-  async function addTransaction(tx){
-    if(!parseDateDDMMYYYY(tx.dateStr)) throw new Error('Fecha inválida');
-    tx.id = 't_'+Date.now(); tx.amount = Number(tx.amount)||0; tx.createdAt = new Date().toISOString();
-    await pushAndMaybeSync(sd=>{
-      sd.transactions.unshift(tx);
-      if(tx.bankId){
-        const b = sd.banks.find(x=>x.id===tx.bankId);
-        if(b) b.balance = (Number(b.balance)||0) + (tx.type === 'Egreso' ? -tx.amount : tx.amount);
-      }
-      if(tx.debtId && tx.type === 'Egreso'){
-        const d = sd.debts.find(x=>x.id===tx.debtId);
-        if(d) d.outstanding = Math.max(0, (Number(d.outstanding)||0) - tx.amount);
-      }
-    });
-    checkCategoryLimitAfterAdd(tx);
-  }
-
-  function checkCategoryLimitAfterAdd(tx){
-    const cid = tx.categoryId; if(!cid) return;
-    const cat = state.singleData.categories.find(c=>c.id===cid); if(!cat || !cat.limitMonthly || Number(cat.limitMonthly) <= 0) return;
-    const date = parseDateDDMMYYYY(tx.dateStr);
-    if(!date) return;
-    const month = date.getMonth(), year = date.getFullYear();
-    const total = state.singleData.transactions.reduce((acc,t)=>{
-      const d = parseDateDDMMYYYY(t.dateStr || '');
-      if(!d) return acc;
-      if(d.getMonth()===month && d.getFullYear()===year && t.categoryId === cid) acc += Number(t.amount)||0;
-      return acc;
-    },0);
-    if(total > Number(cat.limitMonthly)) showToast(`Límite superado en "${cat.name}": ${fmtMoney(total)} / ${fmtMoney(cat.limitMonthly)}`, true);
-    else if(total >= Number(cat.limitMonthly)*0.8) showToast(`Cuidado: "${cat.name}" cerca del límite (${fmtMoney(total)} / ${fmtMoney(cat.limitMonthly)})`);
-  }
-
-  // ---------- RENDER / UI ----------
-  function switchView(view){
-    const views=['dashboard','transactions','banks','categories','export'];
-    views.forEach(v=>{ const el = document.getElementById('view-'+v); if(el) el.style.display = (v===view)?'':'none'; });
-    document.querySelectorAll('nav.bottom-nav button').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
-    updateSessionInfo();
-  }
-
-  function renderAll(){
-    renderDashboard(); renderTransactions(); renderBanks(); renderCategories(); populateFilters(); updateSessionInfo();
-  }
-
-  function renderDashboard(){
-    let inc=0, exp=0;
-    const now = new Date(), month=now.getMonth(), year=now.getFullYear();
-    state.singleData.transactions.forEach(t=>{
-      const d = parseDateDDMMYYYY(t.dateStr||'');
-      if(!d) return;
-      if(d.getMonth()===month && d.getFullYear()===year){
-        if((t.type||'Ingreso').toLowerCase()==='egreso') exp += Number(t.amount)||0; else inc += Number(t.amount)||0;
-      }
-    });
-    $('#balance').textContent = fmtMoney(inc-exp);
-    $('#flows').textContent = `Ingresos: ${fmtMoney(inc)} · Egresos: ${fmtMoney(exp)}`;
-    $('#month-label').textContent = `${now.toLocaleString('default',{month:'long'})} ${year}`;
-    let assets=0, liabilities=0;
-    state.singleData.banks.forEach(b=>assets += Number(b.balance)||0);
-    state.singleData.debts.forEach(d=>liabilities += Number(d.outstanding)||0);
-    $('#net-assets').textContent = fmtMoney(assets-liabilities);
-    $('#alerts').innerHTML = (state.singleData.categories.map(cat=>{
-      if(!cat.limitMonthly || Number(cat.limitMonthly)<=0) return null;
-      const total = state.singleData.transactions.reduce((acc,t)=>{
-        const d = parseDateDDMMYYYY(t.dateStr || '');
-        if(!d) return acc;
-        const now2 = new Date();
-        if(d.getMonth()===now2.getMonth() && d.getFullYear()===now2.getFullYear() && t.categoryId === cat.id) acc += Number(t.amount)||0;
-        return acc;
-      },0);
-      if(total >= Number(cat.limitMonthly)) return `<div style="margin-bottom:6px;color:var(--danger)"><strong>${cat.name}</strong> ${fmtMoney(total)} / ${fmtMoney(cat.limitMonthly)} (Superado)</div>`;
-      if(total >= Number(cat.limitMonthly)*0.8) return `<div style="margin-bottom:6px"><strong>${cat.name}</strong> ${fmtMoney(total)} / ${fmtMoney(cat.limitMonthly)} (Cerca)</div>`;
-      return null;
-    }).filter(Boolean).join('')) || '<div class="muted">Sin alertas</div>';
-  }
-
-  function renderTransactions(){
-    const tbody = $('#tx-table tbody'); if(!tbody) return; tbody.innerHTML = '';
-    const rows = applyFiltersAndSearch();
-    rows.forEach(t=>{
-      const date = t.dateStr||'';
-      const bank = state.singleData.banks.find(b=>b.id===t.bankId);
-      const cat = state.singleData.categories.find(c=>c.id===t.categoryId);
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${date}</td><td>${bank?bank.name:'-'}</td><td>${t.type}</td><td>${cat?cat.name:(t.categoryName||'-')}</td><td class="right">${fmtMoney(Number(t.amount)||0)}</td><td><button class="ghost compact" data-id="${t.id}" data-act="edit">E</button> <button class="danger compact" data-id="${t.id}" data-act="del">X</button></td>`;
-      tbody.appendChild(tr);
-    });
-    $$('#tx-table button').forEach(btn=>{
-      btn.onclick = ()=>{ const id=btn.dataset.id, act=btn.dataset.act; if(act==='del') showConfirm('Eliminar transacción','Confirmar eliminación', async ()=>{ state.singleData.transactions = state.singleData.transactions.filter(x=>x.id!==id); await pushAndMaybeSync(()=>{}); }); if(act==='edit'){ const tx = state.singleData.transactions.find(x=>x.id===id); if(tx) openTransactionModal(tx); } };
-    });
-  }
-
-  function applyFiltersAndSearch(){
-    const q = $('#search').value.trim().toLowerCase();
-    const bank = $('#filter-bank').value;
-    const from = $('#filter-from').value.trim();
-    const to = $('#filter-to').value.trim();
-    return state.singleData.transactions.filter(t=>{
-      const date = parseDateDDMMYYYY(t.dateStr||'');
-      if(from){ const f = parseDateDDMMYYYY(from); if(!f || !date || date < f) return false; }
-      if(to){ const tt = parseDateDDMMYYYY(to); if(!tt || !date || date > tt) return false; }
-      if(bank && t.bankId !== bank) return false;
-      if(q){ const cat = state.singleData.categories.find(c=>c.id===t.categoryId); const txt = `${t.description||''} ${(cat?cat.name:'')}`.toLowerCase(); if(!txt.includes(q)) return false; }
-      return true;
-    });
-  }
-
-  function renderBanks(){
-    const wrap = $('#banks-table'); if(!wrap) return;
-    if(state.singleData.banks.length === 0) wrap.innerHTML = '<div class="muted">No hay cuentas</div>';
-    else wrap.innerHTML = `<table><thead><tr><th>Cuenta</th><th class="right">Saldo</th><th>Acc.</th></tr></thead><tbody>${state.singleData.banks.map(b=>`<tr><td>${b.name}<div class="muted" style="font-size:12px">${b.type||''}</div></td><td class="right">${fmtMoney(Number(b.balance)||0)}</td><td><button class="ghost compact" data-id="${b.id}" data-act="edit">E</button> <button class="danger compact" data-id="${b.id}" data-act="del">X</button></td></tr>`).join('')}</tbody></table>`;
-    const dwrap = $('#debts-table'); if(!dwrap) return;
-    if(state.singleData.debts.length === 0) dwrap.innerHTML = '<div class="muted">No hay deudas</div>';
-    else dwrap.innerHTML = `<table><thead><tr><th>Deuda</th><th>Banco</th><th class="right">Saldo</th><th class="right">Cuota</th><th>Acc.</th></tr></thead><tbody>${state.singleData.debts.map(d=>`<tr><td>${d.name}</td><td>${(state.singleData.banks.find(b=>b.id===d.bankId)||{name:'-'}).name}</td><td class="right">${fmtMoney(Number(d.outstanding)||0)}</td><td class="right">${fmtMoney(Number(d.monthlyPayment)||0)}</td><td><button class="ghost compact" data-id="${d.id}" data-act="pay">P</button> <button class="danger compact" data-id="${d.id}" data-act="del">X</button></td></tr>`).join('')}</tbody></table>`;
-    $$('#banks-table button, #debts-table button').forEach(btn=>{ const act=btn.dataset.act, id=btn.dataset.id; btn.onclick = ()=>{ if(act==='edit') openBankModal(id); if(act==='del') showConfirm('Eliminar','Confirmar eliminación', async ()=>{ state.singleData.banks = state.singleData.banks.filter(x=>x.id!==id); pushAndMaybeSync(()=>{}); }); if(act==='pay') openDebtPaymentModal(id); }; });
-  }
-
-  function renderCategories(){
-    const tbody = $('#categories-table tbody'); if(!tbody) return; tbody.innerHTML = '';
-    state.singleData.categories.forEach(c=>{ const tr=document.createElement('tr'); tr.innerHTML = `<td>${c.name}</td><td class="right">${c.limitMonthly?fmtMoney(Number(c.limitMonthly)||0):'Sin límite'}</td><td><button class="ghost compact" data-id="${c.id}" data-act="edit">E</button> <button class="danger compact" data-id="${c.id}" data-act="del">X</button></td>`; tbody.appendChild(tr); });
-    $$('#categories-table button').forEach(btn=>{ const id=btn.dataset.id, act=btn.dataset.act; btn.onclick = ()=>{ if(act==='edit') openCategoryModal(id); if(act==='del') showConfirm('Eliminar categoría','Confirmar', async ()=>{ state.singleData.categories = state.singleData.categories.filter(x=>x.id!==id); await pushAndMaybeSync(()=>{}); }); }; });
-  }
-
-  function populateFilters(){ const sel = $('#filter-bank'); if(!sel) return; sel.innerHTML = '<option value="">-- Todas --</option>' + state.singleData.banks.map(b=>`<option value="${b.id}">${b.name}</option>`).join(''); }
-
-  function updateSessionInfo(){
-    $('#cloud-api').value = state.apiBase;
-    $('#org-id-manual').value = state.orgId;
-    const info = state.cloudOn ? 'Cloud ON' : 'Local';
-    const joined = state.session ? ` · Vinculado: ${state.session.orgId.slice(0,6)}` : ' · No vinculado';
-    $('#session-info').textContent = info + (state.session ? joined : '');
-    $('#org-join-display').textContent = state.orgId ? `Org: ${state.orgId.slice(0,8)}` : 'No vinculado';
-    $('#btn-cloud-toggle').classList.toggle('cloud-on', state.cloudOn);
-    $('#btn-cloud-toggle').classList.toggle('cloud-off', !state.cloudOn);
-    $('#btn-cloud-toggle').textContent = state.cloudOn ? 'Cloud: ON' : 'Cloud: OFF';
-  }
-
-  // ---------- MODALES ----------
-  function showModal(html){ $('#modal').innerHTML = html; $('#modal-backdrop').style.display = 'flex'; }
-  function closeModal(){ $('#modal').innerHTML = ''; $('#modal-backdrop').style.display = 'none'; }
-  function showConfirm(title,text,onConfirm){ showModal(`<div><strong>${title}</strong><div class="muted" style="margin-top:8px">${text}</div><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:12px"><button id="m-cancel" class="ghost compact">Cancelar</button><button id="m-confirm" class="danger compact">Confirmar</button></div></div>`); $('#m-cancel').onclick = closeModal; $('#m-confirm').onclick = async ()=>{ try{ await onConfirm(); } catch(e){ console.error(e); alert('Error: '+e.message); } closeModal(); }; }
-
-  function openJoinModal(){
-    showModal(`<div><h3 style="margin:0">Vincular dispositivo (sin Auth cliente)</h3><div class="muted" style="margin-top:8px">Pega el JOIN CODE (proporcionado por la organización central). El servidor validará y emitirá un token de sesión.</div><div style="display:grid;gap:8px;margin-top:10px"><div><label>JOIN CODE</label><input id="join-code-input" placeholder="ABC123" /></div><div style="display:flex;gap:8px;justify-content:flex-end"><button id="join-cancel" class="ghost compact">Cerrar</button><button id="join-apply" class="primary compact">Unir</button></div><hr style="border:none;border-top:1px solid rgba(255,255,255,0.03)"><div class="muted small">Nota: si no tienes backend desplegado, la app seguirá funcionando en Local (Cloud OFF).</div></div></div>`);
-    $('#join-cancel').onclick = closeModal;
-    $('#join-apply').onclick = async ()=>{
-      const code = $('#join-code-input').value.trim();
-      if(!code) return alert('Ingresa el join code');
-      if(!state.apiBase) return alert('Primero pega tu CLOUD_API_BASE en Export > campo CLOUD_API_BASE');
-      try{
-        await cloudJoin(code);
-        await syncLoadFromCloudIfPossible();
-        closeModal();
-      } catch(e){ console.error(e); alert('No se pudo vincular: ' + e.message); }
-    };
-  }
-
-  function openCategoryModal(editId){
-    const c = state.singleData.categories.find(x=>x.id===editId) || { name:'', limitMonthly:0 };
-    showModal(`<div><h3 style="margin:0">${editId ? 'Editar categoría' : 'Nueva categoría'}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><div><label>Nombre</label><input id="c-name" value="${c.name}" /></div><div><label>Límite mensual (0 = sin límite)</label><input id="c-limit" value="${c.limitMonthly || 0}" /></div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button id="c-cancel" class="ghost compact">Cancelar</button><button id="c-save" class="primary compact">Guardar</button></div></div>`);
-    $('#c-cancel').onclick = closeModal;
-    $('#c-save').onclick = async ()=>{ try{ const name = $('#c-name').value.trim(); const limit = Number($('#c-limit').value) || 0; if(!name) return alert('Nombre requerido'); if(!editId) await addCategory({ name, limitMonthly: limit }); else await updateCategory(editId, { name, limitMonthly: limit }); closeModal(); } catch(e){ console.error(e); alert('Error: '+e.message); } };
-  }
-
-  function openTransactionModal(existing){
-    const catOpts = `<option value="">-- Seleccionar categoría --</option>` + state.singleData.categories.map(c=>`<option value="${c.id}">${c.name}${c.limitMonthly?` (Lím: ${fmtMoney(c.limitMonthly)})`:''}</option>`).join('');
-    const bankOpts = `<option value="">-- Seleccionar cuenta --</option>` + state.singleData.banks.map(b=>`<option value="${b.id}">${b.name}</option>`).join('');
-    const debtOpts = `<option value="">-- Ninguna --</option>` + state.singleData.debts.map(d=>`<option value="${d.id}">${d.name} · ${fmtMoney(d.outstanding)}</option>`).join('');
-    const defaults = existing || { type:'Ingreso', amount:0, categoryId:'', description:'', dateStr:dateToDDMMYYYY(new Date()), bankId:'' };
-    showModal(`<div><h3 style="margin:0">${existing ? 'Editar transacción' : 'Nueva transacción'}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><div><label>Tipo</label><select id="m-type"><option ${defaults.type==='Ingreso'?'selected':''}>Ingreso</option><option ${defaults.type==='Egreso'?'selected':''}>Egreso</option></select></div><div><label>Monto</label><input id="m-amount" value="${defaults.amount||0}" /></div><div><label>Cuenta</label><select id="m-bank">${bankOpts}</select></div><div><label>Categoría</label><select id="m-cat">${catOpts}</select></div><div style="grid-column:1/-1"><label>Descripción</label><input id="m-desc" value="${(defaults.description||'').replace(/"/g,'&quot;')}" /></div><div><label>Fecha (dd/mm/yyyy)</label><input id="m-date" value="${defaults.dateStr||''}" /></div><div><label>Pago a deuda (opcional)</label><select id="m-debt">${debtOpts}</select></div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button id="m-cancel" class="ghost compact">Cancelar</button><button id="m-save" class="primary compact">Guardar</button></div></div>`);
-    if(existing){ setTimeout(()=>{ if(existing.bankId) $('#m-bank').value = existing.bankId; if(existing.categoryId) $('#m-cat').value = existing.categoryId; if(existing.debtId) $('#m-debt').value = existing.debtId; if($('#m-amount')) $('#m-amount').value = Number(existing.amount)||0; },50); }
-    $('#m-cancel').onclick = closeModal;
-    $('#m-save').onclick = async ()=> {
-      try{
-        const type = $('#m-type').value;
-        const amount = Number($('#m-amount').value) || 0;
-        const bankId = $('#m-bank').value || null;
-        const categoryId = $('#m-cat').value || null;
-        const description = $('#m-desc').value.trim();
-        const dateStr = $('#m-date').value.trim();
-        const debtId = $('#m-debt').value || null;
-        if(!amount || amount <= 0) return alert('Monto inválido');
-        if(!parseDateDDMMYYYY(dateStr)) return alert('Fecha inválida (dd/mm/yyyy)');
-        await addTransaction({ type, amount, categoryId, description, dateStr, bankId, debtId });
-        closeModal();
-      } catch(e){ console.error(e); alert('Error al guardar transacción: '+e.message); }
-    };
-  }
-
-  function openBankModal(editId){
-    const b = state.singleData.banks.find(x=>x.id===editId) || { name:'', balance:0, type:'Cuenta', currency:'PEN' };
-    showModal(`<div><h3 style="margin:0">${editId ? 'Editar cuenta' : 'Nueva cuenta'}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><div><label>Nombre</label><input id="b-name" value="${b.name}" /></div><div><label>Tipo</label><input id="b-type" value="${b.type}" /></div><div><label>Saldo inicial</label><input id="b-balance" value="${Number(b.balance)||0}" /></div><div><label>Moneda</label><input id="b-currency" value="${b.currency||'PEN'}" /></div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button id="b-cancel" class="ghost compact">Cancelar</button><button id="b-save" class="primary compact">Guardar</button></div></div>`);
-    $('#b-cancel').onclick = closeModal;
-    $('#b-save').onclick = async ()=> {
-      try{
-        const name = $('#b-name').value.trim(); const type = $('#b-type').value.trim(); const balance = Number($('#b-balance').value)||0; const currency = $('#b-currency').value.trim()||'PEN';
-        if(!name) return alert('Nombre requerido');
-        if(!editId){ await addBank({ name, type, balance, currency }); } else { await updateBank(editId, { name, type, balance, currency }); }
-        closeModal();
-      } catch(e){ console.error(e); alert('Error al guardar cuenta: '+e.message); }
-    };
-  }
-
-  function openDebtModal(){ showModal(`<div><h3 style="margin:0">Nueva deuda</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><div><label>Nombre</label><input id="d-name" /></div><div><label>Banco</label><select id="d-bank"><option value="">-- Seleccionar --</option>${state.singleData.banks.map(b=>`<option value="${b.id}">${b.name}</option>`).join('')}</select></div><div><label>Saldo pendiente</label><input id="d-out" value="0" /></div><div><label>Cuota mensual</label><input id="d-pay" value="0" /></div><div><label>Interés (%)</label><input id="d-interest" value="0" /></div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button id="d-cancel" class="ghost compact">Cancelar</button><button id="d-save" class="primary compact">Guardar</button></div></div>`); $('#d-cancel').onclick = closeModal; $('#d-save').onclick = async ()=> { try{ const name=$('#d-name').value.trim(); const bankId=$('#d-bank').value||null; const outstanding=Number($('#d-out').value)||0; const monthlyPayment=Number($('#d-pay').value)||0; const interest=Number($('#d-interest').value)||0; if(!name) return alert('Nombre requerido'); await addDebt({ name, bankId, outstanding, monthlyPayment, interest }); closeModal(); } catch(e){ console.error(e); alert('Error al guardar deuda: '+e.message); } }; }
-
-  function openDebtPaymentModal(debtId){
-    const d = state.singleData.debts.find(x=>x.id===debtId); if(!d) return alert('Deuda no encontrada');
-    showModal(`<div><h3 style="margin:0">Pagar ${d.name}</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><div><label>Monto</label><input id="pay-amount" value="${Number(d.monthlyPayment)||0}" /></div><div><label>Cuenta</label><select id="pay-bank">${state.singleData.banks.map(b=>`<option value="${b.id}">${b.name}</option>`).join('')}</select></div><div style="grid-column:1/-1"><label>Descripción</label><input id="pay-desc" value="Pago deuda ${d.name}" /></div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button id="pay-cancel" class="ghost compact">Cancelar</button><button id="pay-save" class="primary compact">Registrar pago</button></div></div>`);
-    $('#pay-cancel').onclick = closeModal;
-    $('#pay-save').onclick = async ()=> {
-      try{
-        const amount = Number($('#pay-amount').value) || 0; const bankId = $('#pay-bank').value; const desc = $('#pay-desc').value.trim();
-        if(!amount || amount <= 0) return alert('Monto inválido');
-        const today = dateToDDMMYYYY(new Date());
-        await addTransaction({ type:'Egreso', amount, categoryId:null, categoryName:'Pago Deuda', description:desc, dateStr:today, bankId, debtId });
-        closeModal();
-      } catch(e){ console.error(e); alert('Error al registrar pago: '+e.message); }
-    };
-  }
-
-  // ---------- EXPORT / IMPORT / PDF ----------
-  function exportTransactionsCSV(){
-    const rows = state.singleData.transactions.map(t=>{ const date = t.dateStr || ''; const bank = state.singleData.banks.find(b=>b.id===t.bankId); const cat = state.singleData.categories.find(c=>c.id===t.categoryId); return [date, bank?bank.name:'', t.type||'', cat?cat.name:(t.categoryName||''), (t.description||'').replace(/"/g,'""'), t.amount||0]; });
-    const csv = [['fecha,cuenta,tipo,categoria,descripcion,monto'], ...rows.map(r=>r.map((c,i)=> i===4?`"${c}"`:c).join(','))].join('\n');
-    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'transacciones.csv'; a.click(); URL.revokeObjectURL(url);
-  }
-  function exportBackupJSON(){ const data = JSON.parse(JSON.stringify(state.singleData)); const blob = new Blob([JSON.stringify(data,null,2)], { type:'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'backup_single_data.json'; a.click(); URL.revokeObjectURL(url); }
-  async function importFile(file){ if(!file) return alert('Selecciona archivo'); const text = await file.text(); if(file.name.toLowerCase().endsWith('.csv')){ const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean); const headers = lines.shift().split(',').map(h=>h.toLowerCase()); for(const line of lines){ const parts = line.match(/(".*?"|[^,]+)(?=\s*,|\s*$)/g).map(p=>p.replace(/^"|"$/g,'').replace(/""/g,'"')); const obj={}; headers.forEach((h,i)=> obj[h]=parts[i]||''); const bank = state.singleData.banks.find(b=>b.name===obj.cuenta); const cat = state.singleData.categories.find(c=>c.name===obj.categoria); await addTransaction({ type: obj.tipo||'Ingreso', amount: Number(obj.monto)||0, categoryId: cat?cat.id:null, categoryName: obj.categoria||'', description: obj.descripcion||'', dateStr: obj.fecha, bankId: bank?bank.id:null }); } showToast('CSV importado'); } else { try{ const data = JSON.parse(text); if(data.categories){ for(const c of data.categories) await addCategory(c); } if(data.banks){ for(const b of data.banks) await addBank(b); } if(data.debts){ for(const d of data.debts) await addDebt(d); } if(data.fixed){ for(const f of data.fixed) await addFixedExpense(f); } if(data.savings){ for(const s of data.savings) await addSaving(s); } if(data.transactions){ for(const t of data.transactions) await addTransaction({ type:t.type||'Ingreso', amount:t.amount||0, categoryId:t.categoryId||null, categoryName:t.categoryName||t.category||'', description:t.description||'', dateStr:t.dateStr || '' , bankId:t.bankId||null }); } showToast('JSON importado'); } catch(e){ alert('JSON inválido'); } } }
-
-  function exportReportPDF(){
-    const node = document.createElement('div');
-    node.style.padding = '12mm';
-    node.style.background = '#fff';
-    node.style.color = '#111';
-    node.style.fontFamily = 'Arial, Helvetica, sans-serif';
-    node.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6mm">
-        <div>
-          <div class="report-title">Reporte Financiero - JHONATAN ORELLANA</div>
-          <div class="report-sub" style="color:#444;margin-top:2mm">Fecha: ${dateToDDMMYYYY(new Date())}</div>
+  <!-- MODALES -->
+  <!-- PRODUCT -->
+  <div id="modal-product" class="modal" aria-hidden="true">
+    <div class="modal-card card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:800">Producto</div>
+        <button data-close class="text-xl">✕</button>
+      </div>
+      <form id="form-product" class="mt-3 space-y-2">
+        <input type="hidden" id="product-id"/>
+        <input id="product-name" placeholder="Nombre" required />
+        <div style="display:flex;gap:8px">
+          <input id="product-category" placeholder="Categoría" class="flex-1"/>
+          <input id="product-price" placeholder="Precio" type="number" step="0.01" style="width:110px"/>
         </div>
-        <div style="text-align:right">
-          <div class="report-title">${$('#balance').textContent}</div>
+        <div style="display:flex;gap:8px">
+          <input id="product-barcode" placeholder="Código de barras" class="flex-1"/>
+          <input id="product-stock" placeholder="Stock" type="number" style="width:110px"/>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button data-close type="button" class="px-3 py-2 border rounded">Cancelar</button>
+          <button type="submit" class="px-3 py-2 bg-green-600 text-white rounded">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SCANNER -->
+  <div id="modal-scan" class="modal" aria-hidden="true">
+    <div class="modal-card card p-0">
+      <div style="background:#000;color:white;padding:10px;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:800">Escáner</div>
+        <div>
+          <button id="btn-toggle-torch" class="px-2 py-1 rounded hidden">🔦</button>
+          <button data-close class="text-xl">✕</button>
         </div>
       </div>
-      <hr style="border:none;border-top:1px solid #ddd;margin-bottom:6mm">
-      <div class="report-sub" style="margin-bottom:3mm">Bancos</div>
-      <div class="report-normal" style="margin-bottom:6mm">${state.singleData.banks.length ? `<ul style="margin:0 0 6mm 14px">${state.singleData.banks.map(b=>`<li style="margin-bottom:2mm">${b.name}: ${fmtMoney(Number(b.balance)||0)}</li>`).join('')}</ul>` : '<div style="color:#666">Sin cuentas registradas</div>'}</div>
-      <div class="report-sub" style="margin-bottom:3mm">Deudas</div>
-      <div class="report-normal" style="margin-bottom:6mm">${state.singleData.debts.length ? `<ul style="margin:0 0 6mm 14px">${state.singleData.debts.map(d=>`<li style="margin-bottom:2mm">${d.name} - Saldo: ${fmtMoney(Number(d.outstanding)||0)} - Cuota: ${fmtMoney(Number(d.monthlyPayment)||0)}</li>`).join('')}</ul>` : '<div style="color:#666">Sin deudas</div>'}</div>
-      <div class="report-sub" style="margin-bottom:3mm">Últimas transacciones</div>
-      <table style="width:100%;border-collapse:collapse;font-size:10pt">
-        <thead><tr><th style="text-align:left;border-bottom:1px solid #ddd;padding:6px 0">Fecha</th><th style="text-align:left;border-bottom:1px solid #ddd;padding:6px 0">Cuenta</th><th style="text-align:left;border-bottom:1px solid #ddd;padding:6px 0">Categoría</th><th style="text-align:right;border-bottom:1px solid #ddd;padding:6px 0">Monto</th></tr></thead>
-        <tbody>
-          ${state.singleData.transactions.slice(0,40).map(t=>`<tr><td style="padding:6px 0">${t.dateStr || ''}</td><td style="padding:6px 0">${(state.singleData.banks.find(b=>b.id===t.bankId)||{name:'-'}).name}</td><td style="padding:6px 0">${(state.singleData.categories.find(c=>c.id===t.categoryId)||{name:t.categoryName||'-'}).name}</td><td style="padding:6px 0;text-align:right">${fmtMoney(Number(t.amount)||0)}</td></tr>`).join('')}
-        </tbody>
-      </table>
-      <div style="margin-top:8mm;font-size:10pt;color:#666">Generado por JHONATAN ORELLANA - App Personal</div>
-    `;
-    if(window.html2pdf) html2pdf().set({ margin:10, filename:`reporte_${(new Date()).toISOString().slice(0,10)}.pdf`, image:{type:'jpeg',quality:0.98}, html2canvas:{scale:2,useCORS:true}, jsPDF:{unit:'mm',format:'a4',orientation:'portrait'} }).from(node).save();
-    else alert('html2pdf no cargado. Recarga con conexión.');
-  }
+      <div id="video-wrap" style="position:relative;height:44vh;background:#000">
+        <video id="video" autoplay muted playsinline></video>
+        <canvas id="overlay-canvas"></canvas>
+        <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:60%;height:24%;border:2px dashed rgba(255,255,255,0.5);border-radius:8px;pointer-events:none"></div>
+      </div>
+      <div style="padding:8px;background:white;display:flex;flex-direction:column;gap:8px">
+        <input id="scanned-code" class="px-3 py-2 border rounded" placeholder="Código detectado" readonly/>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="flex:1">
+            <div class="small-muted">Producto encontrado</div>
+            <div id="scanned-product-name" style="font-weight:700">—</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button id="btn-register-from-scan" class="px-3 py-2 bg-indigo-600 text-white rounded">Registrar</button>
+            <button id="btn-scan-add-to-quick" class="px-3 py-2 bg-emerald-600 text-white rounded">Agregar a Venta</button>
+            <button id="btn-stop-camera" class="px-3 py-2 border rounded">Detener</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  // ---------- TECLA 'N' para nueva transacción ----------
-  let modalOpen = false;
-  const modalBackdrop = $('#modal-backdrop');
-  const observer = new MutationObserver(()=>{ modalOpen = modalBackdrop.style.display === 'flex'; });
-  observer.observe(modalBackdrop, { attributes:true, attributeFilter:['style'] });
-  window.addEventListener('keydown', (e)=>{
-    if(e.key.toLowerCase() === 'n' && !e.ctrlKey && !e.altKey && !e.metaKey){
-      const active = document.activeElement;
-      const tag = active && active.tagName ? active.tagName.toLowerCase() : '';
-      if(modalOpen) return;
-      if(tag === 'input' || tag === 'textarea' || tag === 'select' || active.isContentEditable) return;
-      if(e.repeat) return;
-      openTransactionModal();
-    }
+  <!-- QUICK SALE -->
+  <div id="modal-quick" class="modal" aria-hidden="true">
+    <div class="modal-card card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:800">Venta Rápida</div>
+        <button data-close class="text-xl">✕</button>
+      </div>
+      <form id="form-quick" class="mt-3 space-y-2">
+        <div style="position:relative">
+          <input id="quick-search" placeholder="Buscar por letras o código..." />
+          <div id="quick-suggestions" class="suggestions hidden"></div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <select id="quick-product" class="flex-1"></select>
+          <input id="quick-qty" type="number" value="1" min="1" style="width:80px"/>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <label class="small-muted">Pago</label>
+          <select id="quick-payment" class="px-3 py-2 rounded border">
+            <option value="EFECTIVO">EFECTIVO</option>
+            <option value="YAPE">YAPE</option>
+            <option value="A_CREDITO">A CREDITO</option>
+          </select>
+          <input id="quick-customer" placeholder="Cliente (si A CREDITO)" class="flex-1"/>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>Total: <span id="quick-total">0.00</span></div>
+          <div style="display:flex;gap:8px">
+            <button type="button" id="quick-scan-inside" class="px-3 py-2 border rounded">Escanear</button>
+            <button type="button" id="quick-add" class="px-3 py-2 border rounded">Agregar</button>
+            <button type="submit" class="px-3 py-2 bg-red-600 text-white rounded">Cobrar</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-weight:800">Carrito</div>
+          <div id="quick-cart" class="mt-2 space-y-2"></div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CLIENTS -->
+  <div id="modal-clients" class="modal" aria-hidden="true">
+    <div class="modal-card card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:800">Clientes (A CREDITO)</div>
+        <button data-close class="text-xl">✕</button>
+      </div>
+      <div class="mt-2">
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <input id="client-name" placeholder="Nuevo cliente" class="flex-1"/>
+          <button id="btn-add-client" class="px-3 py-2 bg-green-600 text-white rounded">Agregar</button>
+        </div>
+        <div id="clients-list" class="max-h-64 overflow-auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REPORTS -->
+  <div id="modal-reports" class="modal" aria-hidden="true">
+    <div class="modal-card card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-weight:800">Reportes</div>
+        <button data-close class="text-xl">✕</button>
+      </div>
+      <div class="mt-2">
+        <div style="display:flex;gap:8px;align-items:end">
+          <div style="flex:1"><label class="small-muted">Fecha</label><input id="report-date" type="date" class="w-full" /></div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button id="btn-preview-day" class="px-3 py-2 bg-indigo-600 text-white rounded">Vista</button>
+            <button id="btn-download-day" class="px-3 py-2 bg-gray-800 text-white rounded">Descargar PDF</button>
+            <button id="btn-print-day" class="px-3 py-2 border rounded">Imprimir</button>
+          </div>
+        </div>
+        <div id="report-preview" class="mt-3 max-h-72 overflow-auto card small-muted"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN (unchanged) -->
+  <div id="modal-login" class="modal visible" aria-hidden="false" style="background:linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.6))">
+    <div class="modal-card card p-4" style="max-width:420px">
+      <h2 style="font-weight:800">Ingresar — TiendaSmart</h2>
+      <p class="small-muted">Usuario: <strong>LIZ</strong> — Contraseña: <strong>MAGALY</strong></p>
+      <form id="form-login" class="mt-2 space-y-3">
+        <input id="login-user" placeholder="Usuario" class="w-full"/>
+        <input id="login-pass" placeholder="Contraseña" type="password" class="w-full"/>
+        <div style="display:flex;gap:8px">
+          <button type="submit" class="flex-1 px-4 py-3 bg-blue-600 text-white rounded font-semibold">Entrar</button>
+          <button type="button" id="login-guest" class="flex-1 px-4 py-3 border rounded">Demo</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ================= FIREBASE CONFIG ================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyBh2WHinnQeRD9fsmdEMJ9zkNVJNcixzS4",
+  authDomain: "jhonatan-7ca7d.firebaseapp.com",
+  projectId: "jhonatan-7ca7d",
+  storageBucket: "jhonatan-7ca7d.firebasestorage.app",
+  messagingSenderId: "248102422749",
+  appId: "1:248102422749:web:097c4e553e610d27dff334"
+};
+/* ================================================== */
+
+/* Helpers */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const uid = () => 'id-' + Math.random().toString(36).slice(2,9);
+const money = v => Number(v||0).toFixed(2);
+const todayYMD = ()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+
+/* State */
+let STATE = { products: [], sales: [], customers: [] }; // removed responsibles
+let cloudEnabled = false, db = null;
+const COLLECTION = "MODO DE PREODUCCIÓN", DOC_ID = "DATOS", FIELD = "MAGALY";
+
+/* Toast utilities */
+let toastTimeout = null;
+function showToast(message, actions = [], ttl = 8000){
+  const wrap = $('#toast-wrap'); wrap.innerHTML = '';
+  const t = document.createElement('div'); t.className = 'toast';
+  const msg = document.createElement('div'); msg.className='msg'; msg.textContent = message;
+  const act = document.createElement('div'); act.className='actions';
+  actions.forEach(a=>{
+    const b = document.createElement('button'); b.textContent = a.label;
+    b.addEventListener('click', ()=> { try{ a.onClick(); }catch(e){ console.error(e); } hideToast(); });
+    act.appendChild(b);
   });
+  t.appendChild(msg); if(actions.length>0) t.appendChild(act);
+  wrap.appendChild(t);
+  if(toastTimeout) clearTimeout(toastTimeout);
+  if(ttl > 0) toastTimeout = setTimeout(()=> hideToast(), ttl);
+}
+function hideToast(){ const wrap = $('#toast-wrap'); wrap.innerHTML = ''; if(toastTimeout){ clearTimeout(toastTimeout); toastTimeout = null; } }
 
-  // ---------- BIND UI ----------
-  function bindUI(){
-    document.querySelectorAll('nav.bottom-nav button').forEach(b => b.addEventListener('click', ()=> switchView(b.dataset.view)));
-    $('#btn-add-transaction').onclick = ()=> openTransactionModal();
-    $('#btn-add-bank').onclick = ()=> openBankModal();
-    $('#btn-add-debt').onclick = ()=> openDebtModal();
-    $('#btn-new-category')?.addEventListener('click', ()=> openCategoryModal());
-    $('#export-csv').onclick = exportTransactionsCSV;
-    $('#export-json').onclick = exportBackupJSON;
-    $('#btn-import').onclick = ()=> importFile($('#import-file').files[0]);
-    $('#export-pdf').onclick = exportReportPDF;
-    $('#search').addEventListener('input', ()=> renderTransactions());
-    $('#modal-backdrop').onclick = (e)=> { if(e.target.id === 'modal-backdrop') closeModal(); };
-    $('#btn-manage-join').onclick = ()=> openJoinModal();
-    $('#btn-cloud-toggle').onclick = ()=> { state.cloudOn = !state.cloudOn; localStorage.setItem('jo_cloud_mode', state.cloudOn ? 'on' : 'off'); updateSessionInfo(); if(state.cloudOn) { state.apiBase = $('#cloud-api').value.trim() || state.apiBase; localStorage.setItem('jo_api_base', state.apiBase); if(state.session) syncLoadFromCloudIfPossible(); } };
-    $('#cloud-api').onchange = (e)=> { state.apiBase = e.target.value.trim(); localStorage.setItem('jo_api_base', state.apiBase); };
-    $('#org-id-manual').onchange = (e)=> { state.orgId = e.target.value.trim(); localStorage.setItem('jo_org_id', state.orgId); };
-  }
-
-  // ---------- START ----------
-  (function init(){
-    // load saved cloud mode
-    const cm = localStorage.getItem('jo_cloud_mode');
-    state.cloudOn = cm === 'on';
-    const s = localStorage.getItem('jo_api_base'); if(s) state.apiBase = s;
-    const sess = localStorage.getItem(SESSION_KEY); if(sess) state.session = JSON.parse(sess);
-    const org = localStorage.getItem('jo_org_id'); if(org) state.orgId = org;
-    loadLocal();
-    bindUI();
-    renderAll();
-    switchView('dashboard');
-  })();
-
-  // expose for debugging
-  window._jo_state = state;
-  window._jo_syncSave = syncSaveToCloudIfPossible;
-  window._jo_syncLoad = syncLoadFromCloudIfPossible;
-
-  </script>
-
-  <!--
-    -----------------------------
-    EJEMPLO DE CLOUD FUNCTION (Node.js + Express)
-    (cópialo y despliega en Cloud Functions / Cloud Run)
-    -----------------------------
-    // index.js (Cloud Function)
-    const express = require('express');
-    const admin = require('firebase-admin');
-    admin.initializeApp();
-    const db = admin.firestore();
-    const app = express();
-    app.use(require('cors')({ origin: true }));
-    app.use(express.json());
-
-    // Util: generate token simple (firmado con random). Para producción usa JWT/Firestore tokens.
-    const crypto = require('crypto');
-    function generateToken(){ return crypto.randomBytes(32).toString('hex'); }
-
-    // POST /join  -> { ok, orgId, token, expiresAt }
-    app.post('/join', async (req, res) => {
-      try{
-        const { joinCode } = req.body;
-        if(!joinCode) return res.status(400).json({ ok:false, error:'joinCode required' });
-        // buscar org con joinCode
-        const q = await db.collection('organizations').where('joinCode','==',joinCode).limit(1).get();
-        if(q.empty) return res.status(404).json({ ok:false, error:'joinCode not found' });
-        const orgDoc = q.docs[0];
-        const orgId = orgDoc.id;
-        // crea session token en colección server-side (in-memory no sirve)
-        const token = generateToken();
-        const expiresAt = Date.now() + 1000*60*60*24; // 24h (ajustar)
-        await db.collection('serverSessions').doc(token).set({ orgId, expiresAt, createdAt: admin.firestore.FieldValue.serverTimestamp() });
-        return res.json({ ok:true, orgId, token, expiresAt });
-      }catch(e){ console.error(e); return res.status(500).json({ ok:false, error: e.message }); }
-    });
-
-    // middleware: verifica session token
-    async function requireToken(req,res,next){
-      try{
-        const auth = req.headers.authorization || '';
-        if(!auth.startsWith('Bearer ')) return res.status(401).json({ ok:false, error:'missing token' });
-        const token = auth.split(' ')[1];
-        const snap = await db.collection('serverSessions').doc(token).get();
-        if(!snap.exists) return res.status(401).json({ ok:false, error:'invalid token' });
-        const data = snap.data();
-        if(data.expiresAt < Date.now()) return res.status(401).json({ ok:false, error:'token expired' });
-        req.orgId = data.orgId;
-        next();
-      }catch(e){ console.error(e); return res.status(500).json({ ok:false, error: e.message }); }
-    }
-
-    // GET /data?orgId=ID
-    app.get('/data', requireToken, async (req,res) => {
-      try{
-        const orgId = req.query.orgId || req.orgId;
-        if(!orgId) return res.status(400).json({ ok:false, error:'orgId required' });
-        const ref = db.collection('organizations').doc(orgId).collection('DATA').doc('DATA');
-        const snap = await ref.get();
-        if(!snap.exists) return res.json({ ok:true, data: { transactions:[], banks:[], debts:[], fixed:[], savings:[], categories:[], meta:{} } });
-        return res.json({ ok:true, data: snap.data().data });
-      }catch(e){ console.error(e); return res.status(500).json({ ok:false, error:e.message }); }
-    });
-
-    // POST /data  body { orgId, data }
-    app.post('/data', requireToken, async (req,res) => {
-      try{
-        const { orgId, data } = req.body;
-        if(!orgId || !data) return res.status(400).json({ ok:false, error:'orgId and data required' });
-        // write single doc (merge)
-        const ref = db.collection('organizations').doc(orgId).collection('DATA').doc('DATA');
-        await ref.set({ data, updatedAt: admin.firestore.FieldValue.serverTimestamp() }, { merge:true });
-        return res.json({ ok:true });
-      }catch(e){ console.error(e); return res.status(500).json({ ok:false, error:e.message }); }
-    });
-
-    // deploy
-    exports.app = functions.https.onRequest(app);
-
-    ------------------------------------------------------------------
-    RECOMENDACIONES:
-    - Protege la colección serverSessions: sólo el servidor debe poder escribirla.
-    - Ajusta expiresAt corto (ej. 1 hora) y posibilidad de renovar.
-    - No expongas claves privadas en el cliente. El token aquí es efímero y emitido por el servidor.
-    - En Firestore, aplica reglas que bloqueen cualquier lectura/escritura directa del cliente:
-        match /databases/{database}/documents {
-          match /{document=**} { allow read, write: if false; }
+/* Firestore init + sync */
+function initFirebaseAuto(){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    const docRef = db.collection(COLLECTION).doc(DOC_ID);
+    docRef.get().then(snap=>{
+      if(!snap.exists) docRef.set({ [FIELD]: { products:[], sales:[], customers:[] } });
+      else {
+        const remote = snap.data() && snap.data()[FIELD];
+        if(remote){
+          STATE.products = remote.products || []; STATE.sales = remote.sales || []; STATE.customers = remote.customers || [];
+          renderInventory(); renderQuickSelect(); renderClients();
         }
-    ------------------------------------------------------------------
-  -->
+      }
+    });
+    docRef.onSnapshot(snap=>{
+      const remote = snap.exists ? snap.data()[FIELD] : null;
+      if(remote){
+        STATE.products = remote.products || []; STATE.sales = remote.sales || []; STATE.customers = remote.customers || [];
+        renderInventory(); renderQuickSelect(); renderClients();
+        $('#cloud-label').textContent = 'conectado';
+      }
+    }, err => { console.warn('onSnapshot', err); $('#cloud-label').textContent = 'error'; });
+    cloudEnabled = true; $('#cloud-label').textContent = 'conectado';
+  }catch(e){ console.warn('firebase init', e); $('#cloud-label').textContent = 'error'; }
+}
+async function pushStateToCloud(){ if(!cloudEnabled || !db) return; try{ const docRef = db.collection(COLLECTION).doc(DOC_ID); await docRef.set({ [FIELD]: STATE }, { merge:true }); }catch(e){ console.warn('push err', e); } }
 
+/* Local backup */
+function saveLocalBackup(){ try{ localStorage.setItem('tienda_local_backup', JSON.stringify(STATE)); }catch(e){} }
+
+/* AUTH simple */
+const AUTH_USER='LIZ', AUTH_PASS='MAGALY', AUTH_KEY='ts_user';
+function isAuth(){ return !!localStorage.getItem(AUTH_KEY); }
+function setAuth(u){ localStorage.setItem(AUTH_KEY,u); $('#modal-login') && ($('#modal-login').classList.remove('visible')); }
+$('#form-login').addEventListener('submit', e=>{ e.preventDefault(); const u=$('#login-user').value.trim(), p=$('#login-pass').value; if(u===AUTH_USER && p===AUTH_PASS){ setAuth(u); startApp(); } else alert('Credenciales inválidas'); });
+$('#login-guest').addEventListener('click', ()=>{ setAuth('GUEST'); startApp(); });
+
+/* Modals helpers */
+function openModal(id){ const m = $('#'+id); if(!m) return; m.classList.add('visible'); m.setAttribute('aria-hidden','false'); }
+function closeModalId(id){ const m = $('#'+id); if(!m) return; if(id === 'modal-scan') stopCamera(); m.classList.remove('visible'); m.setAttribute('aria-hidden','true'); }
+document.addEventListener('click', e=>{ const b = e.target.closest('[data-close]'); if(b){ const modal = b.closest('.modal'); if(modal) closeModalId(modal.id); } });
+
+/* Inventory render */
+function renderInventory(filter=''){
+  const container = $('#inventory-list'); container.innerHTML = '';
+  const q = (filter||'').trim().toLowerCase();
+  let list = STATE.products.slice();
+  if(q) list = list.filter(p => (p.name||'').toLowerCase().includes(q) || (p.barcode||'').includes(q));
+  if(list.length === 0){ container.innerHTML = '<div class="card small-muted">No hay productos</div>'; return; }
+  for(const p of list){
+    const low = (p.stock||0) <= 5;
+    const node = document.createElement('div'); node.className='inventory-item';
+    node.innerHTML = `<div class="left">
+        <div class="meta">${escapeHtml(p.name)} ${low?'<span style="color:#b91c1c"> • STOCK BAJO</span>':''}</div>
+        <div class="sub">${escapeHtml(p.category||'')} • ${escapeHtml(p.barcode||'')}</div>
+        <div class="small-muted">S/ ${money(p.price)} · Stock: ${p.stock||0}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end">
+        <button class="px-3 py-2 bg-red-500 text-white rounded sell-btn" data-id="${p.id}">Vender</button>
+        <button class="px-3 py-2 border rounded income-btn" data-id="${p.id}">+Stock</button>
+        <button class="px-3 py-2 border rounded edit-btn" data-id="${p.id}">Editar</button>
+      </div>`;
+    container.appendChild(node);
+  }
+  $$('.sell-btn').forEach(b=> b.onclick = ()=> openQuickWithProduct(b.dataset.id));
+  $$('.income-btn').forEach(b=> b.onclick = ()=> openIncome(b.dataset.id));
+  $$('.edit-btn').forEach(b=> b.onclick = ()=> openProductModal(STATE.products.find(x=>x.id===b.dataset.id)));
+}
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* Product CRUD */
+$('#btn-add-product').addEventListener('click', ()=> openProductModal());
+function openProductModal(product, afterSaveCallback){
+  $('#form-product').reset(); $('#product-id').value='';
+  if(product){
+    $('#product-id').value = product.id || '';
+    $('#product-name').value = product.name || '';
+    $('#product-category').value = product.category||'';
+    $('#product-price').value = product.price||0;
+    $('#product-barcode').value = product.barcode||'';
+    $('#product-stock').value = product.stock||0;
+  }
+  const form = $('#form-product');
+  form._afterSave = afterSaveCallback || null;
+  openModal('modal-product');
+}
+$('#form-product').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const id = $('#product-id').value || uid();
+  const prod = { id, name: $('#product-name').value.trim(), category: $('#product-category').value.trim(), price: Number($('#product-price').value)||0, barcode: $('#product-barcode').value.trim(), stock: Number($('#product-stock').value)||0, createdAt: new Date().toISOString() };
+  const idx = STATE.products.findIndex(x=>x.id===id);
+  if(idx >= 0) STATE.products[idx] = prod; else STATE.products.unshift(prod);
+  renderInventory(); renderQuickSelect(); saveLocalBackup(); await pushStateToCloud();
+  const form = $('#form-product');
+  if(form && form._afterSave){ try{ form._afterSave(prod); }catch(e){} form._afterSave = null; }
+  closeModalId('modal-product');
+});
+
+/* Stock income */
+function openIncome(productId){
+  const qtyStr = prompt('Cantidad a agregar (ingreso):','1'); if(!qtyStr) return;
+  const qty = Math.max(1, Number(qtyStr));
+  const p = STATE.products.find(x=>x.id===productId); if(!p) return alert('Producto no encontrado');
+  p.stock = (p.stock||0) + qty; STATE.products = STATE.products.map(x=> x.id===p.id ? p : x);
+  saveLocalBackup(); pushStateToCloud().catch(()=>{}); renderInventory();
+}
+
+/* Sales / Quick sale */
+let quickCart = [];
+function renderQuickSelect(){
+  const sel = $('#quick-product'); if(!sel) return;
+  sel.innerHTML = ''; STATE.products.forEach(p=>{ const o = document.createElement('option'); o.value = p.id; o.textContent = `${p.name} (stock ${p.stock||0})`; sel.appendChild(o); });
+  updateQuickTotal();
+}
+$('#btn-open-quick').addEventListener('click', ()=>{ renderQuickSelect(); openModal('modal-quick'); });
+
+$('#quick-search').addEventListener('input', (e)=>{
+  const q = e.target.value.trim().toLowerCase();
+  showQuickSuggestions(q);
+  if(q.length >= 1){
+    const found = STATE.products.find(p => p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q));
+    if(found) $('#quick-product').value = found.id;
+  }
+  updateQuickTotal();
+});
+function showQuickSuggestions(q){
+  const box = $('#quick-suggestions'); if(!box) return; box.innerHTML=''; box.classList.add('hidden'); if(!q) return;
+  const results = STATE.products.filter(p => p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q)).slice(0,8);
+  if(results.length===0) return;
+  for(const p of results){
+    const d = document.createElement('div'); d.className='px-3 py-2'; d.innerHTML = `<div style="font-weight:700">${p.name}</div><div class="small-muted">${p.barcode||''} • ${p.category||''}</div>`;
+    d.onclick = ()=>{ $('#quick-product').value = p.id; $('#quick-suggestions').classList.add('hidden'); $('#quick-search').value = ''; updateQuickTotal(); };
+    box.appendChild(d);
+  }
+  box.classList.remove('hidden');
+}
+$('#quick-product') && $('#quick-product').addEventListener('change', updateQuickTotal);
+$('#quick-qty') && $('#quick-qty').addEventListener('input', updateQuickTotal);
+function updateQuickTotal(){ const pid = $('#quick-product')? $('#quick-product').value : null; const qty = Number($('#quick-qty')? $('#quick-qty').value : 0)||0; const p = STATE.products.find(x=>x.id===pid); $('#quick-total') && ($('#quick-total').textContent = money(p ? p.price * qty : 0)); }
+
+$('#quick-add').addEventListener('click', ()=>{
+  const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||1; const p = STATE.products.find(x=>x.id===pid); if(!p) return alert('Selecciona producto'); quickCart.push({ productId: pid, qty, price: p.price }); renderQuickCart();
+});
+function renderQuickCart(){
+  const el = $('#quick-cart'); if(!el) return; el.innerHTML = '';
+  quickCart.forEach((it, idx)=>{
+    const p = STATE.products.find(x=>x.id===it.productId);
+    const row = document.createElement('div'); row.className='flex justify-between items-center';
+    row.innerHTML = `<div>${p.name} x ${it.qty}</div><div>S/ ${money(it.qty*it.price)} <button data-idx="${idx}" class="text-red-600 ml-2">Quitar</button></div>`;
+    el.appendChild(row);
+  });
+  $$('#quick-cart button').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); });
+}
+
+$('#form-quick').addEventListener('submit', async e=>{
+  e.preventDefault();
+  if(quickCart.length===0) return alert('Agregar productos al carrito');
+  const customer = $('#quick-customer').value.trim(); const payment = $('#quick-payment').value;
+  for(const it of quickCart){ const p = STATE.products.find(x=>x.id===it.productId); if(p) p.stock = (p.stock||0) - it.qty; }
+  const total = quickCart.reduce((s,i)=>s + i.qty*i.price,0);
+  const sale = { id: uid(), items: quickCart.slice(), total, date: new Date().toISOString(), customerName: customer||null, paid: (payment !== 'A_CREDITO'), paymentType: payment, responsible: null };
+  STATE.sales.unshift(sale);
+  if(payment === 'A_CREDITO' && customer){
+    const existing = STATE.customers.find(c=>c.name === customer);
+    if(existing) existing.balance = (existing.balance||0) + total; else STATE.customers.push({ name: customer, balance: total, createdAt: new Date().toISOString() });
+  }
+  quickCart = []; renderQuickCart(); renderInventory(); renderClients(); saveLocalBackup(); await pushStateToCloud();
+  closeModalId('modal-quick'); alert('Venta registrada correctamente');
+});
+
+function openQuickWithProduct(productId){
+  renderQuickSelect();
+  openModal('modal-quick');
+  $('#quick-product').value = productId;
+  $('#quick-qty').value = 1;
+  updateQuickTotal();
+}
+
+/* Clients */
+$('#btn-open-clients').addEventListener('click', ()=> openModal('modal-clients'));
+$('#btn-add-client').addEventListener('click', async ()=>{ const name = $('#client-name').value.trim(); if(!name) return alert('Ingresa nombre'); const existing = STATE.customers.find(c=>c.name === name); if(existing) return alert('Cliente ya existe'); STATE.customers.push({ name, balance:0, createdAt: new Date().toISOString() }); $('#client-name').value=''; renderClients(); saveLocalBackup(); await pushStateToCloud(); });
+function renderClients(){ const el = $('#clients-list'); if(!el) return; el.innerHTML=''; if((STATE.customers||[]).length===0) el.innerHTML = '<div class="small-muted">No hay clientes</div>'; for(const c of STATE.customers){ const div = document.createElement('div'); div.className='p-2 border rounded mb-2 bg-white flex justify-between items-center'; div.innerHTML = `<div><div style="font-weight:700">${c.name}</div><div class="small-muted">Saldo: S/ ${money(c.balance||0)}</div></div><div style="display:flex;gap:8px"><button data-name="${c.name}" class="px-3 py-1 border btn-abono">Abono</button><button data-name="${c.name}" class="px-3 py-1 bg-green-600 text-white btn-saldar">Saldar</button></div>`; el.appendChild(div); } $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = STATE.customers.find(x=>x.name===name); c.balance = Math.max(0,(c.balance||0) - amt); saveLocalBackup(); await pushStateToCloud(); renderClients(); }); $$('.btn-saldar').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; if(!confirm(`Saldar cuenta de ${name}?`)) return; const c=STATE.customers.find(x=>x.name===name); c.balance=0; saveLocalBackup(); await pushStateToCloud(); renderClients(); }); }
+
+/* Import/Export XLSX */
+$('#btn-export-xlsx').addEventListener('click', ()=>{
+  const headers = ['name','category','price','barcode','stock'];
+  const rows = STATE.products.map(p => ({ name: p.name, category: p.category||'', price: p.price||0, barcode: p.barcode||'', stock: p.stock||0 }));
+  const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+  XLSX.writeFile(wb, `inventario_${new Date().toISOString().slice(0,10)}.xlsx`);
+});
+$('#btn-import-xlsx').addEventListener('click', ()=> $('#file-xlsx').click());
+$('#file-xlsx').addEventListener('change', async (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  const data = await f.arrayBuffer();
+  const workbook = XLSX.read(data, { type: 'array' });
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  if(json.length === 0) return alert('Hoja vacía');
+  const keys = Object.keys(json[0]).map(k => k.toString().toLowerCase());
+  const required = ['name','category','price','barcode','stock'];
+  const missing = required.filter(r => !keys.includes(r));
+  if(missing.length > 0) return alert('Formato inválido. Columnas requeridas: ' + required.join(', '));
+  if(!confirm(`Importar ${json.length} productos (se actualizarán/crearán)?`)) return;
+  for(const row of json){
+    const name = row.name || ''; const category = row.category || ''; const price = Number(row.price) || 0; const barcode = String(row.barcode || '').trim(); const stock = Number(row.stock) || 0;
+    let existing = STATE.products.find(p => (p.barcode || '') === barcode && barcode !== '');
+    if(!existing && name) existing = STATE.products.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if(existing){ existing.name = name; existing.category = category; existing.price = price; existing.barcode = barcode; existing.stock = stock; }
+    else STATE.products.push({ id: uid(), name, category, price, barcode, stock, createdAt: new Date().toISOString() });
+  }
+  saveLocalBackup(); await pushStateToCloud(); renderInventory(); renderQuickSelect(); alert('Importación finalizada'); e.target.value = '';
+});
+
+/* ------------------ SCANNER (with toast + auto-close on add) ------------------ */
+const video = $('#video'); let videoStream=null, currentTrack=null;
+let detectionLoop=false, quaggaActive=false, readBuffer=[];
+const READ_CONFIRM=3, WINDOW_MS=2000;
+const overlay = $('#overlay-canvas'); let octx;
+
+function resizeOverlay(){ if(!overlay || !video) return; overlay.width = video.clientWidth; overlay.height = video.clientHeight; octx = overlay.getContext('2d'); }
+function clearOverlay(){ if(!octx) resizeOverlay(); octx && octx.clearRect(0,0,overlay.width,overlay.height); }
+function pushRead(code){ const now = Date.now(); readBuffer = readBuffer.filter(r => now - r.t < WINDOW_MS); readBuffer.push({ code, t: now }); const last = readBuffer.slice(-READ_CONFIRM); if(last.length >= READ_CONFIRM && last.every(x=> x.code === last[0].code)) return last[0].code; return null; }
+
+async function startCameraHighRes(){
+  const constraints = { video: { facingMode: { ideal:'environment' }, width: { ideal:1280 }, height: { ideal:720 } }, audio:false };
+  videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+  video.srcObject = videoStream; currentTrack = videoStream.getTracks()[0];
+  await video.play(); resizeOverlay();
+  const caps = currentTrack.getCapabilities ? currentTrack.getCapabilities() : {};
+  if(caps && caps.torch) $('#btn-toggle-torch').classList.remove('hidden'); else $('#btn-toggle-torch').classList.add('hidden');
+}
+
+async function startDetection(){
+  $('#scanned-code').value = ''; $('#scanned-product-name').textContent = '—'; readBuffer = [];
+  try{
+    if('BarcodeDetector' in window){
+      const detector = new BarcodeDetector({ formats: ['ean_13','code_128','upc_e','upc_a','ean_8'] });
+      await startCameraHighRes();
+      detectionLoop = true;
+      while(detectionLoop){
+        if(!video || video.readyState < 2){ await new Promise(r=>setTimeout(r,100)); continue; }
+        try{
+          const canvas = document.createElement('canvas'); canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d'); ctx.drawImage(video,0,0,canvas.width,canvas.height);
+          const bitmap = await createImageBitmap(canvas);
+          const roi = { sx: Math.floor(canvas.width*0.2), sy: Math.floor(canvas.height*0.36), sw: Math.floor(canvas.width*0.6), sh: Math.floor(canvas.height*0.28) };
+          const cropped = await createImageBitmap(bitmap, roi.sx, roi.sy, roi.sw, roi.sh);
+          const barcodes = await detector.detect(cropped);
+          clearOverlay(); drawROI(roi);
+          if(barcodes && barcodes.length > 0){
+            const code = (barcodes[0].rawValue || '').trim();
+            const confirmed = pushRead(code);
+            if(confirmed){
+              $('#scanned-code').value = confirmed;
+              const found = STATE.products.find(x => (x.barcode||'') === confirmed || ((x.barcode||'').replace(/\D/g,'') === confirmed.replace(/\D/g,'')));
+              if(found){
+                $('#scanned-product-name').textContent = found.name;
+                // show toast with Add action
+                showToast(`Detectado: ${found.name}`, [
+                  { label: 'Añadir', onClick: () => { quickCart.push({ productId: found.id, qty: 1, price: found.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); stopCamera(); closeModalId('modal-scan'); showToast('Agregado al carrito y cámara detenida', [], 2500); } },
+                  { label: 'Cerrar', onClick: ()=> { /* just hide*/ } }
+                ], 10000);
+              } else {
+                $('#scanned-product-name').textContent = 'No registrado';
+                showToast(`Código no registrado: ${confirmed}`, [
+                  { label: 'Registrar', onClick: () => { openProductModal({ barcode: confirmed, name:'', category:'', price:0, stock:0 }, (saved)=>{ quickCart.push({ productId: saved.id, qty:1, price: saved.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); stopCamera(); closeModalId('modal-scan'); showToast('Registrado y agregado al carrito', [], 2500); }); } },
+                  { label: 'Cerrar', onClick: ()=>{} }
+                ], 10000);
+              }
+              showConfirmation(confirmed);
+              await new Promise(r=>setTimeout(r,600));
+            }
+          }
+          bitmap.close(); cropped.close();
+        }catch(err){ console.warn('detector loop err', err); detectionLoop=false; fallbackQuagga(); break; }
+        await new Promise(r=>setTimeout(r,80));
+      }
+    } else fallbackQuagga();
+  }catch(err){ console.warn('startDetection err', err); fallbackQuagga(); }
+}
+
+function drawROI(roi){ if(!octx) resizeOverlay(); const scaleX = overlay.width / (video.videoWidth||1); const scaleY = overlay.height / (video.videoHeight||1); octx.strokeStyle='rgba(0,255,100,0.9)'; octx.lineWidth=3; octx.strokeRect(roi.sx*scaleX, roi.sy*scaleY, roi.sw*scaleX, roi.sh*scaleY); }
+function showConfirmation(text){ if(!octx) resizeOverlay(); octx.font='20px monospace'; octx.fillStyle='rgba(0,0,0,0.6)'; const x=10,y=30,w=octx.measureText(text).width+20; octx.fillRect(x,y-22,w,28); octx.fillStyle='white'; octx.fillText(text,x+8,y); }
+
+function fallbackQuagga(){
+  startCameraHighRes().then(()=>{
+    if(!window.Quagga){ alert('Quagga no disponible'); return; }
+    quaggaActive = true;
+    Quagga.init({
+      inputStream:{ name:'Live', type:'LiveStream', target:'#video', constraints:{ facingMode:'environment', width:1280, height:720 } },
+      decoder:{ readers:['ean_reader','ean_8_reader','code_128_reader','upc_reader','upc_e_reader'] },
+      locate:true
+    }, err => { if(err) { console.error(err); return; } Quagga.start(); });
+    Quagga.onProcessed(result => { clearOverlay(); if(!result) return; if(result.boxes) result.boxes.filter(b=>b!==result.box).forEach(b=> drawBox(b,'rgba(255,255,255,0.2)')); if(result.box) drawBox(result.box,'lime'); });
+    Quagga.onDetected(data => { const code = data && data.codeResult && data.codeResult.code; if(code){ const confirmed = pushRead(code); if(confirmed){ $('#scanned-code').value = confirmed; const found = STATE.products.find(x => (x.barcode||'') === confirmed || ((x.barcode||'').replace(/\D/g,'') === confirmed.replace(/\D/g,''))); if(found){
+          $('#scanned-product-name').textContent = found.name;
+          showToast(`Detectado: ${found.name}`, [
+            { label: 'Añadir', onClick: () => { quickCart.push({ productId: found.id, qty: 1, price: found.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); stopCamera(); closeModalId('modal-scan'); showToast('Agregado al carrito y cámara detenida', [], 2500); } },
+            { label: 'Cerrar', onClick: ()=>{} }
+          ], 10000);
+        } else {
+          $('#scanned-product-name').textContent = 'No registrado';
+          showToast(`Código no registrado: ${confirmed}`, [
+            { label: 'Registrar', onClick: () => { openProductModal({ barcode: confirmed, name:'', category:'', price:0, stock:0 }, (saved)=>{ quickCart.push({ productId: saved.id, qty:1, price: saved.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); stopCamera(); closeModalId('modal-scan'); showToast('Registrado y agregado al carrito', [], 2500); }); } },
+            { label: 'Cerrar', onClick: ()=>{} }
+          ], 10000);
+        } try{ Quagga.stop(); }catch(e){}
+      } } });
+    function drawBox(path,color){ if(!octx) resizeOverlay(); octx.strokeStyle=color; octx.lineWidth=3; octx.beginPath(); octx.moveTo(path[0].x,path[0].y); for(let i=1;i<path.length;i++) octx.lineTo(path[i].x,path[i].y); octx.closePath(); octx.stroke(); }
+  }).catch(e=>console.warn('quagga camera err', e));
+}
+
+async function stopCamera(){ detectionLoop = false; if(quaggaActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} quaggaActive=false; } if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); video.srcObject = null; videoStream = null; currentTrack = null; clearOverlay(); readBuffer=[]; hideToast(); }
+
+/* Scanner buttons */
+$('#btn-open-scan').addEventListener('click', ()=>{ openModal('modal-scan'); startDetection().catch(()=>{}); });
+$('#btn-stop-camera').addEventListener('click', ()=> stopCamera());
+$('#btn-register-from-scan').addEventListener('click', ()=> {
+  const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado');
+  openProductModal({ barcode: code, name:'', category:'', price:0, stock:0 }, null);
+});
+$('#btn-scan-add-to-quick').addEventListener('click', ()=> {
+  const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado');
+  // if exists add; else open register and add after save
+  const p = STATE.products.find(x => (x.barcode||'') === code || ((x.barcode||'').replace(/\D/g,'') === code.replace(/\D/g,'')));
+  if(p){
+    quickCart.push({ productId: p.id, qty:1, price: p.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); stopCamera(); closeModalId('modal-scan'); showToast('Agregado al carrito y cámara detenida', [], 2500);
+  } else {
+    openProductModal({ barcode: code, name:'', category:'', price:0, stock:0 }, (saved)=>{ quickCart.push({ productId: saved.id, qty:1, price: saved.price }); renderQuickCart(); saveLocalBackup(); pushStateToCloud(); stopCamera(); closeModalId('modal-scan'); showToast('Registrado y agregado al carrito', [], 2500); });
+  }
+});
+
+/* Quick modal scan button: open scanner (user will add via toast) */
+$('#quick-scan-inside').addEventListener('click', ()=>{ openModal('modal-scan'); startDetection().catch(()=>{}); });
+
+/* Reports (reactivated) */
+async function buildDailyWithInventoryHTML(date){
+  const daySales = (STATE.sales||[]).filter(s=> s.date.slice(0,10) === date).sort((a,b)=>a.date.localeCompare(b.date));
+  const creditSales = daySales.filter(s=> s.paymentType === 'A_CREDITO' || !s.paid);
+  let rows = ''; let total = 0;
+  for(const s of daySales){
+    total += Number(s.total||0);
+    const t = new Date(s.date).toLocaleTimeString();
+    const payment = s.paymentType || (s.paid? 'EFECTIVO':'A_CREDITO');
+    const items = s.items.map(it=>{ const p = STATE.products.find(pp=>pp.id===it.productId); return `${p? p.name: it.productId} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>');
+    rows += `<tr><td style="padding:6px">${t}</td><td style="padding:6px">${s.id}</td><td style="padding:6px">${s.customerName||'-'}</td><td style="padding:6px">${s.responsible||'-'}</td><td style="padding:6px">${payment}</td><td style="padding:6px">${items}</td><td style="padding:6px;text-align:right">S/ ${money(s.total)}</td></tr>`;
+  }
+  const creditRows = creditSales.map(s=>{ const t = new Date(s.date).toLocaleTimeString(); const items = s.items.map(it=>{ const p = STATE.products.find(pp=>pp.id===it.productId); return `${p? p.name: it.productId} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>'); return `<tr><td style="padding:6px">${t}</td><td style="padding:6px">${s.id}</td><td style="padding:6px">${s.customerName||'-'}</td><td style="padding:6px">${s.responsible||'-'}</td><td style="padding:6px">${s.paymentType||'A_CREDITO'}</td><td style="padding:6px">${items}</td><td style="padding:6px;text-align:right">S/ ${money(s.total)}</td></tr>`; }).join('');
+  const products = (STATE.products||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
+  let invRows = ''; for(const p of products){ invRows += `<tr><td style="padding:6px">${escapeHtml(p.name)}</td><td style="padding:6px">${escapeHtml(p.category||'')}</td><td style="padding:6px">${escapeHtml(p.barcode||'')}</td><td style="padding:6px;text-align:right">${p.stock||0}</td><td style="padding:6px;text-align:right">S/ ${money(p.price)}</td></tr>`; }
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#111;padding:8mm;font-size:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div><h1 style="margin:0;font-size:18px">MINIMARKET LA ESQUINA DEL AHORRO</h1><div style="font-size:12px">Reporte del dia: <strong>${date}</strong></div></div>
+      <div style="text-align:right;font-size:12px">Generado: ${new Date().toLocaleString()}</div>
+    </div><hr style="margin:8px 0">
+    <h3 style="margin-bottom:6px">Ventas del día</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody></table>
+    <div style="text-align:right;font-weight:bold;margin-top:8px">Total (día): S/ ${money(total)}</div><hr style="margin:8px 0">
+    <h3 style="margin-bottom:6px">Ventas por cobrar (A CREDITO)</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#f3f4f6;padding:6px">Hora</th><th style="background:#f3f4f6;padding:6px">ID</th><th style="background:#f3f4f6;padding:6px">Cliente</th><th style="background:#f3f4f6;padding:6px">Encargado</th><th style="background:#f3f4f6;padding:6px">Pago</th><th style="background:#f3f4f6;padding:6px">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead><tbody>${creditRows.length? creditRows: '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas por cobrar</td></tr>'}</tbody></table>
+    <hr style="margin:12px 0"><h3 style="margin-bottom:6px">Reporte de Inventario</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Nombre</th><th style="background:#f3f4f6;padding:6px;text-align:left">Categoría</th><th style="background:#f3f4f6;padding:6px;text-align:left">Código</th><th style="background:#f3f4f6;padding:6px;text-align:right">Stock</th><th style="background:#f3f4f6;padding:6px;text-align:right">Precio</th></tr></thead><tbody>${invRows || '<tr><td colspan="5" style="padding:12px;text-align:center;color:#666">No hay productos</td></tr>'}</tbody></table>
+    <div style="font-size:11px;color:#666;margin-top:10px">Reporte generado por TiendaSmart — MINIMARKET LA ESQUINA DEL AHORRO</div>
+  </div>`;
+  return html;
+}
+
+async function downloadCombinedPDF(date){
+  if(!date) return alert('Selecciona fecha');
+  const html = await buildDailyWithInventoryHTML(date);
+  const wrapper = document.createElement('div'); wrapper.style.width='1123px'; wrapper.style.background='#fff'; wrapper.innerHTML = html; document.body.appendChild(wrapper);
+  try{
+    const scale = 2.2;
+    const canvas = await html2canvas(wrapper, { scale, useCORS:true, logging:false, windowWidth: wrapper.scrollWidth, windowHeight: wrapper.scrollHeight });
+    const imgData = canvas.toDataURL('image/png',1.0);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF('p','mm','a4');
+    const pageW = 210, pageH = 297, margin = 10;
+    const usableW = pageW - margin*2;
+    const pxToMm = usableW / canvas.width;
+    const imgHeightMM = canvas.height * pxToMm;
+    if(imgHeightMM <= (pageH - margin*2)){
+      pdf.addImage(imgData,'PNG',margin,margin,usableW,imgHeightMM);
+    } else {
+      const pxPerPage = Math.floor((pageH - margin*2) / pxToMm);
+      let pos = 0, remaining = canvas.height, page=0;
+      while(remaining > 0){
+        const h = Math.min(pxPerPage, remaining);
+        const tmp = document.createElement('canvas'); tmp.width = canvas.width; tmp.height = h;
+        const tctx = tmp.getContext('2d'); tctx.fillStyle='#fff'; tctx.fillRect(0,0,tmp.width,tmp.height);
+        tctx.drawImage(canvas, 0, pos, canvas.width, h, 0, 0, tmp.width, tmp.height);
+        const data = tmp.toDataURL('image/png');
+        const hMM = h * pxToMm;
+        if(page>0) pdf.addPage();
+        pdf.addImage(data,'PNG',margin,margin,usableW,hMM);
+        remaining -= h; pos += h; page++;
+      }
+    }
+    const filename = `Reporte del dia ${date}.pdf`;
+    pdf.save(filename);
+  }catch(e){ console.error('pdf err', e); alert('Error generando PDF'); }
+  wrapper.remove();
+}
+
+/* Reports binds */
+$('#btn-open-reports') && $('#btn-open-reports').addEventListener('click', ()=> { $('#report-date').value = todayYMD(); openModal('modal-reports'); });
+$('#btn-preview-day') && $('#btn-preview-day').addEventListener('click', async ()=> { const d = $('#report-date').value || todayYMD(); const html = await buildDailyWithInventoryHTML(d); $('#report-preview').innerHTML = html; });
+$('#btn-download-day') && $('#btn-download-day').addEventListener('click', async ()=> { const d = $('#report-date').value || todayYMD(); await downloadCombinedPDF(d); });
+$('#btn-print-day') && $('#btn-print-day').addEventListener('click', async ()=> { const d = $('#report-date').value || todayYMD(); const html = await buildDailyWithInventoryHTML(d); printHTML(html, `Reporte del dia ${d}`); });
+function printHTML(html, title='Reporte'){ const w = window.open('','_blank'); if(!w) return alert('Permite popups'); w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:Arial,Helvetica,sans-serif;margin:10mm;font-size:12px} table{width:100%;border-collapse:collapse} th{background:#f3f4f6;padding:6px;text-align:left} td{padding:6px;border-bottom:1px solid #eee}</style></head><body>${html}</body></html>`); w.document.close(); w.focus(); setTimeout(()=>w.print(),700); }
+
+/* Search header */
+$('#search').addEventListener('input', (e)=>{ renderInventory(e.target.value); });
+
+/* UI init / start */
+function initUI(){ $$('.modal').forEach(m=> m.classList.remove('visible')); if(!isAuth()) $('#modal-login').classList.add('visible'); else { $('#modal-login').classList.remove('visible'); startApp(); } document.addEventListener('keydown', e=>{ if(e.key === 'Escape') $$('.modal.visible').forEach(m=> closeModalId(m.id)); }); }
+async function startApp(){
+  try{ const cached = localStorage.getItem('tienda_local_backup'); if(cached){ const obj = JSON.parse(cached); STATE = Object.assign(STATE, obj); } }catch(e){ console.warn('cache read err', e); }
+  renderInventory(); renderQuickSelect(); renderClients();
+  try{ initFirebaseAuto(); }catch(e){ console.warn('auto firebase err', e); }
+}
+
+/* sync toggle */
+$('#btn-sync-toggle').addEventListener('click', ()=> {
+  if(cloudEnabled){ cloudEnabled = false; $('#cloud-label').textContent = 'desconectado'; $('#btn-sync-toggle').textContent = 'Cloud OFF'; alert('Cloud desactivado (local)'); }
+  else initFirebaseAuto();
+});
+
+/* periodic backup */
+setInterval(()=> saveLocalBackup(), 10000);
+
+/* start UI */
+initUI();
+if(isAuth()){ $('#modal-login').classList.remove('visible'); startApp(); }
+</script>
 </body>
 </html>
+
+
