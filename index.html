@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no"/>
-<title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart (Móvil) - Actualizado</title>
+<title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart (Móvil)</title>
 
 <!-- Tailwind (prototipo) -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -115,7 +115,6 @@
       </div>
       <form id="form-product" class="mt-3 space-y-2">
         <input type="hidden" id="product-id"/>
-        <label for="product-name" class="small-muted">Nombre</label>
         <input id="product-name" placeholder="Nombre" required />
         <div style="display:flex;gap:8px">
           <input id="product-category" placeholder="Categoría" class="flex-1"/>
@@ -154,7 +153,7 @@
           <div style="flex:1">
             <div class="small-muted">Producto encontrado</div>
             <div id="scanned-product-name" style="font-weight:700">—</div>
-            <div id="scanned-product-price" class="small-muted">Precio: -</div>
+            <div class="small-muted">Precio: <strong id="scanned-product-price">—</strong></div>
           </div>
           <div style="display:flex;flex-direction:column;gap:6px">
             <button id="btn-register-from-scan" class="px-3 py-2 bg-indigo-600 text-white rounded">Registrar</button>
@@ -187,12 +186,12 @@
           <select id="quick-payment" class="px-3 py-2 rounded border">
             <option value="EFECTIVO">EFECTIVO</option>
             <option value="YAPE">YAPE</option>
-            <option value="A_CREDITO">A_CREDITO</option>
+            <option value="A_CREDITO">A CREDITO</option>
           </select>
           <input id="quick-customer" placeholder="Cliente (si A CREDITO)" class="flex-1"/>
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center">
-          <div>Total: <span id="quick-total">0.00</span></div>
+          <div>Total producto: <span id="quick-total">0.00</span></div>
           <div style="display:flex;gap:8px">
             <button type="button" id="quick-scan-inside" class="px-3 py-2 border rounded">Escanear</button>
             <button type="button" id="quick-add" class="px-3 py-2 border rounded">Agregar</button>
@@ -202,6 +201,7 @@
         <div>
           <div style="font-weight:800">Carrito</div>
           <div id="quick-cart" class="mt-2 space-y-2"></div>
+          <div style="margin-top:8px;text-align:right;font-weight:800">Total carrito: S/ <span id="quick-cart-total">0.00</span></div>
         </div>
       </form>
     </div>
@@ -249,7 +249,7 @@
   <div id="modal-login" class="modal visible" aria-hidden="false" style="background:linear-gradient(180deg, rgba(0,0,0,0.45), rgba(0,0,0,0.6))">
     <div class="modal-card card p-4" style="max-width:420px">
       <h2 style="font-weight:800">Ingresar — TiendaSmart</h2>
-      <p class="small-muted">Usuario: <strong>LIZ</strong></p>
+      <p class="small-muted">Usuario: <strong>LIZ</strong> — Contraseña: <strong>MAGALY</strong></p>
       <form id="form-login" class="mt-2 space-y-3">
         <input id="login-user" placeholder="Usuario" class="w-full"/>
         <input id="login-pass" placeholder="Contraseña" type="password" class="w-full"/>
@@ -283,9 +283,12 @@ const money = v => Number(v||0).toFixed(2);
 const todayYMD = ()=>{ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
 /* State */
-let STATE = { products: [], sales: [], customers: [] }; // customers now contain transactions
+let STATE = { products: [], sales: [], customers: [] };
 let cloudEnabled = false, db = null;
 const COLLECTION = "MODO DE PREODUCCIÓN", DOC_ID = "DATOS", FIELD = "MAGALY";
+
+/* Sanitizer */
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* Toast utilities */
 let toastTimeout = null;
@@ -334,15 +337,10 @@ function initFirebaseAuto(){
   }catch(e){ console.warn('firebase init', e); $('#cloud-label').textContent = 'error'; }
 }
 
-async function pushStateToCloud(){ if(!cloudEnabled || !db) return; try{ const docRef = db.collection(COLLECTION).doc(DOC_ID); await docRef.set({ [FIELD]: STATE }, { merge:true }); }catch(e){ console.warn('push err', e); } }
-
-/* Debounced cloud push */
+/* Debounced push to cloud */
 let pushTimeout = null;
-function schedulePushStateToCloud(delay = 1500){
-  if(!cloudEnabled || !db) return;
-  if(pushTimeout) clearTimeout(pushTimeout);
-  pushTimeout = setTimeout(async () => { try{ await pushStateToCloud(); }catch(e){console.warn(e);} pushTimeout = null; }, delay);
-}
+async function pushStateToCloud(){ if(!cloudEnabled || !db) return; try{ const docRef = db.collection(COLLECTION).doc(DOC_ID); await docRef.set({ [FIELD]: STATE }, { merge:true }); }catch(e){ console.warn('push err', e); } }
+function schedulePushStateToCloud(delay = 1500){ if(!cloudEnabled || !db) return; if(pushTimeout) clearTimeout(pushTimeout); pushTimeout = setTimeout(async ()=>{ try{ await pushStateToCloud(); }catch(e){ console.warn(e); } pushTimeout = null; }, delay); }
 
 /* Local backup */
 function saveLocalBackup(){ try{ localStorage.setItem('tienda_local_backup', JSON.stringify(STATE)); }catch(e){} }
@@ -385,7 +383,6 @@ function renderInventory(filter=''){
   $$('.income-btn').forEach(b=> b.onclick = ()=> openIncome(b.dataset.id));
   $$('.edit-btn').forEach(b=> b.onclick = ()=> openProductModal(STATE.products.find(x=>x.id===b.dataset.id)));
 }
-function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 /* Product CRUD */
 $('#btn-add-product').addEventListener('click', ()=> openProductModal());
@@ -447,7 +444,7 @@ function showQuickSuggestions(q){
   const results = STATE.products.filter(p => p.name.toLowerCase().includes(q) || (p.barcode||'').includes(q)).slice(0,8);
   if(results.length===0) return;
   for(const p of results){
-    const d = document.createElement('div'); d.className='px-3 py-2'; d.innerHTML = `<div style="font-weight:700">${escapeHtml(p.name)}</div><div class="small-muted">${escapeHtml(p.barcode||'')} • ${escapeHtml(p.category||'')}</div>`;
+    const d = document.createElement('div'); d.className='px-3 py-2'; d.innerHTML = `<div style="font-weight:700">${p.name}</div><div class="small-muted">${p.barcode||''} • ${p.category||''}</div>`;
     d.onclick = ()=>{ $('#quick-product').value = p.id; $('#quick-suggestions').classList.add('hidden'); $('#quick-search').value = ''; updateQuickTotal(); };
     box.appendChild(d);
   }
@@ -455,34 +452,23 @@ function showQuickSuggestions(q){
 }
 $('#quick-product') && $('#quick-product').addEventListener('change', updateQuickTotal);
 $('#quick-qty') && $('#quick-qty').addEventListener('input', updateQuickTotal);
-
-function computeCartTotal(){
-  return quickCart.reduce((s,i)=> s + (i.qty * i.price), 0);
-}
-
-function updateQuickTotal(){
-  // show total of cart + selected product*qty
-  const pid = $('#quick-product')? $('#quick-product').value : null;
-  const selQty = Number($('#quick-qty')? $('#quick-qty').value : 0)||0;
-  const p = STATE.products.find(x=>x.id===pid);
-  const selectedTotal = p ? p.price * selQty : 0;
-  const cartTotal = computeCartTotal();
-  $('#quick-total') && ($('#quick-total').textContent = money(cartTotal + selectedTotal));
-}
+function updateQuickTotal(){ const pid = $('#quick-product')? $('#quick-product').value : null; const qty = Number($('#quick-qty')? $('#quick-qty').value : 0)||0; const p = STATE.products.find(x=>x.id===pid); $('#quick-total') && ($('#quick-total').textContent = money(p ? p.price * qty : 0)); }
 
 $('#quick-add').addEventListener('click', ()=>{
-  const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||1; const p = STATE.products.find(x=>x.id===pid); if(!p) return alert('Selecciona producto');
-  quickCart.push({ productId: pid, qty, price: p.price }); renderQuickCart(); saveLocalBackup(); schedulePushStateToCloud(); updateQuickTotal();
+  const pid = $('#quick-product').value; const qty = Number($('#quick-qty').value)||1; const p = STATE.products.find(x=>x.id===pid); if(!p) return alert('Selecciona producto'); quickCart.push({ productId: pid, qty, price: p.price }); renderQuickCart(); saveLocalBackup(); schedulePushStateToCloud();
 });
 function renderQuickCart(){
   const el = $('#quick-cart'); if(!el) return; el.innerHTML = '';
+  let cartTotal = 0;
   quickCart.forEach((it, idx)=>{
-    const p = STATE.products.find(x=>x.id===it.productId);
+    const p = STATE.products.find(x=>x.id===it.productId) || { name: 'Producto desconocido', price: it.price };
+    cartTotal += (it.qty * it.price);
     const row = document.createElement('div'); row.className='flex justify-between items-center';
     row.innerHTML = `<div>${escapeHtml(p.name)} x ${it.qty}</div><div>S/ ${money(it.qty*it.price)} <button data-idx="${idx}" class="text-red-600 ml-2">Quitar</button></div>`;
     el.appendChild(row);
   });
-  $$('#quick-cart button').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); updateQuickTotal(); });
+  $$('#quick-cart button').forEach(b=> b.onclick = ()=> { quickCart.splice(Number(b.dataset.idx),1); renderQuickCart(); });
+  $('#quick-cart-total').textContent = money(cartTotal);
 }
 
 $('#form-quick').addEventListener('submit', async e=>{
@@ -495,10 +481,13 @@ $('#form-quick').addEventListener('submit', async e=>{
   STATE.sales.unshift(sale);
   if(payment === 'A_CREDITO' && customer){
     let existing = STATE.customers.find(c=>c.name === customer);
-    if(!existing){ existing = { name: customer, balance:0, transactions: [], createdAt: new Date().toISOString() }; STATE.customers.push(existing); }
-    existing.balance = (existing.balance||0) + total;
-    existing.transactions = existing.transactions || [];
-    existing.transactions.push({ id: uid(), type: 'debt', amount: total, date: new Date().toISOString(), saleId: sale.id, paid: false });
+    if(existing){
+      existing.balance = (existing.balance||0) + total;
+      existing.debts = existing.debts || [];
+      existing.debts.push({ saleId: sale.id, amount: total, date: new Date().toISOString(), paid: false });
+    } else {
+      STATE.customers.push({ name: customer, balance: total, createdAt: new Date().toISOString(), debts: [{ saleId: sale.id, amount: total, date: new Date().toISOString(), paid: false }] });
+    }
   }
   quickCart = []; renderQuickCart(); renderInventory(); renderClients(); saveLocalBackup(); schedulePushStateToCloud();
   closeModalId('modal-quick'); alert('Venta registrada correctamente');
@@ -513,20 +502,37 @@ function openQuickWithProduct(productId){
 
 /* Clients */
 $('#btn-open-clients').addEventListener('click', ()=> openModal('modal-clients'));
-$('#btn-add-client').addEventListener('click', async ()=>{ const name = $('#client-name').value.trim(); if(!name) return alert('Ingresa nombre'); const existing = STATE.customers.find(c=>c.name === name); if(existing) return alert('Cliente ya existe'); STATE.customers.push({ name, balance:0, transactions: [], createdAt: new Date().toISOString() }); $('#client-name').value=''; renderClients(); saveLocalBackup(); schedulePushStateToCloud(); });
-
-function renderClients(){ const el = $('#clients-list'); if(!el) return; el.innerHTML=''; if((STATE.customers||[]).length===0) el.innerHTML = '<div class="small-muted">No hay clientes</div>'; for(const c of STATE.customers){ const div = document.createElement('div'); div.className='p-2 border rounded mb-2 bg-white flex flex-col gap-2'; let txHtml = '';
-  if((c.transactions||[]).length>0){ txHtml = '<div class="small-muted" style="font-size:12px">Historial:</div>' + c.transactions.slice().reverse().map(t=>{
-    return `<div style="font-size:13px;padding:6px;border-radius:6px;background:#f9fafb;display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:700">${escapeHtml(t.type)} S/ ${money(t.amount)}</div><div class="small-muted" style="font-size:12px">${new Date(t.date).toLocaleString()} ${t.saleId? '•' + escapeHtml(t.saleId): ''}</div></div><div>${t.paid? '<span class="small-muted">PAGADO</span>' : '<button data-cust="'+escapeHtml(c.name)+'" data-tx="'+escapeHtml(t.id)+'" class="px-2 py-1 bg-green-600 text-white btn-pay">Marcar pago</button>'}</div></div>`;
-  }).join(''); }
-  div.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:700">${escapeHtml(c.name)}</div><div class="small-muted">Saldo: S/ ${money(c.balance||0)}</div></div><div style="display:flex;gap:8px"><button data-name="${escapeHtml(c.name)}" class="px-3 py-1 border btn-abono">Abono</button><button data-name="${escapeHtml(c.name)}" class="px-3 py-1 bg-green-600 text-white btn-saldar">Saldar</button></div></div>${txHtml}`;
-  el.appendChild(div);
- }
- $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = STATE.customers.find(x=>x.name===name); c.balance = Math.max(0,(c.balance||0) - amt); c.transactions = c.transactions || []; c.transactions.push({ id: uid(), type: 'payment', amount: amt, date: new Date().toISOString(), paid: true }); saveLocalBackup(); schedulePushStateToCloud(); renderClients(); });
- $$('.btn-saldar').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; if(!confirm(`Saldar cuenta de ${name}?`)) return; const c=STATE.customers.find(x=>x.name===name); c.transactions = c.transactions || []; if((c.balance||0) > 0) c.transactions.push({ id: uid(), type: 'payment', amount: c.balance, date: new Date().toISOString(), paid: true }); c.balance=0; saveLocalBackup(); schedulePushStateToCloud(); renderClients(); });
- // pay buttons inside transactions
- $$('.btn-pay').forEach(bt=> bt.onclick = ()=>{ const name = bt.dataset.cust; const txid = bt.dataset.tx; const c = STATE.customers.find(x=>x.name===name); if(!c) return alert('Cliente no encontrado'); const tx = c.transactions.find(t=>t.id===txid); if(!tx) return alert('Transacción no encontrada'); tx.paid = true; c.balance = Math.max(0,(c.balance||0) - tx.amount); saveLocalBackup(); schedulePushStateToCloud(); renderClients(); });
+$('#btn-add-client').addEventListener('click', async ()=>{ const name = $('#client-name').value.trim(); if(!name) return alert('Ingresa nombre'); const existing = STATE.customers.find(c=>c.name === name); if(existing) return alert('Cliente ya existe'); STATE.customers.push({ name, balance:0, createdAt: new Date().toISOString(), debts: [] }); $('#client-name').value=''; renderClients(); saveLocalBackup(); schedulePushStateToCloud(); });
+function renderClients(){ const el = $('#clients-list'); if(!el) return; el.innerHTML=''; if((STATE.customers||[]).length===0) el.innerHTML = '<div class="small-muted">No hay clientes</div>'; for(const c of STATE.customers){ const debts = c.debts || []; const div = document.createElement('div'); div.className='p-2 border rounded mb-2 bg-white flex flex-col gap-2';
+    const header = document.createElement('div'); header.style.display='flex'; header.style.justifyContent='space-between'; header.innerHTML = `<div><div style="font-weight:700">${escapeHtml(c.name)}</div><div class="small-muted">Saldo: S/ ${money(c.balance||0)}</div></div>`;
+    const actions = document.createElement('div'); actions.style.display='flex'; actions.style.gap='8px'; actions.innerHTML = `<button data-name="${escapeHtml(c.name)}" class="px-3 py-1 border btn-abono">Abono</button><button data-name="${escapeHtml(c.name)}" class="px-3 py-1 bg-green-600 text-white btn-saldar">Saldar</button>`;
+    header.appendChild(actions);
+    div.appendChild(header);
+    if(debts.length){
+      const debtBox = document.createElement('div'); debtBox.innerHTML = '<div style="font-weight:700">Deudas</div>';
+      for(const d of debts){
+        const row = document.createElement('div'); row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center'; row.style.padding='6px 0';
+        row.innerHTML = `<div><div style="font-weight:700">ID: ${escapeHtml(d.saleId)}</div><div class="small-muted">Monto: S/ ${money(d.amount)} • Fecha: ${new Date(d.date).toLocaleDateString()}</div></div>`;
+        const btns = document.createElement('div'); btns.style.display='flex'; btns.style.gap='6px';
+        const payBtn = document.createElement('button'); payBtn.className='px-3 py-1 bg-blue-600 text-white'; payBtn.textContent='Registrar Pago'; payBtn.onclick = ()=> registerPaymentForDebt(c.name, d.saleId);
+        const settleBtn = document.createElement('button'); settleBtn.className='px-3 py-1 border'; settleBtn.textContent='Marcar como pagado'; settleBtn.onclick = ()=> settleDebt(c.name, d.saleId);
+        btns.appendChild(payBtn); btns.appendChild(settleBtn);
+        row.appendChild(btns);
+        debtBox.appendChild(row);
+      }
+      div.appendChild(debtBox);
+    }
+    el.appendChild(div);
+  }
+  // bindabono/saldar
+  $$('.btn-abono').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; const amt = Number(prompt(`Abono para ${name} - monto:`, '0'))||0; if(amt<=0) return; const c = STATE.customers.find(x=>x.name===name); c.balance = Math.max(0,(c.balance||0) - amt); // reduce debts from oldest
+    let remaining = amt; if(c.debts && c.debts.length){ for(const debt of c.debts){ if(remaining<=0) break; const take = Math.min(remaining, debt.amount); debt.amount = Math.max(0, debt.amount - take); remaining -= take; if(debt.amount === 0) debt.paid = true; } c.debts = c.debts.filter(d=> d.amount > 0); }
+    saveLocalBackup(); schedulePushStateToCloud(); renderClients(); });
+  $$('.btn-saldar').forEach(b=> b.onclick = async ()=>{ const name=b.dataset.name; if(!confirm(`Saldar cuenta de ${name}?`)) return; const c=STATE.customers.find(x=>x.name===name); c.balance=0; c.debts = []; saveLocalBackup(); schedulePushStateToCloud(); renderClients(); });
 }
+
+function registerPaymentForDebt(clientName, saleId){ const amt = Number(prompt('Monto a registrar (parcial):','0'))||0; if(amt<=0) return; const client = STATE.customers.find(c=>c.name===clientName); if(!client) return alert('Cliente no encontrado'); const debt = (client.debts||[]).find(d=>d.saleId===saleId); if(!debt) return alert('Deuda no encontrada'); debt.amount = Math.max(0, debt.amount - amt); client.balance = Math.max(0,(client.balance||0) - amt); if(debt.amount === 0) debt.paid = true; client.debts = client.debts.filter(d=> d.amount > 0); saveLocalBackup(); schedulePushStateToCloud(); renderClients(); }
+function settleDebt(clientName, saleId){ if(!confirm('Marcar esta deuda como pagada?')) return; const client = STATE.customers.find(c=>c.name===clientName); if(!client) return; const debt = (client.debts||[]).find(d=>d.saleId===saleId); if(!debt) return; client.balance = Math.max(0,(client.balance||0) - debt.amount); client.debts = client.debts.filter(d=> d.saleId !== saleId); saveLocalBackup(); schedulePushStateToCloud(); renderClients(); }
 
 /* Import/Export XLSX */
 $('#btn-export-xlsx').addEventListener('click', ()=>{
@@ -549,22 +555,17 @@ $('#file-xlsx').addEventListener('change', async (e)=>{
   const missing = required.filter(r => !keys.includes(r));
   if(missing.length > 0) return alert('Formato inválido. Columnas requeridas: ' + required.join(', '));
   if(!confirm(`Importar ${json.length} productos (se actualizarán/crearán)?`)) return;
-  // build index
-  const byBarcode = new Map();
-  const byName = new Map();
-  for(const p of STATE.products){ if(p.barcode) byBarcode.set(p.barcode.replace(/\D/g,''), p); if(p.name) byName.set(p.name.trim().toLowerCase(), p); }
   for(const row of json){
-    const name = String(row.name || '').trim(); const category = row.category || ''; const price = Number(row.price) || 0; const barcode = String(row.barcode || '').trim(); const stock = Number(row.stock) || 0;
-    const normBarcode = barcode.replace(/\D/g,'');
-    let existing = normBarcode ? byBarcode.get(normBarcode) : null;
-    if(!existing && name) existing = byName.get(name.toLowerCase());
+    const name = row.name || ''; const category = row.category || ''; const price = Number(row.price) || 0; const barcode = String(row.barcode || '').trim(); const stock = Number(row.stock) || 0;
+    let existing = STATE.products.find(p => (p.barcode || '') === barcode && barcode !== '');
+    if(!existing && name) existing = STATE.products.find(p => p.name.toLowerCase() === name.toLowerCase());
     if(existing){ existing.name = name; existing.category = category; existing.price = price; existing.barcode = barcode; existing.stock = stock; }
-    else { const prod = { id: uid(), name, category, price, barcode, stock, createdAt: new Date().toISOString() }; STATE.products.push(prod); }
+    else STATE.products.push({ id: uid(), name, category, price, barcode, stock, createdAt: new Date().toISOString() });
   }
   saveLocalBackup(); schedulePushStateToCloud(); renderInventory(); renderQuickSelect(); alert('Importación finalizada'); e.target.value = '';
 });
 
-/* ------------------ SCANNER (with toast + precise control) ------------------ */
+/* ------------------ SCANNER (with toast + auto-close on add) ------------------ */
 const video = $('#video'); let videoStream=null, currentTrack=null;
 let detectionLoop=false, quaggaActive=false, readBuffer=[];
 const READ_CONFIRM=3, WINDOW_MS=2000;
@@ -583,40 +584,41 @@ async function startCameraHighRes(){
   if(caps && caps.torch) $('#btn-toggle-torch').classList.remove('hidden'); else $('#btn-toggle-torch').classList.add('hidden');
 }
 
-/* optimized single canvas for detection */
-const detectorCanvas = document.createElement('canvas');
-const detectorCtx = detectorCanvas.getContext('2d');
-
+/* Optimized detection using single canvas + RAF */
+const detectorCanvas = document.createElement('canvas'); const detectorCtx = detectorCanvas.getContext('2d');
+let barcodeDetectorInstance = null; let rafId = null;
 async function startDetection(){
-  $('#scanned-code').value = ''; $('#scanned-product-name').textContent = '—'; $('#scanned-product-price').textContent = 'Precio: -'; readBuffer = [];
+  $('#scanned-code').value = ''; $('#scanned-product-name').textContent = '—'; $('#scanned-product-price').textContent = '—'; readBuffer = [];
   try{
     if('BarcodeDetector' in window){
-      const detector = new BarcodeDetector({ formats: ['ean_13','code_128','upc_e','upc_a','ean_8'] });
+      barcodeDetectorInstance = new BarcodeDetector({ formats: ['ean_13','code_128','upc_e','upc_a','ean_8'] });
       await startCameraHighRes();
       detectionLoop = true;
       const loop = async ()=>{
-        if(!detectionLoop) return;
         try{
-          if(!video || video.readyState < 2){ requestAnimationFrame(loop); return; }
+          if(!detectionLoop) return;
+          if(!video || video.readyState < 2){ rafId = requestAnimationFrame(loop); return; }
           detectorCanvas.width = video.videoWidth; detectorCanvas.height = video.videoHeight;
           detectorCtx.drawImage(video,0,0,detectorCanvas.width,detectorCanvas.height);
           const roi = { sx: Math.floor(detectorCanvas.width*0.2), sy: Math.floor(detectorCanvas.height*0.36), sw: Math.floor(detectorCanvas.width*0.6), sh: Math.floor(detectorCanvas.height*0.28) };
-          const imageBitmap = await createImageBitmap(detectorCanvas, roi.sx, roi.sy, roi.sw, roi.sh);
-          const barcodes = await detector.detect(imageBitmap);
-          imageBitmap.close();
+          // crop using createImageBitmap from ImageData for efficiency
+          const imageData = detectorCtx.getImageData(roi.sx, roi.sy, roi.sw, roi.sh);
+          const bitmap = await createImageBitmap(imageData);
+          const barcodes = await barcodeDetectorInstance.detect(bitmap);
+          bitmap.close();
           clearOverlay(); drawROI(roi);
           if(barcodes && barcodes.length > 0){
             const code = (barcodes[0].rawValue || '').trim();
             const confirmed = pushRead(code);
             if(confirmed){
-              handleDetectedCode(confirmed, { autoCloseOnRegister: true });
+              handleDetectedCode(confirmed);
               await new Promise(r=>setTimeout(r,600));
             }
           }
         }catch(err){ console.warn('detector loop err', err); detectionLoop=false; fallbackQuagga(); return; }
-        requestAnimationFrame(loop);
+        rafId = requestAnimationFrame(loop);
       };
-      requestAnimationFrame(loop);
+      rafId = requestAnimationFrame(loop);
     } else fallbackQuagga();
   }catch(err){ console.warn('startDetection err', err); fallbackQuagga(); }
 }
@@ -634,30 +636,29 @@ function fallbackQuagga(){
       locate:true
     }, err => { if(err) { console.error(err); return; } Quagga.start(); });
     Quagga.onProcessed(result => { clearOverlay(); if(!result) return; if(result.boxes) result.boxes.filter(b=>b!==result.box).forEach(b=> drawBox(b,'rgba(255,255,255,0.2)')); if(result.box) drawBox(result.box,'lime'); });
-    Quagga.onDetected(data => { const code = data && data.codeResult && data.codeResult.code; if(code){ const confirmed = pushRead(code); if(confirmed){ handleDetectedCode(confirmed, { autoCloseOnRegister: true }); try{ Quagga.stop(); }catch(e){} } } });
+    Quagga.onDetected(data => { const code = data && data.codeResult && data.codeResult.code; if(code){ const confirmed = pushRead(code); if(confirmed){ handleDetectedCode(confirmed); try{ Quagga.stop(); }catch(e){} } } });
     function drawBox(path,color){ if(!octx) resizeOverlay(); octx.strokeStyle=color; octx.lineWidth=3; octx.beginPath(); octx.moveTo(path[0].x,path[0].y); for(let i=1;i<path.length;i++) octx.lineTo(path[i].x,path[i].y); octx.closePath(); octx.stroke(); }
   }).catch(e=>console.warn('quagga camera err', e));
 }
 
-async function stopCamera(){ detectionLoop = false; if(quaggaActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} quaggaActive=false; } if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); video.srcObject = null; videoStream = null; currentTrack = null; clearOverlay(); readBuffer=[]; hideToast(); }
+async function stopCamera(){ detectionLoop = false; if(rafId) cancelAnimationFrame(rafId); rafId = null; if(quaggaActive && window.Quagga){ try{ Quagga.stop(); }catch(e){} quaggaActive=false; }
+  if(barcodeDetectorInstance){ try{ barcodeDetectorInstance = null; }catch(e){} }
+  if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); video.srcObject = null; videoStream = null; currentTrack = null; clearOverlay(); readBuffer=[]; hideToast(); }
 
-/* centralizar manejo de codigo detectado */
-function handleDetectedCode(code, opts = { autoCloseOnRegister: true }){
-  $('#scanned-code').value = code;
-  const found = STATE.products.find(x => (x.barcode||'') === code || ((x.barcode||'').replace(/\D/g,'') === code.replace(/\D/g,'')));
-  if(found){
-    $('#scanned-product-name').textContent = found.name;
-    $('#scanned-product-price').textContent = 'Precio: S/ ' + money(found.price);
+/* central handler when code confirmed */
+function handleDetectedCode(code){ $('#scanned-code').value = code; const found = STATE.products.find(x => (x.barcode||'') === code || ((x.barcode||'').replace(/\D/g,'') === code.replace(/\D/g,'')));
+  if(found){ $('#scanned-product-name').textContent = found.name; $('#scanned-product-price').textContent = `S/ ${money(found.price)}`;
+    // show toast with add action — now add will NOT close camera
     showToast(`Detectado: ${found.name} — S/ ${money(found.price)}`, [
-      { label: 'Añadir', onClick: () => { quickCart.push({ productId: found.id, qty: 1, price: found.price }); renderQuickCart(); saveLocalBackup(); schedulePushStateToCloud(); /* DO NOT stop camera */ showToast('Agregado al carrito', [], 2000); } },
-      { label: 'Registrar', onClick: () => { /* close camera then open register modal prefilled */ stopCamera(); openProductModal({ barcode: code, name:'', category:'', price:found.price||0, stock:0 }, (saved)=>{ quickCart.push({ productId: saved.id, qty:1, price: saved.price }); renderQuickCart(); saveLocalBackup(); schedulePushStateToCloud(); showToast('Registrado y agregado al carrito', [], 2500); }); } },
-      { label: 'Cerrar', onClick: ()=> { /* nothing */ } }
-    ], 10000);
+      { label: 'Añadir', onClick: () => { quickCart.push({ productId: found.id, qty: 1, price: found.price }); renderQuickCart(); saveLocalBackup(); schedulePushStateToCloud(); showToast('Agregado al carrito'); } },
+      { label: 'Cerrar', onClick: ()=> { /* just hide*/ } }
+    ], 7000);
   } else {
-    $('#scanned-product-name').textContent = 'No registrado';
-    $('#scanned-product-price').textContent = 'Precio: -';
+    $('#scanned-product-name').textContent = 'No registrado'; $('#scanned-product-price').textContent = '—';
     showToast(`Código no registrado: ${code}`, [
-      { label: 'Registrar', onClick: () => { stopCamera(); openProductModal({ barcode: code, name:'', category:'', price:0, stock:0 }, (saved)=>{ quickCart.push({ productId: saved.id, qty:1, price: saved.price }); renderQuickCart(); saveLocalBackup(); schedulePushStateToCloud(); showToast('Registrado y agregado al carrito', [], 2500); }); } },
+      { label: 'Registrar', onClick: () => { // stop camera and open registration
+          stopCamera(); closeModalId('modal-scan'); openProductModal({ barcode: code, name:'', category:'', price:0, stock:0 }, (saved)=>{ quickCart.push({ productId: saved.id, qty:1, price: saved.price }); renderQuickCart(); saveLocalBackup(); schedulePushStateToCloud(); showToast('Registrado y agregado al carrito', [], 2500); });
+        } },
       { label: 'Cerrar', onClick: ()=>{} }
     ], 10000);
   }
@@ -669,20 +670,15 @@ $('#btn-open-scan').addEventListener('click', ()=>{ openModal('modal-scan'); sta
 $('#btn-stop-camera').addEventListener('click', ()=> stopCamera());
 $('#btn-register-from-scan').addEventListener('click', ()=> {
   const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado');
-  // stop camera and open product modal to fill details
-  stopCamera(); openProductModal({ barcode: code, name:'', category:'', price:0, stock:0 }, null);
+  stopCamera(); closeModalId('modal-scan'); openProductModal({ barcode: code, name:'', category:'', price:0, stock:0 }, null);
 });
 $('#btn-scan-add-to-quick').addEventListener('click', ()=> {
   const code = $('#scanned-code').value.trim(); if(!code) return alert('No hay código detectado');
-  // IMPORTANT: user requested that adding should NOT close the camera so user can continue scanning
   const p = STATE.products.find(x => (x.barcode||'') === code || ((x.barcode||'').replace(/\D/g,'') === code.replace(/\D/g,'')));
   if(p){
-    quickCart.push({ productId: p.id, qty:1, price: p.price }); renderQuickCart(); saveLocalBackup(); schedulePushStateToCloud(); showToast('Agregado al carrito (sigue escaneando)', [], 2000);
+    quickCart.push({ productId: p.id, qty:1, price: p.price }); renderQuickCart(); saveLocalBackup(); schedulePushStateToCloud(); showToast('Agregado al carrito (cámara sigue activa)', [], 2000);
   } else {
-    // open register but keep camera running - user asked camera should remain open when adding, so we ask if they want to register but keep camera
-    if(confirm('Producto no registrado. ¿Deseas abrir registro (la cámara se detendrá)?')){
-      stopCamera(); openProductModal({ barcode: code, name:'', category:'', price:0, stock:0 }, (saved)=>{ quickCart.push({ productId: saved.id, qty:1, price: saved.price }); renderQuickCart(); saveLocalBackup(); schedulePushStateToCloud(); showToast('Registrado y agregado al carrito', [], 2500); });
-    }
+    stopCamera(); closeModalId('modal-scan'); openProductModal({ barcode: code, name:'', category:'', price:0, stock:0 }, (saved)=>{ quickCart.push({ productId: saved.id, qty:1, price: saved.price }); renderQuickCart(); saveLocalBackup(); schedulePushStateToCloud(); showToast('Registrado y agregado al carrito', [], 2500); });
   }
 });
 
@@ -691,23 +687,23 @@ $('#quick-scan-inside').addEventListener('click', ()=>{ openModal('modal-scan');
 
 /* Reports (reactivated) */
 async function buildDailyWithInventoryHTML(date){
-  const daySales = (STATE.sales||[]).filter(s=> s.date && s.date.slice(0,10) === date).sort((a,b)=>a.date.localeCompare(b.date));
+  const daySales = (STATE.sales||[]).filter(s=> s.date.slice(0,10) === date).sort((a,b)=>a.date.localeCompare(b.date));
   const creditSales = daySales.filter(s=> s.paymentType === 'A_CREDITO' || !s.paid);
   let rows = ''; let total = 0;
   for(const s of daySales){
     total += Number(s.total||0);
-    const t = s.date ? new Date(s.date).toLocaleTimeString() : '-';
+    const t = new Date(s.date).toLocaleTimeString();
     const payment = s.paymentType || (s.paid? 'EFECTIVO':'A_CREDITO');
-    const items = s.items.map(it=>{ const p = STATE.products.find(pp=>pp.id===it.productId); return `${escapeHtml(p? p.name: it.productId)} (${escapeHtml(String(it.qty))} x S/ ${money(it.price)})`; }).join('<br>');
-    rows += `<tr><td style="padding:6px">${escapeHtml(t)}</td><td style="padding:6px">${escapeHtml(s.id)}</td><td style="padding:6px">${escapeHtml(s.customerName||'-')}</td><td style="padding:6px">${escapeHtml(s.responsible||'-')}</td><td style="padding:6px">${escapeHtml(payment)}</td><td style="padding:6px">${items}</td><td style="padding:6px;text-align:right">S/ ${money(s.total)}</td></tr>`;
+    const items = s.items.map(it=>{ const p = STATE.products.find(pp=>pp.id===it.productId); return `${escapeHtml(p? p.name: it.productId)} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>');
+    rows += `<tr><td style="padding:6px">${t}</td><td style="padding:6px">${escapeHtml(s.id)}</td><td style="padding:6px">${escapeHtml(s.customerName||'-')}</td><td style="padding:6px">${escapeHtml(s.responsible||'-')}</td><td style="padding:6px">${escapeHtml(payment)}</td><td style="padding:6px">${items}</td><td style="padding:6px;text-align:right">S/ ${money(s.total)}</td></tr>`;
   }
-  const creditRows = creditSales.map(s=>{ const t = s.date ? new Date(s.date).toLocaleTimeString() : '-'; const items = s.items.map(it=>{ const p = STATE.products.find(pp=>pp.id===it.productId); return `${escapeHtml(p? p.name: it.productId)} (${escapeHtml(String(it.qty))} x S/ ${money(it.price)})`; }).join('<br>'); return `<tr><td style="padding:6px">${escapeHtml(t)}</td><td style="padding:6px">${escapeHtml(s.id)}</td><td style="padding:6px">${escapeHtml(s.customerName||'-')}</td><td style="padding:6px">${escapeHtml(s.responsible||'-')}</td><td style="padding:6px">${escapeHtml(s.paymentType||'A_CREDITO')}</td><td style="padding:6px">${items}</td><td style="padding:6px;text-align:right">S/ ${money(s.total)}</td></tr>`; }).join('');
+  const creditRows = creditSales.map(s=>{ const t = new Date(s.date).toLocaleTimeString(); const items = s.items.map(it=>{ const p = STATE.products.find(pp=>pp.id===it.productId); return `${escapeHtml(p? p.name: it.productId)} (${it.qty} x S/ ${money(it.price)})`; }).join('<br>'); return `<tr><td style="padding:6px">${t}</td><td style="padding:6px">${escapeHtml(s.id)}</td><td style="padding:6px">${escapeHtml(s.customerName||'-')}</td><td style="padding:6px">${escapeHtml(s.responsible||'-')}</td><td style="padding:6px">${escapeHtml(s.paymentType||'A_CREDITO')}</td><td style="padding:6px">${items}</td><td style="padding:6px;text-align:right">S/ ${money(s.total)}</td></tr>`; }).join('');
   const products = (STATE.products||[]).slice().sort((a,b)=>a.name.localeCompare(b.name));
   let invRows = ''; for(const p of products){ invRows += `<tr><td style="padding:6px">${escapeHtml(p.name)}</td><td style="padding:6px">${escapeHtml(p.category||'')}</td><td style="padding:6px">${escapeHtml(p.barcode||'')}</td><td style="padding:6px;text-align:right">${p.stock||0}</td><td style="padding:6px;text-align:right">S/ ${money(p.price)}</td></tr>`; }
   const html = `<div style="font-family:Arial,Helvetica,sans-serif;color:#111;padding:8mm;font-size:12px">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div><h1 style="margin:0;font-size:18px">MINIMARKET LA ESQUINA DEL AHORRO</h1><div style="font-size:12px">Reporte del dia: <strong>${escapeHtml(date)}</strong></div></div>
-      <div style="text-align:right;font-size:12px">Generado: ${escapeHtml(new Date().toLocaleString())}</div>
+      <div style="text-align:right;font-size:12px">Generado: ${new Date().toLocaleString()}</div>
     </div><hr style="margin:8px 0">
     <h3 style="margin-bottom:6px">Ventas del día</h3>
     <table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th style="background:#f3f4f6;padding:6px;text-align:left">Hora</th><th style="background:#f3f4f6;padding:6px;text-align:left">ID</th><th style="background:#f3f4f6;padding:6px;text-align:left">Cliente</th><th style="background:#f3f4f6;padding:6px;text-align:left">Encargado</th><th style="background:#f3f4f6;padding:6px;text-align:left">Pago</th><th style="background:#f3f4f6;padding:6px;text-align:left">Items</th><th style="background:#f3f4f6;padding:6px;text-align:right">Total</th></tr></thead><tbody>${rows || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#666">No hay ventas</td></tr>'}</tbody></table>
