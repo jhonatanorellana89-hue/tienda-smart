@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart</title>
+<title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart (Producción)</title>
 
-<!-- Tailwind (CDN) + Lucide Icons -->
+<!-- Tailwind + lucide (icons) -->
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/lucide@latest"></script>
 
@@ -14,60 +14,243 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
-<!-- QuaggaJS (fallback scanner) -->
+<!-- Quagga fallback -->
 <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
 
-<!-- Firebase Compat SDK -->
+<!-- Firebase compat -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
 <style>
-  /* --- Tipografía y diseño base --- */
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Work+Sans:wght@300;400;500;600;700&display=swap');
   :root{
-    --primary:#4f46e5;
-    --accent:#10b981;
-    --bg:#f6f8fb;
+    --primary:#0f766e;
+    --primary-2:#0b3b38;
+    --accent:#f59e0b;
+    --success:#16a34a;
+    --danger:#ef4444;
+    --bg:#f5f7fb;
     --card:#ffffff;
     --maxw:420px;
+    --ring:rgba(15,118,110,0.18);
+    --shadow:0 12px 30px rgba(15,23,42,0.10);
   }
   *{box-sizing:border-box}
-  body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;background:var(--bg);margin:0;color:#0f172a;-webkit-font-smoothing:antialiased}
-  .app-shell{max-width:var(--maxw);margin:0 auto;min-height:100vh;display:flex;flex-direction:column;position:relative;padding-bottom:120px}
-  header{position:sticky;top:0;z-index:40;background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.9));backdrop-filter:blur(6px);padding:12px;border-bottom:1px solid rgba(0,0,0,0.04);display:flex;justify-content:space-between;align-items:center}
-  h1.app-title{font-size:14px;font-weight:800;letter-spacing:0.06em}
-  p.app-sub{margin:0;font-weight:700;font-size:18px}
-  .card{background:var(--card);border-radius:12px;padding:12px;box-shadow:0 6px 18px rgba(2,6,23,0.06);margin-bottom:12px}
-  .input-pro{width:100%;padding:10px;border-radius:10px;border:1px solid #e6e8eb;background:#fbfcfe;outline:none}
-  .btn-primary{background:var(--primary);color:white;padding:10px;border-radius:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:8px}
-  .modal{position:fixed;inset:0;background:rgba(3,7,18,0.5);display:none;align-items:center;justify-content:center;padding:12px;z-index:80}
+  body{
+    font-family:'Work Sans', system-ui, -apple-system, Segoe UI, sans-serif;
+    background:
+      radial-gradient(900px 400px at 8% -10%, rgba(13,148,136,0.14), transparent 60%),
+      radial-gradient(700px 350px at 92% -15%, rgba(245,158,11,0.14), transparent 55%),
+      var(--bg);
+    margin:0;
+    color:#0f172a;
+    -webkit-font-smoothing:antialiased;
+  }
+  body:before{
+    content:'';
+    position:fixed;
+    inset:-30% -10% auto -10%;
+    height:220px;
+    background: linear-gradient(90deg, rgba(255,255,255,0.0), rgba(255,255,255,0.55), rgba(255,255,255,0.0));
+    opacity:0.35;
+    pointer-events:none;
+    z-index:0;
+  }
+  .app-shell{
+    position:relative;
+    z-index:1;
+    max-width:var(--maxw);
+    margin:0 auto;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    padding-bottom:120px;
+  }
+  header{
+    position:sticky;
+    top:0;
+    z-index:60;
+    background:linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+    backdrop-filter:blur(10px);
+    padding:12px;
+    border-bottom:1px solid rgba(15,23,42,0.06);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .app-title{
+    font-family:'Sora', sans-serif;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.16em;
+    color:#64748b;
+  }
+  .app-sub{
+    margin:0;
+    font-family:'Sora', sans-serif;
+    font-weight:800;
+    font-size:18px;
+  }
+  .card{
+    background:var(--card);
+    border-radius:14px;
+    padding:12px;
+    box-shadow:var(--shadow);
+    border:1px solid #eef2f7;
+    margin-bottom:12px;
+  }
+  .stat-hero{
+    background:linear-gradient(180deg, var(--primary), var(--primary-2));
+    color:#fff;
+    border:none;
+  }
+  .stat-card{
+    background:rgba(255,255,255,0.9);
+  }
+  .input-pro{
+    width:100%;
+    padding:10px;
+    border-radius:12px;
+    border:1px solid #e6e8eb;
+    background:#fff;
+    outline:none;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .input-pro:focus{
+    border-color:var(--primary);
+    box-shadow:0 0 0 4px var(--ring);
+  }
+  .btn-primary{
+    background:linear-gradient(180deg, var(--primary), var(--primary-2));
+    color:white;
+    padding:10px;
+    border-radius:12px;
+    font-weight:700;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    box-shadow:0 10px 18px rgba(15,118,110,0.25);
+  }
+  .modal{
+    position:fixed;
+    inset:0;
+    background:rgba(3,7,18,0.45);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:16px;
+    z-index:100;
+  }
   .modal.visible{display:flex}
-  .modal-sheet{width:100%;max-width:760px;background:white;border-radius:12px;padding:16px;max-height:92vh;overflow:auto}
-  .bottom-nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;padding:10px;background:rgba(255,255,255,0.96);border-top:1px solid rgba(0,0,0,0.04);z-index:60}
+  .modal-sheet{
+    width:100%;
+    max-width:760px;
+    background:white;
+    border-radius:16px;
+    padding:16px;
+    max-height:calc(100dvh - 40px);
+    overflow:auto;
+    box-shadow:0 18px 60px rgba(2,6,23,0.18);
+  }
+  .modal.visible .modal-sheet{animation:pop .18s ease}
+  .bottom-nav{
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:0;
+    display:flex;
+    justify-content:space-around;
+    padding:10px 12px;
+    background:rgba(255,255,255,0.96);
+    border-top:1px solid rgba(15,23,42,0.06);
+    z-index:80;
+    backdrop-filter:blur(8px);
+  }
   .nav-btn{display:flex;flex-direction:column;align-items:center;font-size:12px}
-  .dropdown-suggestions{position:absolute;background:white;border:1px solid #eef2ff;width:100%;max-height:220px;overflow:auto;border-radius:8px;z-index:90}
+  .dropdown-suggestions{
+    position:absolute;
+    background:white;
+    border:1px solid #eef2ff;
+    width:100%;
+    max-height:240px;
+    overflow:auto;
+    border-radius:10px;
+    z-index:200;
+    box-shadow:0 12px 30px rgba(15,23,42,0.12);
+  }
   .suggestion-item{padding:8px;border-radius:8px;cursor:pointer}
   .suggestion-item:hover{background:#f1f5f9}
-  .toast{position:fixed;left:50%;transform:translateX(-50%);top:18px;z-index:100}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);top:18px;z-index:120}
   table{width:100%;border-collapse:collapse}
   th,td{padding:8px;border-bottom:1px solid #f1f5f9;font-size:13px}
   .small-muted{font-size:12px;color:#6b7280}
-  @media (max-width:420px){ :root{--maxw:100vw} .modal-sheet{max-width:100%;border-radius:10px} }
+  .status-dot{width:10px;height:10px;border-radius:999px;display:inline-block}
+
+  .stock-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+  .stock-chip{
+    font-size:12px;
+    padding:6px 10px;
+    border-radius:999px;
+    border:1px solid #e2e8f0;
+    background:#fff;
+  }
+  .stock-chip.stock-out{border-color:#fecaca;color:#b91c1c;background:#fff5f5}
+  .stock-chip.stock-low{border-color:#fde68a;color:#92400e;background:#fffbeb}
+  .stock-section{padding:10px}
+  .stock-title{
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:#64748b;
+    margin-bottom:8px;
+  }
+  .stock-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px;
+    padding:8px;
+    border-radius:10px;
+    background:#f8fafc;
+    border:1px solid #eef2f7;
+    margin-bottom:6px;
+  }
+  .stock-badge{
+    min-width:34px;
+    text-align:center;
+    font-weight:800;
+    border-radius:999px;
+    padding:4px 8px;
+  }
+  .stock-badge.out{background:#fee2e2;color:#b91c1c}
+  .stock-badge.low{background:#fef3c7;color:#92400e}
+  .stock-empty{text-align:center;color:#64748b}
+
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes pop{from{opacity:.7;transform:scale(.98)}to{opacity:1;transform:scale(1)}}
+  .card{animation:rise .25s ease both}
+
+  @media (max-width:420px){
+    :root{--maxw:100vw}
+    .modal-sheet{border-radius:14px;padding:12px}
+  }
 </style>
 </head>
 <body>
 
 <div class="app-shell">
 
-  <!-- HEADER -->
+  <!-- Header -->
   <header>
     <div>
       <div class="app-title">MINIMARKET</div>
       <p class="app-sub">LA ESQUINA DEL AHORRO</p>
     </div>
-    <div class="flex items-center gap-2">
-      <div id="cloud-status" class="flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-full">
-        <span id="dot" style="width:10px;height:10px;border-radius:999px;background:#ef4444;display:inline-block"></span>
+    <div class="flex items-center gap-3">
+      <div id="cloud-status" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100">
+        <span id="dot" class="status-dot" style="background:#ef4444"></span>
         <span id="cloud-text" class="small-muted">Desconectado</span>
       </div>
       <button id="btn-gestion" class="px-3 py-2 bg-white rounded-lg border small-muted">GESTIÓN</button>
@@ -76,15 +259,15 @@
     </div>
   </header>
 
-  <!-- HOME -->
+  <!-- Main content (home tab default) -->
   <main id="tab-home" class="px-4 pt-6">
     <div class="grid grid-cols-2 gap-3">
-      <div class="card" style="background:linear-gradient(180deg,var(--primary),#7c3aed);color:#fff">
+      <div class="card stat-hero">
         <div class="small-muted">Ventas Hoy</div>
         <div style="font-weight:800;font-size:22px" id="stat-ventas">S/ 0.00</div>
         <div class="small-muted mt-2">Resumen del día</div>
       </div>
-      <div class="card">
+      <div class="card stat-card">
         <div class="small-muted">Transacciones</div>
         <div style="font-weight:800;font-size:22px" id="stat-count">0</div>
         <div class="small-muted mt-2">POS activo</div>
@@ -120,9 +303,10 @@
       </div>
       <div id="low-stock-container"></div>
     </div>
+
   </main>
 
-  <!-- INVENTARIO -->
+  <!-- Inventory tab -->
   <main id="tab-inventory" class="hidden px-4 pt-6">
     <div class="flex gap-2">
       <div class="relative flex-1">
@@ -135,7 +319,7 @@
     <div id="inventory-list" class="mt-4"></div>
   </main>
 
-  <!-- REPORTES -->
+  <!-- Reports tab -->
   <main id="tab-reports" class="hidden px-4 pt-6">
     <h2 class="font-bold text-lg mb-3">Reportes</h2>
     <div class="card">
@@ -155,11 +339,10 @@
         <button onclick="downloadReportPDF()" class="px-3 py-2 border rounded">Exportar PDF (A4)</button>
       </div>
     </div>
-
     <div id="report-summary" class="mt-4"></div>
   </main>
 
-  <!-- BOTTOM NAV -->
+  <!-- bottom navigation -->
   <nav class="bottom-nav">
     <button onclick="switchTab('home')" class="nav-btn" data-tab="home"><i data-lucide="layout-grid"></i><span>Inicio</span></button>
     <button onclick="switchTab('inventory')" class="nav-btn" data-tab="inventory"><i data-lucide="box"></i><span>Stock</span></button>
@@ -169,20 +352,20 @@
   </nav>
 </div>
 
-<!-- MODALS -->
+<!-- MODALS: sale, product, scan, clients, gestion, login (definitions below) -->
 
-<!-- MODAL: SALE (POS) -->
+<!-- Modal: Sale (POS) -->
 <div id="modal-sale" class="modal" aria-hidden="true">
-  <div class="modal-sheet">
+  <div class="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="modal-sale-title">
     <div class="flex justify-between items-center mb-3">
-      <h3 class="font-bold text-lg">Nueva Venta</h3>
+      <h3 id="modal-sale-title" class="font-bold text-lg">Nueva Venta</h3>
       <button onclick="closeModal('modal-sale')"><i data-lucide="x"></i></button>
     </div>
 
     <div>
       <div class="relative">
         <i data-lucide="search" class="absolute left-3 top-3 w-4 h-4 text-slate-400"></i>
-        <input id="pos-search" class="input-pro pl-10" placeholder="Escribe o escanea producto... (coincide por letras)">
+        <input id="pos-search" class="input-pro pl-10" placeholder="Escribe o escanea producto... (coincide por letras)" aria-label="buscar producto">
         <div id="pos-suggestions" class="dropdown-suggestions hidden"></div>
       </div>
 
@@ -209,7 +392,7 @@
   </div>
 </div>
 
-<!-- MODAL: PRODUCT -->
+<!-- Modal: Product -->
 <div id="modal-product" class="modal">
   <div class="modal-sheet">
     <div class="flex justify-between items-center mb-3">
@@ -249,7 +432,7 @@
   </div>
 </div>
 
-<!-- MODAL: SCAN -->
+<!-- Modal: Scan -->
 <div id="modal-scan" class="modal">
   <div class="modal-sheet" style="max-width:420px">
     <div class="flex justify-between items-center mb-3">
@@ -267,7 +450,7 @@
   </div>
 </div>
 
-<!-- MODAL: CLIENTS -->
+<!-- Modal: Clients -->
 <div id="modal-clients" class="modal">
   <div class="modal-sheet">
     <div class="flex justify-between items-center mb-3">
@@ -285,7 +468,7 @@
   </div>
 </div>
 
-<!-- MODAL: GESTION -->
+<!-- Modal: Gestion -->
 <div id="modal-gestion" class="modal">
   <div class="modal-sheet">
     <div class="flex justify-between items-center mb-3">
@@ -299,7 +482,7 @@
   </div>
 </div>
 
-<!-- MODAL: LOGIN -->
+<!-- Modal: Login -->
 <div id="login-screen" class="fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center p-8">
   <div class="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center mb-6">
     <i data-lucide="store" class="text-white w-10 h-10"></i>
@@ -321,9 +504,11 @@
 <div id="toast-root" class="toast"></div>
 
 <script>
-/* ========================
-   CONFIG / HELPERS / STATE
-   ======================== */
+/* ============================
+   CONFIG / HELPERS / CONSTANTS
+   ============================ */
+
+/* Firebase config (tu proyecto) */
 const firebaseConfig = {
   apiKey: "AIzaSyBh2WHinnQeRD9fsmdEMj9zkNVJNcixzS4",
   authDomain: "jhonatan-7ca7d.firebaseapp.com",
@@ -332,36 +517,71 @@ const firebaseConfig = {
   messagingSenderId: "248102422749",
   appId: "1:248102422749:web:097c4e553e610d27dff334"
 };
+
+/* DB path: contenedor que usas en Firestore (respeta formato del usuario) */
 const DB = { col: "MODO DE PREODUCCIÓN", doc: "DATOS", field: "MAGALY" };
 
+/* Shortcuts */
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const uid = ()=> 'id-'+Math.random().toString(36).slice(2,9);
 const money = v => Number(v||0).toFixed(2);
 const todayYMD = ()=> { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+const isSameLocalDay = (dateStr, ref = new Date()) => {
+  if(!dateStr) return false;
+  const d = new Date(dateStr);
+  if(Number.isNaN(d.getTime())) return false;
+  return d.getFullYear() === ref.getFullYear() &&
+         d.getMonth() === ref.getMonth() &&
+         d.getDate() === ref.getDate();
+};
 
+/* Toast util (non-blocking) */
 function showToast(msg, ms=1600){
   const root = document.getElementById('toast-root');
-  const el = document.createElement('div'); el.className='bg-slate-900 text-white px-4 py-2 rounded-xl text-sm shadow-lg'; el.style.marginTop='6px'; el.textContent = msg;
-  root.appendChild(el); setTimeout(()=> el.remove(), ms);
+  if(!root) return;
+  const el = document.createElement('div');
+  el.className='bg-slate-900 text-white px-4 py-2 rounded-xl text-sm shadow-lg';
+  el.style.marginTop='6px';
+  el.textContent = msg;
+  root.appendChild(el);
+  setTimeout(()=> el.remove(), ms);
 }
+
+/* Simple escape for safety in HTML rendering */
 function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
 
-/* App state */
-let STATE = { products: [], sales: [], customers: [] };
-let cart = []; let payMethod = 'EFECTIVO'; let db = null; let cloudOn = false;
-let unsubscribe = null;
+/* =========
+   APP STATE
+   ========= */
+let STATE = { products: [], sales: [], customers: [] }; // canonical app state
+let cart = []; let payMethod = 'EFECTIVO'; let db = null; let cloudOn = false; let unsubscribe = null;
 
-/* load local backup */
-try { const b = localStorage.getItem('tienda_local_backup'); if(b) STATE = JSON.parse(b); } catch(e){ console.warn('local parse err', e); }
+/* pendingOps: offline queue persistent in localStorage.
+   Each op has shape { id, type: 'sale'|'product'|'customer', payload, ts, retries } */
+let pendingOps = [];
+const PENDING_KEY = 'tienda_pending_ops_v1';
+const LOCAL_BACKUP_KEY = 'tienda_local_backup_v1';
 
-/* ========================
-   NORMALIZE / MERGE / FIRESTORE SYNC
-   ======================== */
+/* Load persisted state and pending ops */
+try { const b = localStorage.getItem(LOCAL_BACKUP_KEY); if(b) STATE = JSON.parse(b); } catch(e){ console.warn('local parse err', e); }
+try { const p = localStorage.getItem(PENDING_KEY); if(p) pendingOps = JSON.parse(p) || []; } catch(e){ pendingOps = []; }
+
+/* Persist helpers */
+function saveLocalBackup(){ try { localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(STATE)); } catch(e){} }
+function savePending(){ try { localStorage.setItem(PENDING_KEY, JSON.stringify(pendingOps)); } catch(e){} }
+
+/* =========
+   NORMALIZE REMOTE
+   =========
+   - Normalizes remote payloads to canonical STATE
+   - Compatible with older formats
+*/
 function normalizeRemoteData(remote){
   const payload = (remote && remote[DB.field]) ? remote[DB.field] : (remote || {});
   const out = { products: [], sales: [], customers: [] };
 
+  /* normalize product */
   function nProd(raw){
     if(!raw) return null;
     const p = Object.assign({}, raw);
@@ -377,6 +597,7 @@ function normalizeRemoteData(remote){
     return p;
   }
 
+  /* normalize sale items from various shapes */
   function normalizeSaleItems(raw){
     const items=[]; if(!raw) return items;
     if(Array.isArray(raw)){ for(const it of raw) items.push({ productId: it.productId || it.id || it.pid || null, qty: Number(it.qty||it.quantity||1), unitPrice: Number(it.unitPrice||it.price||0) }); return items; }
@@ -388,7 +609,6 @@ function normalizeRemoteData(remote){
   const prodCand = payload.products || payload.inventory || payload.catalog || payload.items || [];
   if(Array.isArray(prodCand)) out.products = prodCand.map(nProd).filter(Boolean);
   else if(typeof prodCand === 'object') out.products = Object.values(prodCand).map(nProd).filter(Boolean);
-
   if(out.products.length === 0){
     for(const k of Object.keys(payload)){
       const v = payload[k];
@@ -399,30 +619,35 @@ function normalizeRemoteData(remote){
   const salesCand = payload.sales || payload.ventas || payload.transactions || payload.orders || [];
   if(Array.isArray(salesCand)){
     out.sales = salesCand.map(s => {
-      const sale = Object.assign({},s);
+      const sale = Object.assign({}, s);
       sale.id = sale.id || sale._id || ('sale-'+Math.random().toString(36).slice(2,9));
       sale.date = sale.date || sale.created || new Date().toISOString();
       sale.total = Number(sale.total || sale.amount || 0);
       sale.paymentType = sale.paymentType || sale.payment || sale.method || 'EFECTIVO';
+      sale.customerId = sale.customerId || sale.customerId || null; // preserve if present
+      sale.customer = sale.customer || sale.cliente || null; // legacy
       sale.items = normalizeSaleItems(sale.items || sale.products || sale.itemsText);
       return sale;
     });
   } else if(typeof salesCand === 'object'){
     out.sales = Object.values(salesCand).map(s => {
-      const sale = Object.assign({},s);
+      const sale = Object.assign({}, s);
       sale.id = sale.id || sale._id || ('sale-'+Math.random().toString(36).slice(2,9));
       sale.date = sale.date || sale.created || new Date().toISOString();
       sale.total = Number(sale.total || sale.amount || 0);
       sale.paymentType = sale.paymentType || sale.payment || sale.method || 'EFECTIVO';
+      sale.customerId = sale.customerId || sale.customerId || null;
+      sale.customer = sale.customer || sale.cliente || null;
       sale.items = normalizeSaleItems(sale.items || sale.products || []);
       return sale;
     });
   }
 
   const customersCand = payload.customers || payload.clientes || [];
-  if(Array.isArray(customersCand)) out.customers = customersCand.map(c=>({ name:c.name||c.nombre||'', balance: Number(c.balance||c.saldo||0), createdAt: c.createdAt||new Date().toISOString() }));
-  else if(typeof customersCand === 'object') out.customers = Object.values(customersCand).map(c=>({ name:c.name||c.nombre||'', balance: Number(c.balance||c.saldo||0), createdAt: c.createdAt||new Date().toISOString() }));
+  if(Array.isArray(customersCand)) out.customers = customersCand.map(c=>({ id: c.id || c._id || uid(), name:c.name||c.nombre||'', balance: Number(c.balance||c.saldo||0), createdAt: c.createdAt||new Date().toISOString() }));
+  else if(typeof customersCand === 'object') out.customers = Object.values(customersCand).map(c=>({ id: c.id || c._id || uid(), name:c.name||c.nombre||'', balance: Number(c.balance||c.saldo||0), createdAt: c.createdAt||new Date().toISOString() }));
 
+  /* link items to product IDs if possible */
   function linkItems(items){
     return items.map(it => {
       if(it.productId) return it;
@@ -438,13 +663,19 @@ function normalizeRemoteData(remote){
       return { productId: it.productId || null, qty:Number(it.qty||1), unitPrice:Number(it.unitPrice||0), rawName: it.name || null };
     });
   }
+
   out.sales = out.sales.map(s => { s.items = linkItems(s.items||[]); if((!s.total||s.total===0) && Array.isArray(s.items)) s.total = s.items.reduce((a,b)=>a + (Number(b.unitPrice||0)*Number(b.qty||1)),0); return s; });
   out.products = out.products.map(p => { p.id = p.id || uid(); p.stock = Number(p.stock||0); p.price = Number(p.price||0); p.costPrice = Number(p.costPrice||0); p.movements = Array.isArray(p.movements)?p.movements:[]; return p; });
 
   return out;
 }
 
+/* =========
+   MERGE STATE
+   - merges remote normalized state with local STATE avoiding destructive overwrite
+*/
 function mergeState(remoteState){
+  // Merge products: prefer more recent createdAt, merge movements by id
   const map = new Map(); (STATE.products||[]).forEach(p => map.set(p.id, JSON.parse(JSON.stringify(p))));
   for(const rp of (remoteState.products||[])){
     const existing = map.get(rp.id);
@@ -452,13 +683,16 @@ function mergeState(remoteState){
     else {
       const ldt = new Date(existing.createdAt||0).getTime(), rdt = new Date(rp.createdAt||0).getTime();
       const base = rdt >= ldt ? rp : existing;
+      // unify movements
       const mm = new Map(); (existing.movements||[]).forEach(m=> mm.set(m.id||JSON.stringify(m), m)); (rp.movements||[]).forEach(m=> mm.set(m.id||JSON.stringify(m), m));
       base.movements = Array.from(mm.values());
+      // prefer non-zero stock? keep remote? we'll take the base (latest)
       map.set(base.id, base);
     }
   }
   const mergedProds = Array.from(map.values());
 
+  // Merge sales: keep set union, prefer latest date on conflict
   const sMap = new Map(); (STATE.sales||[]).forEach(s=> sMap.set(s.id, s));
   for(const rs of (remoteState.sales||[])){
     if(!sMap.has(rs.id)) sMap.set(rs.id, rs);
@@ -470,115 +704,315 @@ function mergeState(remoteState){
   }
   const mergedSales = Array.from(sMap.values()).sort((a,b)=> new Date(b.date)-new Date(a.date));
 
-  const cMap = new Map(); (STATE.customers||[]).forEach(c=> cMap.set((c.name||'').toLowerCase(), c));
+  // Merge customers by normalized name or id
+  const cMap = new Map(); (STATE.customers||[]).forEach(c=> cMap.set((c.id||c.name||'').toString().toLowerCase(), c));
   for(const rc of (remoteState.customers||[])){
-    const key = (rc.name||'').toLowerCase();
+    const key = (rc.id || rc.name || '').toString().toLowerCase();
     if(!cMap.has(key)) cMap.set(key, rc);
     else { const ex = cMap.get(key); ex.balance = Number((Number(ex.balance||0) + Number(rc.balance||0)).toFixed(2)); }
   }
   const mergedCustomers = Array.from(cMap.values());
 
   STATE.products = mergedProds; STATE.sales = mergedSales; STATE.customers = mergedCustomers;
-  try { localStorage.setItem('tienda_local_backup', JSON.stringify(STATE)); } catch(e){}
+  try { localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(STATE)); } catch(e){}
 }
 
-/* ========================
-   FIREBASE: init + sync
-   ======================== */
+/* ==========
+   FIREBASE: init + sync (robust)
+   - respects DB.field and avoids overwriting remote with empty payload
+   - sets onSnapshot listener
+   - initial read uses normalization and merge
+   ========== */
 function initFirebase(){
   try{
-    if(!window.firebase) { console.warn('Firebase SDK missing'); return; }
+    if(!window.firebase) { console.warn('Firebase SDK not loaded'); return; }
     if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
-  }catch(e){ console.error('initFirebase err', e); db = null; }
+  }catch(e){ console.error('initFirebase', e); db = null; }
 }
 
-function startFirestoreSync(){
-  if(!db) { updateOnline(false); return; }
-  const ref = db.collection(DB.col).doc(DB.doc);
-  // unsubscribe previous
-  if(typeof unsubscribe === 'function') try{ unsubscribe(); }catch(e){}
-  unsubscribe = ref.onSnapshot(docSnap => {
-    if(docSnap.exists){
-      const raw = docSnap.data() || {};
-      // normalize remote
+let syncInProgress = false;
+async function startFirestoreSync(){
+  if(!db){ updateOnline(false); return; }
+  const docRef = db.collection(DB.col).doc(DB.doc);
+
+  // initial fetch (one-time read) with normalization & merge
+  try{
+    const snap = await docRef.get();
+    if(snap.exists){
+      const raw = snap.data() || {};
       const normalized = normalizeRemoteData(raw);
       mergeState(normalized);
       renderAll();
       updateOnline(true);
-      console.log('✅ Datos sincronizados desde Firestore');
     } else {
-      // create document with current STATE
-      ref.set({ [DB.field]: STATE }, { merge:true }).then(()=> updateOnline(true)).catch(e=>{ console.warn('set doc err', e); updateOnline(false); });
+      // doc missing: create it with safe merge (do not overwrite other fields)
+      await docRef.set({ [DB.field]: STATE }, { merge: true });
+      updateOnline(true);
     }
-  }, err => {
-    console.error('onSnapshot error', err);
+  }catch(e){
+    console.error('initial read error', e);
     updateOnline(false);
-  });
+    // continue to attempt setting up realtime listener below
+  }
+
+  // realtime listener
+  try{
+    if(typeof unsubscribe === 'function') { try{ unsubscribe(); }catch(_){} }
+    unsubscribe = docRef.onSnapshot(docSnap => {
+      if(!docSnap.exists) {
+        // if doc missing, write local but safely
+        docRef.set({ [DB.field]: STATE }, { merge:true }).catch(e=> console.warn('set missing doc err', e));
+        updateOnline(true);
+        return;
+      }
+      const raw = docSnap.data() || {};
+      const normalized = normalizeRemoteData(raw);
+      mergeState(normalized);
+      renderAll();
+      updateOnline(true);
+      console.log('✅ Datos sincronizados desde Firestore (onSnapshot)');
+      // process pending ops if any
+      processPendingOps();
+    }, err => {
+      console.error('onSnapshot error', err);
+      updateOnline(false);
+    });
+  }catch(e){ console.error('startFirestoreSync err', e); updateOnline(false); }
 }
 
+/* =========
+   pushStateToCloud
+   - pushes STATE to cloud in merge mode
+   - used after local changes
+   ========= */
 async function pushStateToCloud(){
-  if(!db){ try{ localStorage.setItem('tienda_local_backup', JSON.stringify(STATE)); showToast('Guardado local (offline)'); } catch(e){}; return; }
+  if(!db){ showToast('Guardado local (offline)'); saveLocalBackup(); return; }
   try{
-    await db.collection(DB.col).doc(DB.doc).set({ [DB.field]: STATE }, { merge:true });
+    // Do not write empty field that would wipe remote structure: always send canonical object
+    const payload = { [DB.field]: STATE };
+    await db.collection(DB.col).doc(DB.doc).set(payload, { merge: true });
     updateOnline(true);
-    showToast('Sincronizado con Cloud');
+    showToast('Sincronizado con cloud');
+    return true;
   }catch(e){
     console.error('pushStateToCloud err', e);
     updateOnline(false);
-    showToast('Error guardando en Cloud');
+    showToast('Error sincronizando con cloud');
+    return false;
   }
 }
 
-/* Force sync (normalize & write back) */
-async function forceSync(){
-  if(!db) return alert('Cloud no inicializado');
-  if(!confirm('Forzar sincronización y normalización del documento remoto?')) return;
-  try{
-    const ref = db.collection(DB.col).doc(DB.doc);
-    const snap = await ref.get();
-    if(!snap.exists){ await ref.set({ [DB.field]: STATE }, { merge:true }); showToast('Documento creado en Firestore'); return; }
-    const normalized = normalizeRemoteData(snap.data()||{});
-    mergeState(normalized);
-    await ref.set({ [DB.field]: STATE }, { merge:true });
-    showToast('Sincronía forzada OK');
-    renderAll();
-  }catch(e){ console.error(e); alert('forceSync error: ' + (e.message||e)); }
+/* =========
+   OFFLINE QUEUE (pendingOps)
+   - addPendingOp(op): push op and persist
+   - processPendingOps(): try to flush queue to Firestore in FIFO, with retries/backoff
+*/
+function addPendingOp(op){
+  // op: { type, payload, id, ts, retries }
+  op.id = op.id || uid();
+  op.ts = op.ts || new Date().toISOString();
+  op.retries = op.retries || 0;
+  pendingOps.push(op);
+  savePending();
+  showToast('Operación en cola (offline)');
 }
 
-/* update UI online/offline */
+/* Try to flush pending ops; updates STATE locally on success and removes op */
+async function processPendingOps(){
+  if(!db) return;
+  if(pendingOps.length === 0) return;
+  if(syncInProgress) return;
+  syncInProgress = true;
+  try{
+    const docRef = db.collection(DB.col).doc(DB.doc);
+    // We will attempt to apply ops sequentially
+    for(let i = 0; i < pendingOps.length; ){
+      const op = pendingOps[i];
+      try{
+        if(op.type === 'sale'){
+          // read fresh remote, merge, then append sale safely
+          const snap = await docRef.get();
+          const remote = snap.exists ? (snap.data()||{}) : {};
+          const norm = normalizeRemoteData(remote);
+          mergeState(norm); // merge remote changes into STATE
+          // now ensure sale id unique
+          const sale = op.payload;
+          // push locally and then attempt to push state
+          STATE.sales.unshift(sale);
+          // adjust stocks on products
+          for(const it of sale.items){
+            const p = STATE.products.find(x=> x.id === it.productId);
+            if(p) {
+              p.stock = Number(p.stock) - Number(it.qty);
+              p.movements = p.movements || [];
+              p.movements.unshift({ id: uid(), type: 'OUT', qty: it.qty, date: new Date().toISOString(), saleId: sale.id, unitPrice: it.unitPrice });
+            }
+          }
+          // try pushStateToCloud
+          const ok = await pushStateToCloud();
+          if(!ok) throw new Error('push failed');
+          // op succeeded -> remove
+          pendingOps.splice(i,1);
+          savePending();
+          showToast('Operación pendiente enviada');
+          // do not increment i: new element now at same index
+          continue;
+        } else if(op.type === 'product'){
+          // product upsert
+          const product = op.payload;
+          // merge remote then push
+          const snap = await docRef.get();
+          const norm = normalizeRemoteData(snap.exists ? snap.data() : {});
+          mergeState(norm);
+          const idx = STATE.products.findIndex(p => p.id === product.id);
+          if(idx >= 0) STATE.products[idx] = product; else STATE.products.unshift(product);
+          const ok = await pushStateToCloud();
+          if(!ok) throw new Error('push failed');
+          pendingOps.splice(i,1);
+          savePending();
+          continue;
+        } else if(op.type === 'customer'){
+          const cust = op.payload;
+          const snap = await docRef.get();
+          const norm = normalizeRemoteData(snap.exists ? snap.data() : {});
+          mergeState(norm);
+          // merge by id or name
+          const existing = STATE.customers.find(c => (c.id && c.id === cust.id) || ((c.name||'').toLowerCase() === (cust.name||'').toLowerCase()));
+          if(existing) existing.balance = Number((Number(existing.balance||0) + Number(cust.balance||0)).toFixed(2));
+          else STATE.customers.unshift(cust);
+          const ok = await pushStateToCloud();
+          if(!ok) throw new Error('push failed');
+          pendingOps.splice(i,1);
+          savePending();
+          continue;
+        } else {
+          // unknown op type -> remove (to avoid infinite loop)
+          console.warn('Unknown pending op type, discarding', op.type);
+          pendingOps.splice(i,1);
+          savePending();
+          continue;
+        }
+      }catch(err){
+        // operation failed: increase retry counter and break to try later
+        console.warn('Op failed, will retry later', pendingOps[i], err);
+        pendingOps[i].retries = (pendingOps[i].retries || 0) + 1;
+        savePending();
+        // backoff behavior: break loop and wait for next reconnection
+        break;
+      }
+    }
+  }catch(e){
+    console.error('processPendingOps err', e);
+  } finally {
+    syncInProgress = false;
+    // save local state
+    saveLocalBackup();
+    renderAll();
+  }
+}
+
+/* Try periodic flush when online */
+setInterval(()=>{ if(cloudOn) processPendingOps(); }, 15000);
+
+/* =========
+   ONLINE UI
+   ========= */
 function updateOnline(on){
   cloudOn = !!on;
   $('#dot').style.background = on ? '#10b981' : '#ef4444';
   $('#cloud-text').textContent = on ? 'Online' : 'Desconectado';
+  if(on) {
+    processPendingOps();
+  }
 }
 
-/* ========================
-   RENDERS & UI FUNCTIONS
-   ======================== */
-function renderAll(){ renderDashboard(); renderInventoryList(); renderCart(); renderClients(); renderGestionList(); updateReportsIfOpen(); }
+/* =========
+   RENDERS (dashboard, inventory, cart, clients, gestion)
+   ========= */
+function renderAll(){
+  renderDashboard();
+  renderInventoryList();
+  renderCart();
+  renderClients();
+  renderGestionList();
+  updateReportsIfOpen();
+}
+
 function renderDashboard(){
-  const hoy = new Date().toISOString().split('T')[0];
-  const ventasHoy = (STATE.sales||[]).filter(s => (s.date||'').startsWith && (s.date||'').startsWith(hoy));
+  const now = new Date();
+  const ventasHoy = (STATE.sales||[]).filter(s => isSameLocalDay(s.date, now));
   const total = ventasHoy.reduce((a,b)=> a + Number(b.total||0), 0);
   $('#stat-ventas').textContent = `S/ ${money(total)}`;
   $('#stat-count').textContent = ventasHoy.length;
-  const low = (STATE.products||[]).filter(p=> Number(p.stock) <= 5).slice(0,4);
-  const container = $('#low-stock-container'); container.innerHTML = '';
-  low.forEach(p => {
-    const card = document.createElement('div'); card.className='card flex justify-between items-center';
-    card.style.padding='8px'; card.innerHTML = `<div><div style="font-weight:700">${escapeHtml(p.name)}</div><div class="small-muted">S/ ${money(p.price)} • ${p.category||''}</div></div><div class="small-muted">Quedan ${p.stock}</div>`;
+
+  const products = (STATE.products||[]);
+  const outOfStock = products.filter(p => Number(p.stock) <= 0);
+  const lowStock = products.filter(p => Number(p.stock) > 0 && Number(p.stock) <= 5);
+
+  const container = $('#low-stock-container');
+  if(!container) return;
+  container.innerHTML = '';
+
+  const summary = document.createElement('div');
+  summary.className = 'stock-summary';
+  summary.innerHTML = `
+    <div class="stock-chip stock-out">Sin stock: ${outOfStock.length}</div>
+    <div class="stock-chip stock-low">Stock bajo: ${lowStock.length}</div>
+  `;
+  container.appendChild(summary);
+
+  if(outOfStock.length === 0 && lowStock.length === 0){
+    const ok = document.createElement('div');
+    ok.className = 'card stock-empty';
+    ok.textContent = 'Todo en orden: no hay alertas de stock.';
+    container.appendChild(ok);
+    return;
+  }
+
+  const buildSection = (title, items, tone) => {
+    if(items.length === 0) return;
+    const card = document.createElement('div');
+    card.className = 'card stock-section';
+    card.innerHTML = `<div class="stock-title">${title}</div>`;
+    const list = document.createElement('div');
+
+    const display = items.slice(0,6);
+    display.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'stock-row';
+      row.innerHTML = `
+        <div>
+          <div class="font-bold">${escapeHtml(p.name||'')}</div>
+          <div class="small-muted">S/ ${money(p.price)} • ${escapeHtml(p.category||'')}</div>
+        </div>
+        <div class="stock-badge ${tone}">${Number(p.stock)||0}</div>
+      `;
+      list.appendChild(row);
+    });
+
+    if(items.length > 6){
+      const more = document.createElement('div');
+      more.className = 'small-muted';
+      more.textContent = `+${items.length - 6} productos más`;
+      list.appendChild(more);
+    }
+
+    card.appendChild(list);
     container.appendChild(card);
-  });
+  };
+
+  buildSection('Sin stock', outOfStock, 'out');
+  buildSection('Stock bajo', lowStock, 'low');
 }
 
 function renderInventoryList(){
   const container = $('#inventory-list'); if(!container) return; container.innerHTML='';
-  const q = ($('#search-inv').value||'').toLowerCase();
+  const q = ($('#search-inv')?.value||'').toLowerCase();
   const list = (STATE.products||[]).filter(p => !q || (p.name||'').toLowerCase().includes(q) || (p.barcode||'').includes(q));
   if(list.length === 0) container.innerHTML = '<div class="small-muted">No hay productos</div>';
   list.forEach(p=>{
-    const d = document.createElement('div'); d.className='card flex justify-between items-center';
+    const d = document.createElement('div'); d.className='card flex justify-between items-center'; d.style.padding='8px';
     d.onclick = ()=> editProduct(p.id);
     d.innerHTML = `<div><div style="font-weight:800">${escapeHtml(p.name)}</div><div class="small-muted">STOCK: ${p.stock} • S/ ${money(p.price)}</div></div><div class="text-indigo-600"><i data-lucide="edit-3"></i></div>`;
     container.appendChild(d);
@@ -586,59 +1020,380 @@ function renderInventoryList(){
   lucide.createIcons();
 }
 
-/* ========================
-   PRODUCT CRUD
-   ======================== */
-document.getElementById('form-p').addEventListener('submit', async (e)=>{
-  e.preventDefault();
+/* POS search (coincide por letras) */
+function normalizeForSearch(text){
+  return String(text||'')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]/g,'');
+}
+
+function matchLettersOrdered(needle, hay){
+  if(!needle) return true;
+  let i = 0;
+  for(const ch of hay){
+    if(ch === needle[i]) i += 1;
+    if(i >= needle.length) return true;
+  }
+  return false;
+}
+
+function getPosMatches(query){
+  const q = normalizeForSearch(query);
+  const qDigits = String(query||'').replace(/\D/g,'');
+  if(!q && !qDigits) return [];
+  const items = (STATE.products||[]);
+  const scored = [];
+  for(const p of items){
+    const nameNorm = normalizeForSearch(p.name);
+    const catNorm = normalizeForSearch(p.category);
+    const codeNorm = String(p.barcode||'').replace(/\D/g,'');
+    const nameMatch = q && (nameNorm.includes(q) || matchLettersOrdered(q, nameNorm));
+    const catMatch = q && (catNorm.includes(q) || matchLettersOrdered(q, catNorm));
+    const codeMatch = qDigits && codeNorm.includes(qDigits);
+    if(!(nameMatch || catMatch || codeMatch)) continue;
+
+    let score = 0;
+    if(q && nameNorm.startsWith(q)) score += 4;
+    else if(q && nameNorm.includes(q)) score += 3;
+    else if(q && matchLettersOrdered(q, nameNorm)) score += 1;
+    if(qDigits && codeNorm === qDigits) score += 3;
+    else if(qDigits && codeNorm.includes(qDigits)) score += 2;
+    if(Number(p.stock||0) <= 0) score -= 1;
+    scored.push({ p, score });
+  }
+  scored.sort((a,b)=> b.score - a.score);
+  return scored.slice(0, 8).map(s => s.p);
+}
+
+function renderPosSuggestions(matches){
+  const list = $('#pos-suggestions');
+  if(!list) return;
+  list.innerHTML = '';
+  if(!matches || matches.length === 0){
+    list.classList.add('hidden');
+    return;
+  }
+  matches.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'suggestion-item flex items-center justify-between gap-2';
+    const stock = Number(p.stock||0);
+    const stockText = stock <= 0 ? 'Sin stock' : `Stock ${stock}`;
+    row.innerHTML = `
+      <div>
+        <div style="font-weight:700">${escapeHtml(p.name||'')}</div>
+        <div class="small-muted">S/ ${money(p.price)} • ${escapeHtml(p.category||'')}</div>
+      </div>
+      <div class="small-muted">${stockText}</div>
+    `;
+    row.addEventListener('click', ()=> {
+      addToCart(p);
+      const input = $('#pos-search');
+      if(input) input.value = '';
+      list.classList.add('hidden');
+      if(input) input.focus();
+    });
+    list.appendChild(row);
+  });
+  list.classList.remove('hidden');
+}
+
+function addToCart(prod){
+  if(!prod) return;
+  const maxStock = Number(prod.stock||0);
+  const existing = cart.find(i => i.id === prod.id);
+  const currentQty = existing ? Number(existing.qty||0) : 0;
+  if(maxStock <= 0){
+    showToast('Sin stock');
+    return;
+  }
+  if(currentQty + 1 > maxStock){
+    showToast('Stock insuficiente');
+    return;
+  }
+  if(existing) existing.qty += 1;
+  else cart.push({ id: prod.id, name: prod.name, price: Number(prod.price||0), qty: 1 });
+  renderCart();
+}
+
+function setupPosSearch(){
+  const input = $('#pos-search');
+  const list = $('#pos-suggestions');
+  if(!input || !list) return;
+  if(input.dataset.bound === '1') return;
+  input.dataset.bound = '1';
+
+  let lastMatches = [];
+  const refresh = () => {
+    const q = input.value.trim();
+    lastMatches = getPosMatches(q);
+    renderPosSuggestions(lastMatches);
+  };
+
+  input.addEventListener('input', refresh);
+  input.addEventListener('focus', refresh);
+  input.addEventListener('keydown', (ev) => {
+    if(ev.key === 'Enter'){
+      ev.preventDefault();
+      const q = input.value.trim();
+      if(!q) return;
+      const qDigits = q.replace(/\D/g,'');
+      if(qDigits){
+        const exact = (STATE.products||[]).find(p => String(p.barcode||'').replace(/\D/g,'') === qDigits);
+        if(exact){
+          addToCart(exact);
+          input.value = '';
+          list.classList.add('hidden');
+          return;
+        }
+      }
+      const pick = lastMatches && lastMatches[0];
+      if(pick){
+        addToCart(pick);
+        input.value = '';
+        list.classList.add('hidden');
+      }
+    }
+  });
+
+  document.addEventListener('click', (ev) => {
+    if(ev.target === input) return;
+    if(list.contains(ev.target)) return;
+    list.classList.add('hidden');
+  });
+}
+
+/* CART render & operations */
+function renderCart(){
+  const container = $('#pos-cart'); if(!container) return; container.innerHTML='';
+  let total = 0;
+  cart.forEach((item, idx) => {
+    total += item.price * item.qty;
+    const div = document.createElement('div'); div.className='card flex justify-between items-center'; div.style.padding='8px';
+    div.innerHTML = `<div><div style="font-weight:800">${escapeHtml(item.name)}</div><div class="small-muted">S/ ${money(item.price)}</div></div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button onclick="updateQty(${idx},-1)" class="px-2 py-1 border rounded">-</button>
+        <div style="font-weight:800">${item.qty}</div>
+        <button onclick="updateQty(${idx},1)" class="px-2 py-1 border rounded">+</button>
+      </div>`;
+    container.appendChild(div);
+  });
+  $('#pos-total').textContent = money(total);
+  $('#pos-items-count').textContent = `${cart.reduce((s,i)=> s + (i.qty||0),0)} items`;
+}
+
+function updateQty(idx, delta){ if(!cart[idx]) return; cart[idx].qty += delta; if(cart[idx].qty <= 0) cart.splice(idx,1); renderCart(); }
+
+function setPayMethod(m, ev){
+  payMethod = m;
+  $$('.pay-btn').forEach(b=> b.classList.remove('active'));
+  if(ev && ev.currentTarget) ev.currentTarget.classList.add('active');
+  if(m === 'A_CREDITO') $('#pos-customer').classList.remove('hidden'); else $('#pos-customer').classList.add('hidden');
+}
+
+/* ==========
+   completeSale() - OFFLINE-FIRST, customerId handling
+   - validates stock locally
+   - creates customer if not exists (assigns id)
+   - updates customer's balance automatically on A_CREDITO
+   - when offline: pushes op to pendingOps
+   - when online: tries to push to Firestore and process pendingOps
+   ========== */
+async function completeSale(){
   try{
-    const id = $('#p-id').value || uid();
-    const prod = {
-      id,
-      name: $('#p-name').value.trim(),
-      barcode: $('#p-barcode').value.trim(),
-      category: $('#p-cat').value.trim(),
-      costPrice: Number($('#p-cost').value) || 0,
-      price: Number($('#p-price').value) || 0,
-      stock: Number($('#p-stock').value) || 0,
-      createdAt: new Date().toISOString(),
-      movements: (STATE.products.find(p=>p.id===id)?.movements)||[]
+    if(cart.length === 0) return alert('El carrito está vacío');
+    // validate stock locally
+    for(const it of cart){
+      const p = (STATE.products||[]).find(x => x.id === it.id);
+      if(!p) return alert('Producto no encontrado: ' + it.name);
+      if(Number(p.stock) < Number(it.qty)) return alert('Stock insuficiente para: ' + p.name);
+    }
+
+    // assemble sale object with customerId handling
+    const sale = {
+      id: 'V-' + Date.now(),
+      date: new Date().toISOString(),
+      total: cart.reduce((a,b)=> a + (b.price*b.qty), 0),
+      paymentType: payMethod,
+      customerId: null,
+      customerName: null,
+      items: cart.map(i=> ({ productId: i.id, qty: i.qty, unitPrice: i.price })),
+      meta: { origin: 'pos', device: navigator.userAgent }
     };
-    const idx = (STATE.products||[]).findIndex(p=>p.id===id);
-    if(idx >= 0) STATE.products[idx] = prod; else STATE.products.unshift(prod);
-    await pushStateToCloud();
-    showToast('Producto guardado');
-    renderInventoryList(); renderDashboard();
-    closeModal('modal-product');
-  }catch(e){ console.error(e); alert('Error guardando producto: '+ (e.message||e)); }
-});
 
-function editProduct(id){
-  const p = (STATE.products||[]).find(x=> x.id === id); if(!p) return alert('Producto no encontrado');
-  $('#p-id').value = p.id; $('#p-name').value = p.name; $('#p-barcode').value = p.barcode; $('#p-cat').value = p.category;
-  $('#p-cost').value = p.costPrice||0; $('#p-price').value = p.price||0; $('#p-stock').value = p.stock||0;
-  $('#btn-delete-p').classList.remove('hidden'); openModal('modal-product');
+    // handle credit: find or create customer and attach customerId
+    if(payMethod === 'A_CREDITO'){
+      const custName = ($('#pos-customer').value || '').trim();
+      if(!custName) return alert('Ingrese nombre del cliente para A CREDITO');
+      // find by exact name (case-insensitive) or by id
+      let customer = STATE.customers.find(c => (c.name||'').toLowerCase() === custName.toLowerCase());
+      if(!customer){
+        // create local customer entry
+        customer = { id: 'C-'+Date.now(), name: custName, balance: Number(sale.total), createdAt: new Date().toISOString() };
+        // add locally
+        STATE.customers.unshift(customer);
+        // add pending op to create/update customer in cloud
+        addPendingOp({ type: 'customer', payload: customer });
+      } else {
+        // update local balance immediately
+        customer.balance = Number((Number(customer.balance||0) + Number(sale.total)).toFixed(2));
+        // queue customer update
+        addPendingOp({ type: 'customer', payload: { id: customer.id, name: customer.name, balance: customer.balance } });
+      }
+      sale.customerId = customer.id;
+      sale.customerName = customer.name;
+    } else {
+      // for non-credit, optionally attach customerName if provided
+      const custName = ($('#pos-customer').value || '').trim();
+      if(custName){
+        let customer = STATE.customers.find(c => (c.name||'').toLowerCase() === custName.toLowerCase());
+        if(!customer){
+          customer = { id: 'C-'+Date.now(), name: custName, balance: 0, createdAt: new Date().toISOString() };
+          STATE.customers.unshift(customer);
+          addPendingOp({ type: 'customer', payload: customer });
+        }
+        sale.customerId = customer.id;
+        sale.customerName = customer.name;
+      }
+    }
+
+    // update stock locally and movements
+    for(const it of sale.items){
+      const p = STATE.products.find(x => x.id === it.productId);
+      if(p){
+        p.stock = Number(p.stock) - Number(it.qty);
+        p.movements = p.movements || [];
+        p.movements.unshift({ id: uid(), type:'OUT', qty: it.qty, date: new Date().toISOString(), saleId: sale.id, unitPrice: it.unitPrice });
+      }
+    }
+
+    // Add sale locally
+    STATE.sales.unshift(sale);
+    saveLocalBackup();
+
+    // post-sale UI updates (close modal immediately)
+    cart = [];
+    renderCart();
+    renderInventoryList();
+    renderDashboard();
+    closeModal('modal-sale');
+    if($('#pos-customer')) $('#pos-customer').value = '';
+
+    // Build op and either process immediately or queue
+    const op = { type: 'sale', payload: sale };
+    if(!cloudOn || !db){
+      // offline: queue operation
+      addPendingOp(op);
+      showToast('Venta guardada offline. Se sincronizará cuando haya conexión.');
+    } else {
+      // online: attempt to push and also add to pending if fail
+      const ok = await pushStateToCloud();
+      if(!ok){
+        addPendingOp(op);
+        showToast('Venta guardada en cola (error sincronizando).');
+      } else {
+        showToast('Venta registrada y sincronizada');
+      }
+      // attempt to flush pending ops after push
+      processPendingOps();
+    }
+  }catch(e){
+    console.error('completeSale err', e);
+    alert('Error registrando venta: ' + (e && e.message || ''));
+  }
 }
 
-function deleteProduct(){
-  const id = $('#p-id').value; if(!id) return;
-  if(!confirm('Eliminar producto?')) return;
-  STATE.products = (STATE.products||[]).filter(p=>p.id !== id);
-  pushStateToCloud();
-  renderInventoryList(); renderDashboard(); closeModal('modal-product'); showToast('Producto eliminado');
+/* =======
+   Gestion: list, edit, delete sale (delete reverses stock)
+   ======= */
+function renderGestionList(){
+  const container = $('#gestion-list'); if(!container) return; container.innerHTML = '';
+  const rows = (STATE.sales||[]).slice(0,500);
+  if(rows.length === 0) { container.innerHTML = '<div class="small-muted">No hay ventas registradas</div>'; return; }
+  const table = document.createElement('table');
+  table.innerHTML = `<thead><tr><th>Fecha</th><th>ID</th><th>Cliente</th><th>Pago</th><th style="text-align:right">Total</th><th>Acciones</th></tr></thead><tbody></tbody>`;
+  const tbody = table.querySelector('tbody');
+  rows.forEach(s=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${new Date(s.date).toLocaleString()}</td><td>${s.id}</td><td>${escapeHtml(s.customerName||s.customer||'-')}</td><td>${escapeHtml(s.paymentType||s.method||'EFECTIVO')}</td><td style="text-align:right">S/ ${money(s.total)}</td><td style="white-space:nowrap"><button onclick="openEditSale('${s.id}')" class="px-2 py-1 border rounded mr-2">Editar</button><button onclick="deleteSaleConfirm('${s.id}')" class="px-2 py-1 border rounded">Eliminar</button></td>`;
+    tbody.appendChild(tr);
+  });
+  container.appendChild(table);
 }
 
-function calculateUnitPrice(){
-  const cost = Number($('#p-cost').value)||0; const stock = Number($('#p-stock').value)||1;
-  if(stock <= 0) return alert('Stock debe ser mayor que 0');
-  const unit = cost / stock;
-  $('#p-price').value = (unit * 1.30).toFixed(2);
-  showToast('Precio estimado calculado');
+/* Open edit sale modal (allows editing qty per item and payment) */
+function openEditSale(saleId){
+  const s = (STATE.sales||[]).find(x=> x.id === saleId); if(!s) return alert('Venta no encontrada');
+  const modal = document.createElement('div'); modal.className='modal visible'; modal.style.zIndex='120';
+  const sheet = document.createElement('div'); sheet.className='modal-sheet';
+  sheet.innerHTML = `<div class="flex justify-between items-center mb-3"><h3 class="font-bold">Editar Venta ${s.id}</h3><button id="close-edit">Cerrar</button></div>
+    <div><label class="small-muted">Cliente</label><input id="edit-customer" class="input-pro mt-1" value="${escapeHtml(s.customerName||'')}" /></div>
+    <div class="mt-2"><label class="small-muted">Pago</label><select id="edit-payment" class="input-pro mt-1"><option ${ (s.paymentType||s.method) === 'EFECTIVO' ? 'selected':'' }>EFECTIVO</option><option ${ (s.paymentType||s.method) === 'YAPE' ? 'selected':'' }>YAPE</option><option ${ (s.paymentType||s.method) === 'A_CREDITO' ? 'selected':'' }>A_CREDITO</option></select></div>
+    <div class="mt-3"><label class="small-muted">Productos</label><div id="edit-items" style="max-height:220px;overflow:auto;border:1px solid #eee;padding:8px;border-radius:8px;"></div></div>
+    <div class="mt-3 flex gap-2"><button id="save-edit" class="btn-primary">Guardar cambios</button><button id="cancel-edit" class="px-3 py-2 border rounded">Cancelar</button></div>`;
+  modal.appendChild(sheet); document.body.appendChild(modal);
+  const itemsContainer = sheet.querySelector('#edit-items');
+  s.items.forEach((it, idx)=>{
+    const prod = (STATE.products||[]).find(p=> p.id === it.productId) || { name: it.rawName || 'Producto' };
+    const row = document.createElement('div'); row.style.display='flex'; row.style.gap='8px'; row.style.marginBottom='8px';
+    row.innerHTML = `<div style="flex:1"><div style="font-weight:700">${escapeHtml(prod.name)}</div><div class="small-muted">Unit S/ ${money(it.unitPrice||0)}</div></div><div><input type="number" value="${it.qty}" min="1" data-idx="${idx}" class="input-pro edit-qty" style="width:90px"></div>`;
+    itemsContainer.appendChild(row);
+  });
+  sheet.querySelector('#close-edit').addEventListener('click', ()=> modal.remove());
+  sheet.querySelector('#cancel-edit').addEventListener('click', ()=> modal.remove());
+  sheet.querySelector('#save-edit').addEventListener('click', async ()=>{
+    const newCustomer = sheet.querySelector('#edit-customer').value.trim();
+    const newPayment = sheet.querySelector('#edit-payment').value;
+    const qtyInputs = Array.from(sheet.querySelectorAll('.edit-qty'));
+    // compute diffs and adjust stock
+    const oldMap = {}; s.items.forEach(it => { oldMap[it.productId || it.rawName || uid()] = Number(it.qty || 0); });
+    const newMap = {};
+    qtyInputs.forEach(inp => { const idx = Number(inp.getAttribute('data-idx')); const val = Number(inp.value) || 0; const key = s.items[idx].productId || s.items[idx].rawName || uid(); newMap[key] = val; });
+    for(let i=0;i<s.items.length;i++){
+      const it = s.items[i];
+      const key = it.productId || it.rawName || uid();
+      const oldQ = oldMap[key] || 0; const newQ = newMap[key] || 0;
+      const diff = newQ - oldQ; // positive => sold more (reduce stock)
+      if(it.productId){
+        const p = (STATE.products||[]).find(x=> x.id === it.productId);
+        if(p) p.stock = Number(p.stock) - diff;
+      }
+      s.items[i].qty = newQ;
+    }
+    s.total = s.items.reduce((a,b)=> a + (Number(b.unitPrice||0) * Number(b.qty||0)), 0);
+    s.customerName = newCustomer || s.customerName;
+    s.paymentType = newPayment;
+    // push change: update local and push to cloud / pending ops
+    STATE.sales = STATE.sales.map(x => x.id === s.id ? s : x);
+    saveLocalBackup();
+    addPendingOp({ type: 'sale', payload: s }); // queue update as sale op
+    await processPendingOps();
+    showToast('Venta editada (cambios en cola si offline)');
+    renderAll();
+    modal.remove();
+  });
 }
 
-/* ========================
-   IMPORT / EXPORT XLSX
-   ======================== */
+/* delete sale with stock rollback */
+function deleteSaleConfirm(saleId){
+  if(!confirm('Eliminar venta y revertir stock?')) return;
+  const sale = (STATE.sales||[]).find(s=> s.id === saleId); if(!sale) return alert('Venta no encontrada');
+  for(const it of sale.items){
+    const p = (STATE.products||[]).find(x=> x.id === it.productId);
+    if(p){ p.stock = Number(p.stock) + Number(it.qty); p.movements = p.movements || []; p.movements.unshift({ id: uid(), type:'ROLLBACK', qty: it.qty, date: new Date().toISOString(), note: 'Eliminación venta ' + saleId }); }
+  }
+  STATE.sales = (STATE.sales||[]).filter(s=> s.id !== saleId);
+  saveLocalBackup();
+  // queue deletion as a sale op with a flag 'deleted': true (consumer on server side should handle if necessary)
+  addPendingOp({ type: 'sale', payload: { ...sale, deleted: true } });
+  showToast('Venta eliminada (sincronización pendiente)');
+  renderAll();
+}
+
+/* =========
+   IMPORT / EXPORT / REPORTS
+   ========= */
 function exportInventoryXLSX(){
   try{
     const rows = (STATE.products||[]).map(p=>({ id:p.id,name:p.name,category:p.category,barcode:p.barcode,stock:p.stock,price:p.price,costPrice:p.costPrice }));
@@ -651,7 +1406,7 @@ function exportInventoryXLSX(){
 
 function exportSalesXLSX(){
   try{
-    const rows = (STATE.sales||[]).map(s=>({ id:s.id, date:s.date, customer:s.customer||'', paymentType:s.paymentType||s.method||'', total:s.total, items:(s.items||[]).map(it=> ((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name + ' x' + it.qty)).join(' | ') }));
+    const rows = (STATE.sales||[]).map(s=>({ id:s.id, date:s.date, customerId:s.customerId||'', customerName:s.customerName||'', paymentType:s.paymentType||s.method||'', total:s.total, items:(s.items||[]).map(it=> ((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name + ' x' + it.qty)).join(' | ') }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Ventas');
     XLSX.writeFile(wb, `ventas_${todayYMD()}.xlsx`);
@@ -662,7 +1417,7 @@ function exportSalesXLSX(){
 function exportCombinedXLSX(){
   try{
     const from = todayYMD(), to = todayYMD();
-    const salesRows = (STATE.sales||[]).map(s=>({ id:s.id, date:s.date, customer:s.customer||'', paymentType:s.paymentType||s.method||'', total:s.total, items:(s.items||[]).map(it=> ((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name + ' x' + it.qty)).join(' | ') }));
+    const salesRows = (STATE.sales||[]).map(s=>({ id:s.id, date:s.date, customerId:s.customerId||'', customerName:s.customerName||'', paymentType:s.paymentType||s.method||'', total:s.total, items:(s.items||[]).map(it=> ((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name + ' x' + it.qty)).join(' | ') }));
     const invRows = (STATE.products||[]).map(p=>({ id:p.id, name:p.name, category:p.category, barcode:p.barcode, stock:p.stock, price:p.price, costPrice:p.costPrice }));
     const kardex = []; (STATE.products||[]).forEach(p=> (p.movements||[]).forEach(m=> kardex.push({ productId:p.id, productName:p.name, type:m.type||'', qty:m.qty||0, date:m.date||'', note:m.note||'' })));
     const wb = XLSX.utils.book_new();
@@ -674,9 +1429,7 @@ function exportCombinedXLSX(){
   }catch(e){ console.error(e); alert('Error exportando combinado'); }
 }
 
-/* ========================
-   REPORTES (AGRUPADOS POR TIPO)
-   ======================== */
+/* Reports: generate and preview */
 function salesInRange(from,to){
   if(!from||!to) return [];
   const s = new Date(from + 'T00:00:00').getTime(), e = new Date(to + 'T23:59:59.999').getTime();
@@ -711,7 +1464,7 @@ function renderReportSummary(from,to){
   // sales table
   const rows = sales.map(s=>{
     const items = (s.items||[]).map(it => ((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name) + ' x' + it.qty).join('; ');
-    return `<tr><td>${new Date(s.date).toLocaleString()}</td><td>${s.id}</td><td>${escapeHtml(s.customer||'-')}</td><td>${escapeHtml(s.paymentType||s.method||'EFECTIVO')}</td><td style="text-align:right">S/ ${money(s.total)}</td><td>${escapeHtml(items)}</td></tr>`;
+    return `<tr><td>${new Date(s.date).toLocaleString()}</td><td>${s.id}</td><td>${escapeHtml(s.customerName||'-')}</td><td>${escapeHtml(s.paymentType||s.method||'EFECTIVO')}</td><td style="text-align:right">S/ ${money(s.total)}</td><td>${escapeHtml(items)}</td></tr>`;
   }).join('');
   const table = `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th>Fecha</th><th>ID</th><th>Cliente</th><th>Pago</th><th style="text-align:right">Total</th><th>Productos</th></tr></thead><tbody>${rows || '<tr><td colspan="6" class="small-muted">No hay ventas</td></tr>'}</tbody></table>`;
   $('#report-summary').innerHTML = parts.join('') + table + '<hr/>' + buildInventoryMiniHTML();
@@ -723,7 +1476,7 @@ function buildInventoryMiniHTML(){
 }
 
 function previewReportRange(){ const from = $('#rep-from').value || todayYMD(); const to = $('#rep-to').value || todayYMD(); renderReportSummary(from,to); }
-function updateReportsIfOpen(){ if(document.getElementById('tab-reports') && !document.getElementById('tab-reports').classList.contains('hidden')) previewReportRange(); }
+function updateReportsIfOpen(){ if(!document.getElementById('tab-reports').classList.contains('hidden')) previewReportRange(); }
 
 async function downloadReportPDF(){
   const from = $('#rep-from').value || todayYMD(); const to = $('#rep-to').value || todayYMD();
@@ -746,182 +1499,12 @@ async function downloadReportPDF(){
   }catch(e){ console.error(e); alert('Error generando PDF: ' + (e.message||e)); }
 }
 
-/* ========================
-   POS / CART / SALES
-   ======================== */
-$('#pos-search')?.addEventListener('input', (e)=>{
-  const val = e.target.value.trim().toLowerCase();
-  const sug = $('#pos-suggestions'); if(!sug) return; sug.innerHTML='';
-  if(!val){ sug.classList.add('hidden'); return; }
-  const matches = (STATE.products||[]).filter(p => (p.name||'').toLowerCase().includes(val) || (p.barcode||'').includes(val)).slice(0,12);
-  if(matches.length === 0){ sug.classList.add('hidden'); return; }
-  matches.forEach(m => {
-    const div = document.createElement('div'); div.className='suggestion-item';
-    div.innerHTML = `<div style="font-weight:700">${escapeHtml(m.name)}</div><div class="small-muted">S/ ${money(m.price)} • Stock: ${m.stock}</div>`;
-    div.onclick = ()=> { addToCart(m); sug.classList.add('hidden'); $('#pos-search').value = ''; };
-    sug.appendChild(div);
-  });
-  sug.classList.remove('hidden');
-});
-
-function addToCart(p){
-  const ex = cart.find(i=> i.id === p.id);
-  if(ex) ex.qty++; else cart.push({ id:p.id, name:p.name, price:p.price||0, qty:1 });
-  renderCart();
-}
-
-function renderCart(){
-  const container = $('#pos-cart');
-  container.innerHTML = '';
-  let total = 0;
-  cart.forEach((item, idx) => {
-    total += item.price * item.qty;
-    const div = document.createElement('div'); div.className='card flex justify-between items-center';
-    div.style.padding = '8px'; div.innerHTML = `<div><div style="font-weight:800">${escapeHtml(item.name)}</div><div class="small-muted">S/ ${money(item.price)}</div></div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button onclick="updateQty(${idx},-1)" class="px-2 py-1 border rounded">-</button>
-        <div style="font-weight:800">${item.qty}</div>
-        <button onclick="updateQty(${idx},1)" class="px-2 py-1 border rounded">+</button>
-      </div>`;
-    container.appendChild(div);
-  });
-  $('#pos-total').textContent = money(total);
-  $('#pos-items-count').textContent = `${cart.reduce((s,i)=> s + (i.qty||0),0)} items`;
-}
-
-function updateQty(idx, delta){ cart[idx].qty += delta; if(cart[idx].qty <= 0) cart.splice(idx,1); renderCart(); }
-
-function setPayMethod(m, ev){
-  payMethod = m;
-  $$('.pay-btn').forEach(b=> b.classList.remove('active'));
-  if(ev && ev.currentTarget) ev.currentTarget.classList.add('active');
-  if(m === 'A_CREDITO') $('#pos-customer').classList.remove('hidden'); else $('#pos-customer').classList.add('hidden');
-}
-
-async function completeSale(){
-  try{
-    if(cart.length === 0) return alert('El carrito está vacío');
-    // validate stock
-    for(const it of cart){
-      const p = (STATE.products||[]).find(x => x.id === it.id);
-      if(!p) return alert('Producto no encontrado: ' + it.name);
-      if(Number(p.stock) < Number(it.qty)) return alert(`Stock insuficiente para: ${p.name}`);
-    }
-    const total = cart.reduce((a,b) => a + (b.price * b.qty), 0);
-    const sale = { id: 'V-' + Date.now(), date: new Date().toISOString(), total, paymentType: payMethod, customer: $('#pos-customer').value || null, items: cart.map(i=> ({ productId: i.id, qty: i.qty, unitPrice: i.price })) };
-
-    // update stocks and movements
-    for(const it of sale.items){
-      const p = (STATE.products||[]).find(x => x.id === it.productId);
-      if(p){
-        p.stock = Number(p.stock) - Number(it.qty);
-        p.movements = p.movements || [];
-        p.movements.unshift({ id: uid(), type:'OUT', qty: it.qty, date: new Date().toISOString(), saleId: sale.id, unitPrice: it.unitPrice });
-      }
-    }
-
-    // credit handling
-    if(sale.paymentType === 'A_CREDITO' && sale.customer){
-      const key = (sale.customer||'').toLowerCase();
-      const c = (STATE.customers||[]).find(x => (x.name||'').toLowerCase() === key);
-      if(c) c.balance = Number((Number(c.balance||0) + Number(sale.total)).toFixed(2));
-      else STATE.customers.unshift({ name: sale.customer, balance: Number(sale.total), createdAt: new Date().toISOString() });
-    }
-
-    STATE.sales.unshift(sale);
-    await pushStateToCloud();
-    showToast('Venta registrada con éxito');
-
-    // after sale: reset POS
-    cart = []; renderCart(); renderInventoryList(); renderDashboard(); closeModal('modal-sale');
-  }catch(e){ console.error(e); alert('Error registrando venta: ' + (e.message||e)); }
-}
-
-/* ========================
-   GESTIÓN: listar ventas, editar y eliminar
-   ======================== */
-function renderGestionList(){
-  const container = $('#gestion-list'); if(!container) return; container.innerHTML = '';
-  const rows = (STATE.sales||[]).slice(0,500);
-  if(rows.length === 0) { container.innerHTML = '<div class="small-muted">No hay ventas registradas</div>'; return; }
-  const table = document.createElement('table');
-  table.innerHTML = `<thead><tr><th>Fecha</th><th>ID</th><th>Cliente</th><th>Pago</th><th style="text-align:right">Total</th><th>Acciones</th></tr></thead><tbody></tbody>`;
-  const tbody = table.querySelector('tbody');
-  rows.forEach(s=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${new Date(s.date).toLocaleString()}</td><td>${s.id}</td><td>${escapeHtml(s.customer||'-')}</td><td>${escapeHtml(s.paymentType||s.method||'EFECTIVO')}</td><td style="text-align:right">S/ ${money(s.total)}</td><td style="white-space:nowrap"><button onclick="openEditSale('${s.id}')" class="px-2 py-1 border rounded mr-2">Editar</button><button onclick="deleteSaleConfirm('${s.id}')" class="px-2 py-1 border rounded">Eliminar</button></td>`;
-    tbody.appendChild(tr);
-  });
-  container.appendChild(table);
-}
-
-/* open edit sale modal */
-function openEditSale(saleId){
-  const s = (STATE.sales||[]).find(x=> x.id === saleId); if(!s) return alert('Venta no encontrada');
-  const modal = document.createElement('div'); modal.className='modal visible'; modal.style.zIndex='120';
-  const sheet = document.createElement('div'); sheet.className='modal-sheet';
-  sheet.innerHTML = `<div class="flex justify-between items-center mb-3"><h3 class="font-bold">Editar Venta ${s.id}</h3><button id="close-edit">Cerrar</button></div>
-    <div><label class="small-muted">Cliente</label><input id="edit-customer" class="input-pro mt-1" value="${escapeHtml(s.customer||'')}" /></div>
-    <div class="mt-2"><label class="small-muted">Pago</label><select id="edit-payment" class="input-pro mt-1"><option ${ (s.paymentType||s.method) === 'EFECTIVO' ? 'selected':'' }>EFECTIVO</option><option ${ (s.paymentType||s.method) === 'YAPE' ? 'selected':'' }>YAPE</option><option ${ (s.paymentType||s.method) === 'A_CREDITO' ? 'selected':'' }>A_CREDITO</option></select></div>
-    <div class="mt-3"><label class="small-muted">Productos</label><div id="edit-items" style="max-height:220px;overflow:auto;border:1px solid #eee;padding:8px;border-radius:8px;"></div></div>
-    <div class="mt-3 flex gap-2"><button id="save-edit" class="btn-primary">Guardar cambios</button><button id="cancel-edit" class="px-3 py-2 border rounded">Cancelar</button></div>`;
-  modal.appendChild(sheet); document.body.appendChild(modal);
-  const itemsContainer = sheet.querySelector('#edit-items');
-  s.items.forEach((it, idx)=>{
-    const prod = (STATE.products||[]).find(p=> p.id === it.productId) || { name: it.rawName || 'Producto' };
-    const row = document.createElement('div'); row.style.display='flex'; row.style.gap='8px'; row.style.marginBottom='8px';
-    row.innerHTML = `<div style="flex:1"><div style="font-weight:700">${escapeHtml(prod.name)}</div><div class="small-muted">Unit S/ ${money(it.unitPrice||0)}</div></div><div><input type="number" value="${it.qty}" min="1" data-idx="${idx}" class="input-pro edit-qty" style="width:90px"></div>`;
-    itemsContainer.appendChild(row);
-  });
-  sheet.querySelector('#close-edit').addEventListener('click', ()=> modal.remove());
-  sheet.querySelector('#cancel-edit').addEventListener('click', ()=> modal.remove());
-  sheet.querySelector('#save-edit').addEventListener('click', async ()=>{
-    const newCustomer = sheet.querySelector('#edit-customer').value.trim();
-    const newPayment = sheet.querySelector('#edit-payment').value;
-    const qtyInputs = Array.from(sheet.querySelectorAll('.edit-qty'));
-    // compute diffs and adjust stock
-    const oldMap = {}; s.items.forEach(it => { oldMap[it.productId || it.rawName || uid()] = Number(it.qty || 0); });
-    const newMap = {};
-    qtyInputs.forEach(inp => { const idx = Number(inp.getAttribute('data-idx')); const val = Number(inp.value) || 0; const key = s.items[idx].productId || s.items[idx].rawName || uid(); newMap[key] = val; });
-    for(let i=0;i<s.items.length;i++){
-      const it = s.items[i];
-      const key = it.productId || it.rawName || uid();
-      const oldQ = oldMap[key] || 0; const newQ = newMap[key] || 0;
-      const diff = newQ - oldQ; // positive => sold more (reduce stock)
-      if(it.productId){
-        const p = (STATE.products||[]).find(x=> x.id === it.productId);
-        if(p) p.stock = Number(p.stock) - diff;
-      }
-      s.items[i].qty = newQ;
-    }
-    s.total = s.items.reduce((a,b)=> a + (Number(b.unitPrice||0) * Number(b.qty||0)), 0);
-    s.customer = newCustomer || s.customer;
-    s.paymentType = newPayment;
-    await pushStateToCloud();
-    showToast('Venta editada');
-    renderAll();
-    modal.remove();
-  });
-}
-
-/* delete sale with stock rollback */
-function deleteSaleConfirm(saleId){
-  if(!confirm('Eliminar venta y revertir stock?')) return;
-  const sale = (STATE.sales||[]).find(s=> s.id === saleId); if(!sale) return alert('Venta no encontrada');
-  for(const it of sale.items){
-    const p = (STATE.products||[]).find(x=> x.id === it.productId);
-    if(p){ p.stock = Number(p.stock) + Number(it.qty); p.movements = p.movements || []; p.movements.unshift({ id: uid(), type:'ROLLBACK', qty: it.qty, date: new Date().toISOString(), note: 'Eliminación venta ' + saleId }); }
-  }
-  STATE.sales = (STATE.sales||[]).filter(s=> s.id !== saleId);
-  pushStateToCloud();
-  showToast('Venta eliminada y stock revertido');
-  renderAll();
-}
-
-/* ========================
-   SCANNER (camera, BarcodeDetector + Quagga fallback)
-   ======================== */
-let videoStream = null; let detecting = false;
+/* =========
+   SCANNER (BarcodeDetector preferred; Quagga fallback)
+   - auto-close camera when registered
+   - if product not found -> open product modal with barcode pre-filled
+   ========= */
+let videoStream = null, detecting = false;
 async function startScanner(){
   openModal('modal-scan');
   try{
@@ -931,7 +1514,10 @@ async function startScanner(){
     await $('#video').play();
     detecting = true;
     detectionLoop();
-  }catch(e){ console.warn('camera access err', e); alert('No se pudo acceder a la cámara'); }
+  }catch(e){
+    console.warn('camera access err', e);
+    alert('No se pudo acceder a la cámara: ' + (e && e.message || ''));
+  }
 }
 
 async function stopScanner(){
@@ -955,7 +1541,6 @@ async function detectionLoop(){
           break;
         }
       } else if(typeof Quagga !== 'undefined'){
-        // Quagga fallback (live stream)
         if(!Quagga.initialized){
           Quagga.init({
             inputStream: { name: "Live", type: "LiveStream", target: document.querySelector('#video') },
@@ -982,26 +1567,43 @@ function registerScanned(){
   const code = $('#scanned-code').value.trim();
   if(!code) return alert('No hay código detectado');
   const found = (STATE.products||[]).find(p=> p.barcode === code || (p.barcode||'').replace(/\D/g,'') === code.replace(/\D/g,''));
-  if(found){ addToCart(found); showToast('Agregado: ' + found.name); closeModal('modal-scan'); stopScanner(); }
-  else { closeModal('modal-scan'); stopScanner(); openModal('modal-product'); $('#p-barcode').value = code; showToast('Código nuevo - completar registro'); }
+  if(found){
+    addToCart(found);
+    showToast('Agregado: ' + found.name);
+    closeModal('modal-scan');
+    stopScanner();
+  } else {
+    // open product modal with code prefilled
+    closeModal('modal-scan');
+    stopScanner();
+    openModal('modal-product');
+    $('#p-barcode').value = code;
+    showToast('Código nuevo - complete registro');
+  }
 }
 
-/* ========================
-   CLIENTES (add, abono, saldar)
-   ======================== */
-$('#btn-open-clients').addEventListener('click', ()=> openModal('modal-clients'));
-document.getElementById('form-client').addEventListener('submit', async (ev)=>{
+/* =========
+   CLIENTS
+   ========= */
+$('#btn-open-clients')?.addEventListener('click', ()=> openModal('modal-clients'));
+document.getElementById('form-client')?.addEventListener('submit', async (ev)=>{
   ev.preventDefault();
   const name = ($('#client-name').value||'').trim();
   const init = Number($('#client-initial').value) || 0;
   if(!name) return alert('Nombre requerido');
   const key = name.toLowerCase();
   const existing = (STATE.customers||[]).find(c=> (c.name||'').toLowerCase() === key);
-  if(existing) existing.balance = Number((Number(existing.balance||0) + init).toFixed(2));
-  else STATE.customers.unshift({ name, balance: init, createdAt: new Date().toISOString() });
-  $('#client-name').value = ''; $('#client-initial').value = '';
-  await pushStateToCloud();
-  showToast('Cliente agregado/actualizado');
+  if(existing) {
+    existing.balance = Number((Number(existing.balance||0) + init).toFixed(2));
+    addPendingOp({ type: 'customer', payload: existing });
+  } else {
+    const customer = { id: 'C-'+Date.now(), name, balance: init, createdAt: new Date().toISOString() };
+    STATE.customers.unshift(customer);
+    addPendingOp({ type: 'customer', payload: customer });
+  }
+  $('#client-name').value=''; $('#client-initial').value='';
+  saveLocalBackup();
+  showToast('Cliente agregado/actualizado (cola si offline)');
   renderClients();
 });
 
@@ -1020,6 +1622,7 @@ function renderClients(){
   });
 }
 
+/* Abono and Clear debt */
 async function promptAddPayment(name){
   const amt = prompt('Ingrese monto de abono para ' + name);
   if(!amt) return;
@@ -1029,8 +1632,9 @@ async function promptAddPayment(name){
   if(!c) return alert('Cliente no encontrado');
   c.balance = Number((Number(c.balance||0) - val).toFixed(2));
   if(c.balance < 0) c.balance = 0;
-  await pushStateToCloud();
-  showToast('Abono registrado');
+  addPendingOp({ type: 'customer', payload: c });
+  saveLocalBackup();
+  showToast('Abono registrado (cola si offline)');
   renderClients();
 }
 
@@ -1039,16 +1643,69 @@ async function clearDebt(name){
   const c = (STATE.customers||[]).find(x=> (x.name||'') === name);
   if(!c) return alert('Cliente no encontrado');
   c.balance = 0;
-  await pushStateToCloud();
-  showToast('Deuda saldada');
+  addPendingOp({ type: 'customer', payload: c });
+  saveLocalBackup();
+  showToast('Deuda saldada (cola si offline)');
   renderClients();
 }
 
-/* ========================
-   LOGIN / AUTH (local)
-   ======================== */
+/* =========
+   PRODUCT CRUD
+   ========= */
+document.getElementById('form-p')?.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  try{
+    const id = $('#p-id').value || uid();
+    const prod = {
+      id,
+      name: $('#p-name').value.trim(),
+      barcode: $('#p-barcode').value.trim(),
+      category: $('#p-cat').value.trim(),
+      costPrice: Number($('#p-cost').value) || 0,
+      price: Number($('#p-price').value) || 0,
+      stock: Number($('#p-stock').value) || 0,
+      createdAt: new Date().toISOString(),
+      movements: (STATE.products.find(p=>p.id===id)?.movements)||[]
+    };
+    const idx = (STATE.products||[]).findIndex(p=>p.id===id);
+    if(idx >= 0) STATE.products[idx] = prod; else STATE.products.unshift(prod);
+    saveLocalBackup();
+    addPendingOp({ type: 'product', payload: prod });
+    showToast('Producto guardado (cola si offline)');
+    renderInventoryList(); renderDashboard();
+    closeModal('modal-product');
+  }catch(e){ console.error(e); alert('Error guardando producto: '+ (e.message||e)); }
+});
+
+function editProduct(id){
+  const p = (STATE.products||[]).find(x=> x.id === id); if(!p) return alert('Producto no encontrado');
+  $('#p-id').value = p.id; $('#p-name').value = p.name; $('#p-barcode').value = p.barcode; $('#p-cat').value = p.category;
+  $('#p-cost').value = p.costPrice||0; $('#p-price').value = p.price||0; $('#p-stock').value = p.stock||0;
+  $('#btn-delete-p').classList.remove('hidden'); openModal('modal-product');
+}
+
+function deleteProduct(){
+  const id = $('#p-id').value; if(!id) return;
+  if(!confirm('Eliminar producto?')) return;
+  STATE.products = (STATE.products||[]).filter(p=>p.id !== id);
+  saveLocalBackup();
+  addPendingOp({ type: 'product', payload: { id, deleted: true } });
+  renderInventoryList(); renderDashboard(); closeModal('modal-product'); showToast('Producto eliminado (cola si offline)');
+}
+
+function calculateUnitPrice(){
+  const cost = Number($('#p-cost').value)||0; const stock = Number($('#p-stock').value)||1;
+  if(stock <= 0) return alert('Stock debe ser mayor que 0');
+  const unit = cost / stock;
+  $('#p-price').value = (unit * 1.30).toFixed(2);
+  showToast('Precio estimado calculado');
+}
+
+/* =========
+   LOGIN (local)
+   ========= */
 const ALLOWED_PASS = 'magaly';
-$('#btn-login').addEventListener('click', ()=> {
+$('#btn-login')?.addEventListener('click', ()=> {
   const user = ($('#l-user').value||'').trim().toLowerCase();
   const pass = ($('#l-pass').value||'').trim();
   const err = $('#login-error'); err.classList.add('hidden'); err.textContent = '';
@@ -1057,50 +1714,108 @@ $('#btn-login').addEventListener('click', ()=> {
     localStorage.setItem('auth_token','ok'); $('#login-screen').style.display = 'none'; lucide.createIcons(); startApp();
   } else { err.textContent = 'Usuario o contraseña incorrectos'; err.classList.remove('hidden'); $('#l-pass').value = ''; $('#l-pass').focus(); }
 });
-$('#btn-demo').addEventListener('click', ()=> { localStorage.setItem('auth_token','ok'); $('#login-screen').style.display = 'none'; startApp(); });
+$('#btn-demo')?.addEventListener('click', ()=> { localStorage.setItem('auth_token','ok'); $('#login-screen').style.display = 'none'; startApp(); });
 
 function logout(){ localStorage.removeItem('auth_token'); location.reload(); }
-function openModal(id){ const m = document.getElementById(id); if(m){ m.classList.add('visible'); m.setAttribute('aria-hidden','false'); } }
-function closeModal(id){ const m = document.getElementById(id); if(m){ m.classList.remove('visible'); m.setAttribute('aria-hidden','true'); if(id==='modal-scan') stopScanner(); } }
-function switchTab(tab){
-  document.getElementById('tab-home').classList.add('hidden'); document.getElementById('tab-inventory').classList.add('hidden'); document.getElementById('tab-reports').classList.add('hidden');
-  if(tab === 'home') document.getElementById('tab-home').classList.remove('hidden');
-  if(tab === 'inventory') document.getElementById('tab-inventory').classList.remove('hidden');
-  if(tab === 'reports') document.getElementById('tab-reports').classList.remove('hidden');
-  lucide.createIcons(); updateReportsIfOpen();
+
+/* Modal helpers with visualViewport handling to avoid keyboard overlapping on mobile */
+function openModal(id){
+  const m = document.getElementById(id);
+  if(!m) return;
+  m.classList.add('visible');
+  // adjust modal position to center even with keyboard: set max-height to visualViewport.height - 40
+  const sheet = m.querySelector('.modal-sheet');
+  if(sheet){
+    try{
+      const vv = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
+      sheet.style.maxHeight = (vv - 40) + 'px';
+      // attach visualViewport resize handler
+      const adjust = ()=> {
+        const vh = (window.visualViewport && window.visualViewport.height) ? window.visualViewport.height : window.innerHeight;
+        sheet.style.maxHeight = (vh - 40) + 'px';
+        // keep sheet centered visually if keyboard open
+        if(window.visualViewport){
+          const offset = Math.max(0, (window.innerHeight - window.visualViewport.height));
+          sheet.style.transform = `translateY(-${offset/4}px)`;
+        }
+      };
+      // store handler reference for closure
+      m._vvHandler = adjust;
+      if(window.visualViewport) window.visualViewport.addEventListener('resize', adjust);
+    }catch(e){}
+  }
 }
 
-/* Bind botones de header */
-$('#btn-gestion').addEventListener('click', ()=> { openModal('modal-gestion'); renderGestionList(); });
-$('#btn-sync').addEventListener('click', ()=> { if(db) { forceSync(); } else { initFirebase(); startFirestoreSync(); } });
+function closeModal(id){
+  const m = document.getElementById(id);
+  if(!m) return;
+  m.classList.remove('visible');
+  const sheet = m.querySelector('.modal-sheet');
+  if(sheet && m._vvHandler && window.visualViewport) try{ window.visualViewport.removeEventListener('resize', m._vvHandler); }catch(e){}
+  // stop scanner if closing scanner modal
+  if(id === 'modal-scan') stopScanner();
+}
 
-/* ========================
-   START APP
-   ======================== */
+/* Utility to switch tabs */
+function switchTab(tab){
+  $('#tab-home').classList.add('hidden'); $('#tab-inventory').classList.add('hidden'); $('#tab-reports').classList.add('hidden');
+  if(tab === 'home') $('#tab-home').classList.remove('hidden');
+  if(tab === 'inventory') $('#tab-inventory').classList.remove('hidden');
+  if(tab === 'reports') $('#tab-reports').classList.remove('hidden');
+  lucide.createIcons();
+  updateReportsIfOpen();
+}
+
+/* Bind header buttons */
+$('#btn-gestion')?.addEventListener('click', ()=> { openModal('modal-gestion'); renderGestionList(); });
+$('#btn-sync')?.addEventListener('click', ()=> { if(db) { forceSync(); } else { initFirebase(); startFirestoreSync(); } });
+
+/* =========
+   FORCE SYNC (admin action)
+   - normalizes remote and writes back merged data
+   ========= */
+async function forceSync(){
+  if(!db) return alert('Cloud no inicializado');
+  if(!confirm('Forzar sincronización y normalización del documento remoto?')) return;
+  try{
+    const ref = db.collection(DB.col).doc(DB.doc);
+    const snap = await ref.get();
+    if(!snap.exists){
+      await ref.set({ [DB.field]: STATE }, { merge:true });
+      showToast('Documento creado en Firestore');
+      return;
+    }
+    const normalized = normalizeRemoteData(snap.data()||{});
+    mergeState(normalized);
+    await ref.set({ [DB.field]: STATE }, { merge:true });
+    showToast('Sincronía forzada OK');
+    renderAll();
+  }catch(e){ console.error(e); alert('forceSync error: ' + (e.message||e)); }
+}
+
+/* =========
+   startApp
+   ========= */
 async function startApp(){
   lucide.createIcons();
   renderAll();
-  // init firebase and sync
   initFirebase();
   startFirestoreSync();
   $('#rep-from').value = todayYMD(); $('#rep-to').value = todayYMD();
-  $('#search-inv').addEventListener('input', renderInventoryList);
-  // expose global functions used inline
-  window.openModal = openModal; window.closeModal = closeModal; window.switchTab = switchTab;
-  window.startScanner = startScanner; window.completeSale = completeSale; window.exportInventoryXLSX = exportInventoryXLSX; window.exportSalesXLSX = exportSalesXLSX;
-  window.exportCombinedXLSX = exportCombinedXLSX; window.exportReportRangeBothXLSX = exportReportRangeBothXLSX; window.exportSalesXLSX = exportSalesXLSX;
+  $('#search-inv')?.addEventListener('input', renderInventoryList);
+  setupPosSearch();
+  // expose some globals for debugging
+  window.STATE = STATE; window.pendingOps = pendingOps; window.pushStateToCloud = pushStateToCloud; window.processPendingOps = processPendingOps; window.addPendingOp = addPendingOp;
 }
 
-/* DOM ready */
+/* DOM Ready */
 document.addEventListener('DOMContentLoaded', ()=>{
   lucide.createIcons();
   if(localStorage.getItem('auth_token')){ $('#login-screen').style.display = 'none'; startApp(); } else { $('#login-screen').style.display = 'flex'; }
-  // expose for console debugging
-  window.STATE = STATE; window.pushStateToCloud = pushStateToCloud; window.forceSync = forceSync; window.initFirebase = initFirebase; window.startFirestoreSync = startFirestoreSync;
 });
 
 /* periodic local backup */
-setInterval(()=> { try{ localStorage.setItem('tienda_local_backup', JSON.stringify(STATE)); }catch(e){} }, 15000);
+setInterval(()=> { try{ saveLocalBackup(); }catch(e){} }, 15000);
 
 </script>
 </body>
