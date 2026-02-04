@@ -186,6 +186,17 @@
   th,td{padding:8px;border-bottom:1px solid #f1f5f9;font-size:13px}
   .small-muted{font-size:12px;color:#6b7280}
   .status-dot{width:10px;height:10px;border-radius:999px;display:inline-block}
+  .pay-btn{font-weight:700;transition:all .15s ease}
+  .pay-btn.active{
+    border-color:var(--primary) !important;
+    background:rgba(15,118,110,0.12) !important;
+    box-shadow:inset 0 0 0 1px var(--primary), 0 6px 14px rgba(15,118,110,0.18);
+  }
+  .qty-input{
+    width:72px;
+    text-align:center;
+    padding:6px 8px;
+  }
 
   .stock-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
   .stock-chip{
@@ -1170,11 +1181,15 @@ function renderCart(){
   let total = 0;
   cart.forEach((item, idx) => {
     total += item.price * item.qty;
+    const subtotal = item.price * item.qty;
     const div = document.createElement('div'); div.className='card flex justify-between items-center'; div.style.padding='8px';
-    div.innerHTML = `<div><div style="font-weight:800">${escapeHtml(item.name)}</div><div class="small-muted">S/ ${money(item.price)}</div></div>
+    div.innerHTML = `<div style="flex:1">
+        <div style="font-weight:800">${escapeHtml(item.name)}</div>
+        <div class="small-muted">Precio: S/ ${money(item.price)} • Subtotal: S/ ${money(subtotal)}</div>
+      </div>
       <div style="display:flex;align-items:center;gap:8px">
         <button onclick="updateQty(${idx},-1)" class="px-2 py-1 border rounded">-</button>
-        <div style="font-weight:800">${item.qty}</div>
+        <input type="number" min="1" value="${item.qty}" oninput="setQty(${idx}, this.value)" class="input-pro qty-input">
         <button onclick="updateQty(${idx},1)" class="px-2 py-1 border rounded">+</button>
       </div>`;
     container.appendChild(div);
@@ -1183,7 +1198,34 @@ function renderCart(){
   $('#pos-items-count').textContent = `${cart.reduce((s,i)=> s + (i.qty||0),0)} items`;
 }
 
-function updateQty(idx, delta){ if(!cart[idx]) return; cart[idx].qty += delta; if(cart[idx].qty <= 0) cart.splice(idx,1); renderCart(); }
+function setQty(idx, value){
+  if(!cart[idx]) return;
+  const prod = (STATE.products||[]).find(p => p.id === cart[idx].id);
+  const maxStock = prod ? Number(prod.stock||0) : null;
+  let qty = Math.floor(Number(value) || 1);
+  if(qty <= 0) { cart.splice(idx,1); renderCart(); return; }
+  if(maxStock !== null){
+    if(maxStock <= 0){
+      showToast('Sin stock');
+      cart.splice(idx,1);
+      renderCart();
+      return;
+    }
+    if(qty > maxStock){
+      showToast('Stock insuficiente');
+      qty = maxStock;
+    }
+  }
+  cart[idx].qty = qty;
+  renderCart();
+}
+
+function updateQty(idx, delta){
+  if(!cart[idx]) return;
+  const next = Number(cart[idx].qty||0) + delta;
+  if(next <= 0) { cart.splice(idx,1); renderCart(); return; }
+  setQty(idx, next);
+}
 
 function setPayMethod(m, ev){
   payMethod = m;
@@ -1427,6 +1469,29 @@ function exportCombinedXLSX(){
     XLSX.writeFile(wb, `Ventas_Inventario_Kardex_${from}_a_${to}.xlsx`);
     showToast('Exportado Ventas + Inventario + Kardex');
   }catch(e){ console.error(e); alert('Error exportando combinado'); }
+}
+
+function exportReportRangeBothXLSX(){
+  try{
+    const from = $('#rep-from').value || todayYMD();
+    const to = $('#rep-to').value || todayYMD();
+    const sales = salesInRange(from,to);
+    const salesRows = sales.map(s=>({
+      id:s.id,
+      date:s.date,
+      customerId:s.customerId||'',
+      customerName:s.customerName||'',
+      paymentType:s.paymentType||s.method||'',
+      total:s.total,
+      items:(s.items||[]).map(it=> ((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name + ' x' + it.qty)).join(' | ')
+    }));
+    const invRows = (STATE.products||[]).map(p=>({ id:p.id, name:p.name, category:p.category, barcode:p.barcode, stock:p.stock, price:p.price, costPrice:p.costPrice }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(salesRows), 'Ventas');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(invRows), 'Inventario');
+    XLSX.writeFile(wb, `Reporte_${from}_a_${to}.xlsx`);
+    showToast('Reporte XLSX exportado');
+  }catch(e){ console.error(e); alert('Error exportando reporte XLSX'); }
 }
 
 /* Reports: generate and preview */
