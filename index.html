@@ -567,6 +567,7 @@ function showToast(msg, ms=1600){
 
 /* Simple escape for safety in HTML rendering */
 function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+function escapeAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
 /* =========
    APP STATE
@@ -695,6 +696,10 @@ function mergeState(remoteState){
   // Merge products: prefer more recent createdAt, merge movements by id
   const map = new Map(); (STATE.products||[]).forEach(p => map.set(p.id, JSON.parse(JSON.stringify(p))));
   for(const rp of (remoteState.products||[])){
+    if(rp && rp.id && rp.deleted){
+      map.delete(rp.id);
+      continue;
+    }
     const existing = map.get(rp.id);
     if(!existing) map.set(rp.id, rp);
     else {
@@ -712,6 +717,10 @@ function mergeState(remoteState){
   // Merge sales: keep set union, prefer latest date on conflict
   const sMap = new Map(); (STATE.sales||[]).forEach(s=> sMap.set(s.id, s));
   for(const rs of (remoteState.sales||[])){
+    if(rs && rs.id && rs.deleted){
+      sMap.delete(rs.id);
+      continue;
+    }
     if(!sMap.has(rs.id)) sMap.set(rs.id, rs);
     else {
       const cur = sMap.get(rs.id);
@@ -724,6 +733,11 @@ function mergeState(remoteState){
   // Merge customers by normalized name or id
   const cMap = new Map(); (STATE.customers||[]).forEach(c=> cMap.set((c.id||c.name||'').toString().toLowerCase(), c));
   for(const rc of (remoteState.customers||[])){
+    if(rc && (rc.id || rc.name) && rc.deleted){
+      const delKey = (rc.id || rc.name || '').toString().toLowerCase();
+      cMap.delete(delKey);
+      continue;
+    }
     const key = (rc.id || rc.name || '').toString().toLowerCase();
     if(!cMap.has(key)) cMap.set(key, rc);
     else { const ex = cMap.get(key); ex.balance = Number((Number(ex.balance||0) + Number(rc.balance||0)).toFixed(2)); }
@@ -1014,7 +1028,7 @@ function renderAll(){
 
 function renderDashboard(){
   const now = new Date();
-  const ventasHoy = (STATE.sales||[]).filter(s => isSameLocalDay(s.date, now));
+  const ventasHoy = (STATE.sales||[]).filter(s => !s.deleted && isSameLocalDay(s.date, now));
   const total = ventasHoy.reduce((a,b)=> a + Number(b.total||0), 0);
   $('#stat-ventas').textContent = `S/ ${money(total)}`;
   $('#stat-count').textContent = ventasHoy.length;
@@ -1414,7 +1428,7 @@ async function completeSale(){
    ======= */
 function renderGestionList(){
   const container = $('#gestion-list'); if(!container) return; container.innerHTML = '';
-  const rows = (STATE.sales||[]).slice(0,500);
+  const rows = (STATE.sales||[]).filter(s => !s.deleted).slice(0,500);
   if(rows.length === 0) { container.innerHTML = '<div class="small-muted">No hay ventas registradas</div>'; return; }
   const table = document.createElement('table');
   table.innerHTML = `<thead><tr><th>Fecha</th><th>ID</th><th>Cliente</th><th>Pago</th><th style="text-align:right">Total</th><th>Acciones</th></tr></thead><tbody></tbody>`;
@@ -1433,7 +1447,7 @@ function openEditSale(saleId){
   const modal = document.createElement('div'); modal.className='modal visible'; modal.style.zIndex='120';
   const sheet = document.createElement('div'); sheet.className='modal-sheet';
   sheet.innerHTML = `<div class="flex justify-between items-center mb-3"><h3 class="font-bold">Editar Venta ${s.id}</h3><button id="close-edit">Cerrar</button></div>
-    <div><label class="small-muted">Cliente</label><input id="edit-customer" class="input-pro mt-1" value="${escapeHtml(s.customerName||'')}" /></div>
+    <div><label class="small-muted">Cliente</label><input id="edit-customer" class="input-pro mt-1" value="${escapeAttr(s.customerName||'')}" /></div>
     <div class="mt-2"><label class="small-muted">Pago</label><select id="edit-payment" class="input-pro mt-1"><option ${ (s.paymentType||s.method) === 'EFECTIVO' ? 'selected':'' }>EFECTIVO</option><option ${ (s.paymentType||s.method) === 'YAPE' ? 'selected':'' }>YAPE</option><option ${ (s.paymentType||s.method) === 'A_CREDITO' ? 'selected':'' }>A_CREDITO</option></select></div>
     <div class="mt-3"><label class="small-muted">Productos</label><div id="edit-items" style="max-height:220px;overflow:auto;border:1px solid #eee;padding:8px;border-radius:8px;"></div></div>
     <div class="mt-3 flex gap-2"><button id="save-edit" class="btn-primary">Guardar cambios</button><button id="cancel-edit" class="px-3 py-2 border rounded">Cancelar</button></div>`;
@@ -1459,10 +1473,23 @@ function openEditSale(saleId){
       const it = s.items[i];
       const key = it.productId || it.rawName || uid();
       const oldQ = oldMap[key] || 0; const newQ = newMap[key] || 0;
+      if(newQ <= 0){
+        alert('La cantidad debe ser mayor que 0');
+        return;
+      }
       const diff = newQ - oldQ; // positive => sold more (reduce stock)
       if(it.productId){
         const p = (STATE.products||[]).find(x=> x.id === it.productId);
-        if(p) p.stock = Number(p.stock) - diff;
+        if(p){
+          const nextStock = Number(p.stock) - diff;
+          if(nextStock < 0){
+            alert('Stock insuficiente para: ' + p.name);
+            return;
+          }
+          p.stock = nextStock;
+          p.movements = p.movements || [];
+          p.movements.unshift({ id: uid(), type:'EDIT_SALE', qty: diff, date: new Date().toISOString(), saleId: s.id });
+        }
       }
       s.items[i].qty = newQ;
     }
@@ -1474,7 +1501,7 @@ function openEditSale(saleId){
     saveLocalBackup();
     queueProductSyncFromItems(s.items);
     addPendingOp({ type: 'sale', payload: s }); // queue update as sale op
-    await processPendingOps();
+    if(cloudOn && db) await processPendingOps();
     showToast('Venta editada (cambios en cola si offline)');
     renderAll();
     modal.remove();
@@ -1494,6 +1521,7 @@ function deleteSaleConfirm(saleId){
   // queue deletion as a sale op with a flag 'deleted': true (consumer on server side should handle if necessary)
   queueProductSyncFromItems(sale.items);
   addPendingOp({ type: 'sale', payload: { ...sale, deleted: true } });
+  if(cloudOn && db) processPendingOps();
   showToast('Venta eliminada (sincronización pendiente)');
   renderAll();
 }
@@ -1513,7 +1541,7 @@ function exportInventoryXLSX(){
 
 function exportSalesXLSX(){
   try{
-    const rows = (STATE.sales||[]).map(s=>({ id:s.id, date:s.date, customerId:s.customerId||'', customerName:s.customerName||'', paymentType:s.paymentType||s.method||'', total:s.total, items:(s.items||[]).map(it=> ((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name + ' x' + it.qty)).join(' | ') }));
+    const rows = (STATE.sales||[]).filter(s => !s.deleted).map(s=>({ id:s.id, date:s.date, customerId:s.customerId||'', customerName:s.customerName||'', paymentType:s.paymentType||s.method||'', total:s.total, items:(s.items||[]).map(it=> ((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name + ' x' + it.qty)).join(' | ') }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Ventas');
     XLSX.writeFile(wb, `ventas_${todayYMD()}.xlsx`);
@@ -1524,7 +1552,7 @@ function exportSalesXLSX(){
 function exportCombinedXLSX(){
   try{
     const from = todayYMD(), to = todayYMD();
-    const salesRows = (STATE.sales||[]).map(s=>({ id:s.id, date:s.date, customerId:s.customerId||'', customerName:s.customerName||'', paymentType:s.paymentType||s.method||'', total:s.total, items:(s.items||[]).map(it=> ((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name + ' x' + it.qty)).join(' | ') }));
+    const salesRows = (STATE.sales||[]).filter(s => !s.deleted).map(s=>({ id:s.id, date:s.date, customerId:s.customerId||'', customerName:s.customerName||'', paymentType:s.paymentType||s.method||'', total:s.total, items:(s.items||[]).map(it=> ((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name + ' x' + it.qty)).join(' | ') }));
     const invRows = (STATE.products||[]).map(p=>({ id:p.id, name:p.name, category:p.category, barcode:p.barcode, stock:p.stock, price:p.price, costPrice:p.costPrice }));
     const kardex = []; (STATE.products||[]).forEach(p=> (p.movements||[]).forEach(m=> kardex.push({ productId:p.id, productName:p.name, type:m.type||'', qty:m.qty||0, date:m.date||'', note:m.note||'' })));
     const wb = XLSX.utils.book_new();
@@ -1563,7 +1591,11 @@ function exportReportRangeBothXLSX(){
 function salesInRange(from,to){
   if(!from||!to) return [];
   const s = new Date(from + 'T00:00:00').getTime(), e = new Date(to + 'T23:59:59.999').getTime();
-  return (STATE.sales||[]).filter(sale => { const t = new Date(sale.date).getTime(); return t >= s && t <= e; });
+  return (STATE.sales||[]).filter(sale => {
+    if(sale.deleted) return false;
+    const t = new Date(sale.date).getTime();
+    return t >= s && t <= e;
+  });
 }
 
 function generateReportData(from,to){
@@ -1730,6 +1762,50 @@ function scannerNormalize(code){
   return String(code || '').trim().replace(/\s+/g, '');
 }
 
+function scannerFindProductByCode(rawCode){
+  const code = scannerNormalize(rawCode);
+  if(!code) return null;
+  const digits = code.replace(/\D/g,'');
+  return (STATE.products||[]).find(p => {
+    const bc = scannerNormalize(p.barcode);
+    const bDigits = bc.replace(/\D/g,'');
+    return bc === code || (digits && bDigits && bDigits === digits);
+  }) || null;
+}
+
+function scannerHandleScannedCode(rawCode, source = 'scanner'){
+  const code = scannerNormalize(rawCode);
+  if(!code) return false;
+  const found = scannerFindProductByCode(code);
+  if(found){
+    if(!$('#modal-sale')?.classList.contains('visible')){
+      openModal('modal-sale');
+    }
+    addToCart(found);
+    if($('#modal-scan')?.classList.contains('visible')){
+      closeModal('modal-scan');
+      window.stopScanner();
+    }
+    showToast(`Producto agregado (${source}): ${found.name}`);
+    const posSearch = $('#pos-search');
+    if(posSearch){
+      posSearch.focus();
+      posSearch.select?.();
+    }
+    return true;
+  }
+
+  if($('#modal-scan')?.classList.contains('visible')){
+    closeModal('modal-scan');
+    window.stopScanner();
+  }
+  openModal('modal-product');
+  $('#p-barcode').value = code;
+  $('#p-name')?.focus();
+  showToast(`Código no registrado (${source}). Registrar producto.`);
+  return false;
+}
+
 function scannerIsRepeated(code){
   const now = Date.now();
   if(code === SCANNER.lastCode && (now - SCANNER.lastAt) < SCANNER.debounceMs) return true;
@@ -1808,9 +1884,9 @@ function scannerOnDetected(raw, source){
   if(!code || scannerIsRepeated(code)) return;
   const input = $('#scanned-code');
   if(input) input.value = code;
-  showToast(`Codigo detectado (${source}): ${code}`, 900);
+  showToast(`Codigo detectado (${source}): ${code}`, 600);
   if(navigator.vibrate) try{ navigator.vibrate(60); }catch(_){}
-  setTimeout(() => window.registerScanned(), 180);
+  scannerHandleScannedCode(code, source);
 }
 
 async function scannerDetectWithNative(video){
@@ -1828,11 +1904,15 @@ function scannerDetectWithQuagga(video){
   const w = video.videoWidth || 0;
   const h = video.videoHeight || 0;
   if(w <= 0 || h <= 0) return Promise.resolve(null);
-  SCANNER.frameCanvas.width = w;
-  SCANNER.frameCanvas.height = h;
+  const scanW = Math.floor(w * 0.82);
+  const scanH = Math.floor(h * 0.34);
+  const sx = Math.floor((w - scanW) / 2);
+  const sy = Math.floor((h - scanH) / 2);
+  SCANNER.frameCanvas.width = scanW;
+  SCANNER.frameCanvas.height = scanH;
   const ctx = SCANNER.frameCanvas.getContext('2d');
   if(!ctx) return Promise.resolve(null);
-  ctx.drawImage(video, 0, 0, w, h);
+  ctx.drawImage(video, sx, sy, scanW, scanH, 0, 0, scanW, scanH);
   const src = SCANNER.frameCanvas.toDataURL('image/jpeg', 0.85);
   return new Promise(resolve => {
     Quagga.decodeSingle({
@@ -1925,25 +2005,43 @@ window.registerScanned = function registerScanned(){
   const rawCode = $('#scanned-code')?.value || '';
   const code = scannerNormalize(rawCode);
   if(!code) return alert('No hay codigo detectado');
-  const digits = code.replace(/\D/g,'');
-  const found = (STATE.products||[]).find(p => {
-    const bc = scannerNormalize(p.barcode);
-    const bDigits = bc.replace(/\D/g,'');
-    return bc === code || (digits && bDigits && bDigits === digits);
-  });
-  if(found){
-    addToCart(found);
-    showToast('Agregado: ' + found.name);
-    closeModal('modal-scan');
-    window.stopScanner();
-  } else {
-    closeModal('modal-scan');
-    window.stopScanner();
-    openModal('modal-product');
-    $('#p-barcode').value = code;
-    showToast('Codigo nuevo - complete registro');
-  }
+  scannerHandleScannedCode(code, 'manual');
 };
+
+const HW_SCANNER = { buffer: '', lastTs: 0, maxGapMs: 65, minLen: 4, bound: false };
+function setupHardwareScannerSupport(){
+  if(HW_SCANNER.bound) return;
+  HW_SCANNER.bound = true;
+  document.addEventListener('keydown', (ev) => {
+    const activeId = document.activeElement?.id || '';
+    const activeTag = (document.activeElement?.tagName || '').toUpperCase();
+    const isTypingContext = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT' || document.activeElement?.isContentEditable;
+    const scannerInputs = activeId === 'pos-search' || activeId === 'scanned-code';
+    if(isTypingContext && !scannerInputs) return;
+
+    if(ev.key === 'Enter'){
+      const candidate = HW_SCANNER.buffer;
+      HW_SCANNER.buffer = '';
+      if(candidate.length >= HW_SCANNER.minLen){
+        ev.preventDefault();
+        scannerHandleScannedCode(candidate, 'lector');
+      }
+      return;
+    }
+
+    if(ev.key.length !== 1) return;
+    if(!/[0-9A-Za-z\-_./]/.test(ev.key)) return;
+    const now = Date.now();
+    if(now - HW_SCANNER.lastTs > HW_SCANNER.maxGapMs){
+      HW_SCANNER.buffer = '';
+    }
+    HW_SCANNER.lastTs = now;
+    HW_SCANNER.buffer += ev.key;
+    if(HW_SCANNER.buffer.length > 80){
+      HW_SCANNER.buffer = HW_SCANNER.buffer.slice(-80);
+    }
+  }, true);
+}
 
 /* =========
    CLIENTS
@@ -2086,6 +2184,12 @@ function openModal(id){
   const m = document.getElementById(id);
   if(!m) return;
   m.classList.add('visible');
+  if(id === 'modal-sale'){
+    setTimeout(()=> { $('#pos-search')?.focus(); }, 40);
+  }
+  if(id === 'modal-product'){
+    setTimeout(()=> { $('#p-name')?.focus(); }, 40);
+  }
   // adjust modal position to center even with keyboard: set max-height to visualViewport.height - 40
   const sheet = m.querySelector('.modal-sheet');
   if(sheet){
@@ -2116,7 +2220,7 @@ function closeModal(id){
   const sheet = m.querySelector('.modal-sheet');
   if(sheet && m._vvHandler && window.visualViewport) try{ window.visualViewport.removeEventListener('resize', m._vvHandler); }catch(e){}
   // stop scanner if closing scanner modal
-  if(id === 'modal-scan') stopScanner();
+  if(id === 'modal-scan' && window.stopScanner) window.stopScanner();
 }
 
 /* Utility to switch tabs */
@@ -2165,6 +2269,7 @@ async function startApp(){
   $('#rep-from').value = todayYMD(); $('#rep-to').value = todayYMD();
   $('#search-inv')?.addEventListener('input', renderInventoryList);
   setupPosSearch();
+  setupHardwareScannerSupport();
   // expose some globals for debugging
   window.STATE = STATE; window.pendingOps = pendingOps;
   window.upsertProduct = upsertProduct; window.upsertCustomer = upsertCustomer; window.upsertSale = upsertSale;
@@ -2183,3 +2288,4 @@ setInterval(()=> { try{ saveLocalBackup(); }catch(e){} }, 15000);
 </script>
 </body>
 </html>
+
