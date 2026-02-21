@@ -1780,6 +1780,19 @@ function scannerFindProductByCode(rawCode){
   }) || null;
 }
 
+function resetPosSearchForScanner(){
+  const input = $('#pos-search');
+  if(input){
+    input.value = '';
+    input.blur();
+  }
+  const list = $('#pos-suggestions');
+  if(list){
+    list.classList.add('hidden');
+    list.innerHTML = '';
+  }
+}
+
 function scannerHandleScannedCode(rawCode, source = 'scanner'){
   const code = scannerNormalize(rawCode);
   if(!code) return false;
@@ -1793,12 +1806,8 @@ function scannerHandleScannedCode(rawCode, source = 'scanner'){
       closeModal('modal-scan');
       window.stopScanner();
     }
+    resetPosSearchForScanner();
     showToast(`Producto agregado (${source}): ${found.name}`);
-    const posSearch = $('#pos-search');
-    if(posSearch){
-      posSearch.focus();
-      posSearch.select?.();
-    }
     return true;
   }
 
@@ -1806,6 +1815,7 @@ function scannerHandleScannedCode(rawCode, source = 'scanner'){
     closeModal('modal-scan');
     window.stopScanner();
   }
+  resetPosSearchForScanner();
   openModal('modal-product');
   $('#p-barcode').value = code;
   $('#p-name')?.focus();
@@ -2205,9 +2215,6 @@ function openModal(id){
   const m = document.getElementById(id);
   if(!m) return;
   m.classList.add('visible');
-  if(id === 'modal-sale'){
-    setTimeout(()=> { $('#pos-search')?.focus(); }, 40);
-  }
   if(id === 'modal-product'){
     setTimeout(()=> { $('#p-name')?.focus(); }, 40);
   }
