@@ -703,7 +703,8 @@ function mergeState(remoteState){
     const existing = map.get(rp.id);
     if(!existing) map.set(rp.id, rp);
     else {
-      const ldt = new Date(existing.createdAt||0).getTime(), rdt = new Date(rp.createdAt||0).getTime();
+      const ldt = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+      const rdt = new Date(rp.updatedAt || rp.createdAt || 0).getTime();
       const base = rdt >= ldt ? rp : existing;
       // unify movements
       const mm = new Map(); (existing.movements||[]).forEach(m=> mm.set(m.id||JSON.stringify(m), m)); (rp.movements||[]).forEach(m=> mm.set(m.id||JSON.stringify(m), m));
@@ -724,13 +725,14 @@ function mergeState(remoteState){
     if(!sMap.has(rs.id)) sMap.set(rs.id, rs);
     else {
       const cur = sMap.get(rs.id);
-      const cd = new Date(cur.date||0).getTime(), rd = new Date(rs.date||0).getTime();
-      if(rd > cd) sMap.set(rs.id, rs);
+      const cd = new Date(cur.updatedAt || cur.date || 0).getTime();
+      const rd = new Date(rs.updatedAt || rs.date || 0).getTime();
+      if(rd >= cd) sMap.set(rs.id, rs);
     }
   }
   const mergedSales = Array.from(sMap.values()).sort((a,b)=> new Date(b.date)-new Date(a.date));
 
-  // Merge customers by normalized name or id
+  // Merge customers by normalized name or id, prefer latest updatedAt
   const cMap = new Map(); (STATE.customers||[]).forEach(c=> cMap.set((c.id||c.name||'').toString().toLowerCase(), c));
   for(const rc of (remoteState.customers||[])){
     if(rc && (rc.id || rc.name) && rc.deleted){
@@ -740,7 +742,12 @@ function mergeState(remoteState){
     }
     const key = (rc.id || rc.name || '').toString().toLowerCase();
     if(!cMap.has(key)) cMap.set(key, rc);
-    else { const ex = cMap.get(key); ex.balance = Number((Number(ex.balance||0) + Number(rc.balance||0)).toFixed(2)); }
+    else {
+      const ex = cMap.get(key);
+      const edt = new Date(ex.updatedAt || ex.createdAt || 0).getTime();
+      const rdt = new Date(rc.updatedAt || rc.createdAt || 0).getTime();
+      if(rdt >= edt) cMap.set(key, rc);
+    }
   }
   const mergedCustomers = Array.from(cMap.values());
 
@@ -1501,7 +1508,7 @@ function openEditSale(saleId){
     saveLocalBackup();
     queueProductSyncFromItems(s.items);
     addPendingOp({ type: 'sale', payload: s }); // queue update as sale op
-    if(cloudOn && db) await processPendingOps();
+    await processPendingOps();
     showToast('Venta editada (cambios en cola si offline)');
     renderAll();
     modal.remove();
@@ -1521,7 +1528,7 @@ function deleteSaleConfirm(saleId){
   // queue deletion as a sale op with a flag 'deleted': true (consumer on server side should handle if necessary)
   queueProductSyncFromItems(sale.items);
   addPendingOp({ type: 'sale', payload: { ...sale, deleted: true } });
-  if(cloudOn && db) processPendingOps();
+  processPendingOps();
   showToast('Venta eliminada (sincronización pendiente)');
   renderAll();
 }
@@ -2008,7 +2015,12 @@ window.registerScanned = function registerScanned(){
   scannerHandleScannedCode(code, 'manual');
 };
 
-const HW_SCANNER = { buffer: '', lastTs: 0, maxGapMs: 65, minLen: 4, bound: false };
+// Ensure inline handlers and legacy references use the robust scanner implementation
+startScanner = window.startScanner;
+stopScanner = window.stopScanner;
+registerScanned = window.registerScanned;
+
+const HW_SCANNER = { buffer: '', lastTs: 0, maxGapMs: 65, minLen: 4, bound: false, lastCode: '', lastAt: 0, dedupeMs: 900 };
 function setupHardwareScannerSupport(){
   if(HW_SCANNER.bound) return;
   HW_SCANNER.bound = true;
@@ -2024,7 +2036,16 @@ function setupHardwareScannerSupport(){
       HW_SCANNER.buffer = '';
       if(candidate.length >= HW_SCANNER.minLen){
         ev.preventDefault();
-        scannerHandleScannedCode(candidate, 'lector');
+        ev.stopPropagation();
+        if(typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+        const code = scannerNormalize(candidate);
+        const now = Date.now();
+        if(code === HW_SCANNER.lastCode && (now - HW_SCANNER.lastAt) < HW_SCANNER.dedupeMs){
+          return;
+        }
+        HW_SCANNER.lastCode = code;
+        HW_SCANNER.lastAt = now;
+        scannerHandleScannedCode(code, 'lector');
       }
       return;
     }
