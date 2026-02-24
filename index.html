@@ -393,7 +393,16 @@
         <button onclick="setPayMethod('A_CREDITO', event)" class="pay-btn bg-slate-50 border-2 border-transparent p-3 rounded-xl">A CREDITO</button>
       </div>
 
-      <input id="pos-customer" class="input-pro mt-3 hidden" placeholder="Nombre del cliente (Crédito)">
+      <div id="pos-credit-wrap" class="mt-3 hidden">
+        <label class="small-muted">Cliente (Crédito)</label>
+        <div class="flex gap-2 mt-1">
+          <select id="pos-customer" class="input-pro flex-1">
+            <option value="">Seleccionar cliente...</option>
+          </select>
+          <button type="button" onclick="openModal('modal-clients')" class="px-3 py-2 border rounded">Nuevo</button>
+        </div>
+        <div class="small-muted mt-1">Primero registra al cliente en CLIENTES y luego selecciónalo aquí.</div>
+      </div>
 
       <div class="flex gap-2 mt-3">
         <button onclick="completeSale()" class="btn-primary w-full py-3">FINALIZAR VENTA</button>
@@ -1323,13 +1332,23 @@ function setPayMethod(m, ev){
   payMethod = m;
   $$('.pay-btn').forEach(b=> b.classList.remove('active'));
   if(ev && ev.currentTarget) ev.currentTarget.classList.add('active');
-  if(m === 'A_CREDITO') $('#pos-customer').classList.remove('hidden'); else $('#pos-customer').classList.add('hidden');
+  const creditWrap = $('#pos-credit-wrap');
+  if(m === 'A_CREDITO'){
+    creditWrap?.classList.remove('hidden');
+    renderCreditCustomerOptions($('#pos-customer')?.value || '');
+    if(getActiveCustomers().length === 0){
+      showToast('Primero registra un cliente para vender a crédito');
+    }
+  } else {
+    creditWrap?.classList.add('hidden');
+    if($('#pos-customer')) $('#pos-customer').value = '';
+  }
 }
 
 /* ==========
    completeSale() - OFFLINE-FIRST, customerId handling
    - validates stock locally
-   - creates customer if not exists (assigns id)
+   - A_CREDITO exige seleccionar cliente ya registrado
    - updates customer's balance automatically on A_CREDITO
    - when offline: pushes op to pendingOps
    - when online: tries to push to Firestore and process pendingOps
@@ -1356,40 +1375,24 @@ async function completeSale(){
       meta: { origin: 'pos', device: navigator.userAgent }
     };
 
-    // handle credit: find or create customer and attach customerId
+    // handle credit: must use an already registered customer
     if(payMethod === 'A_CREDITO'){
-      const custName = ($('#pos-customer').value || '').trim();
-      if(!custName) return alert('Ingrese nombre del cliente para A CREDITO');
-      // find by exact name (case-insensitive) or by id
-      let customer = STATE.customers.find(c => (c.name||'').toLowerCase() === custName.toLowerCase());
-      if(!customer){
-        // create local customer entry
-        customer = { id: 'C-'+Date.now(), name: custName, balance: Number(sale.total), createdAt: new Date().toISOString() };
-        // add locally
-        STATE.customers.unshift(customer);
-        // add pending op to create/update customer in cloud
-        addPendingOp({ type: 'customer', payload: customer });
-      } else {
-        // update local balance immediately
-        customer.balance = Number((Number(customer.balance||0) + Number(sale.total)).toFixed(2));
-        // queue customer update
-        addPendingOp({ type: 'customer', payload: { id: customer.id, name: customer.name, balance: customer.balance } });
+      const customerId = ($('#pos-customer')?.value || '').trim();
+      if(!customerId){
+        alert('Selecciona un cliente registrado para A CREDITO');
+        openModal('modal-clients');
+        return;
       }
+      const customer = (STATE.customers||[]).find(c => c.id === customerId && !c.deleted);
+      if(!customer){
+        alert('El cliente seleccionado no existe. Regístralo nuevamente.');
+        renderCreditCustomerOptions();
+        return;
+      }
+      customer.balance = Number((Number(customer.balance||0) + Number(sale.total)).toFixed(2));
+      addPendingOp({ type: 'customer', payload: { id: customer.id, name: customer.name, balance: customer.balance } });
       sale.customerId = customer.id;
       sale.customerName = customer.name;
-    } else {
-      // for non-credit, optionally attach customerName if provided
-      const custName = ($('#pos-customer').value || '').trim();
-      if(custName){
-        let customer = STATE.customers.find(c => (c.name||'').toLowerCase() === custName.toLowerCase());
-        if(!customer){
-          customer = { id: 'C-'+Date.now(), name: custName, balance: 0, createdAt: new Date().toISOString() };
-          STATE.customers.unshift(customer);
-          addPendingOp({ type: 'customer', payload: customer });
-        }
-        sale.customerId = customer.id;
-        sale.customerName = customer.name;
-      }
     }
 
     // update stock locally and movements
@@ -2078,6 +2081,32 @@ function setupHardwareScannerSupport(){
    CLIENTS
    ========= */
 $('#btn-open-clients')?.addEventListener('click', ()=> openModal('modal-clients'));
+
+function getActiveCustomers(){
+  return (STATE.customers||[])
+    .filter(c => !c.deleted && String(c.name||'').trim())
+    .sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''), 'es', { sensitivity: 'base' }));
+}
+
+function renderCreditCustomerOptions(selectedId = ''){
+  const select = $('#pos-customer');
+  if(!select) return;
+  const prev = selectedId || select.value || '';
+  const customers = getActiveCustomers();
+  select.innerHTML = '<option value="">Seleccionar cliente...</option>';
+  customers.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = `${c.name} ${Number(c.balance||0) > 0 ? `(Deuda: S/ ${money(c.balance)})` : ''}`;
+    select.appendChild(opt);
+  });
+  if(prev && customers.some(c => c.id === prev)){
+    select.value = prev;
+  } else {
+    select.value = '';
+  }
+}
+
 document.getElementById('form-client')?.addEventListener('submit', async (ev)=>{
   ev.preventDefault();
   const name = ($('#client-name').value||'').trim();
@@ -2086,6 +2115,8 @@ document.getElementById('form-client')?.addEventListener('submit', async (ev)=>{
   const key = name.toLowerCase();
   const existing = (STATE.customers||[]).find(c=> (c.name||'').toLowerCase() === key);
   if(existing) {
+    existing.deleted = false;
+    existing.deletedAt = null;
     existing.balance = Number((Number(existing.balance||0) + init).toFixed(2));
     addPendingOp({ type: 'customer', payload: existing });
   } else {
@@ -2097,48 +2128,76 @@ document.getElementById('form-client')?.addEventListener('submit', async (ev)=>{
   saveLocalBackup();
   showToast('Cliente agregado/actualizado (cola si offline)');
   renderClients();
+  renderCreditCustomerOptions();
+  if(cloudOn && db) processPendingOps();
 });
 
 function renderClients(){
   const el = $('#clients-list'); if(!el) return; el.innerHTML='';
-  const list = (STATE.customers||[]).sort((a,b)=> Number(b.balance||0) - Number(a.balance||0));
+  const list = getActiveCustomers().sort((a,b)=> Number(b.balance||0) - Number(a.balance||0));
   if(list.length === 0) el.innerHTML = '<div class="small-muted">No hay clientes registrados</div>';
   list.forEach(c => {
     const row = document.createElement('div'); row.className='card flex justify-between items-center'; row.style.padding='8px';
     row.innerHTML = `<div><div style="font-weight:800">${escapeHtml(c.name)}</div><div class="small-muted">Saldo: S/ ${money(c.balance||0)}</div></div>
       <div style="display:flex;gap:6px">
-        <button onclick="promptAddPayment('${escapeHtml(c.name)}')" class="px-3 py-1 border rounded">Abonar</button>
-        <button onclick="clearDebt('${escapeHtml(c.name)}')" class="px-3 py-1 border rounded">Saldar</button>
+        <button onclick="promptAddPayment('${escapeAttr(c.id)}')" class="px-3 py-1 border rounded">Abonar</button>
+        <button onclick="clearDebt('${escapeAttr(c.id)}')" class="px-3 py-1 border rounded">Saldar</button>
+        <button onclick="deleteCustomer('${escapeAttr(c.id)}')" class="px-3 py-1 border rounded bg-red-50 text-red-700">Eliminar</button>
       </div>`;
     el.appendChild(row);
   });
+  renderCreditCustomerOptions();
 }
 
 /* Abono and Clear debt */
-async function promptAddPayment(name){
-  const amt = prompt('Ingrese monto de abono para ' + name);
+async function promptAddPayment(customerId){
+  const c = (STATE.customers||[]).find(x=> x.id === customerId && !x.deleted);
+  if(!c) return alert('Cliente no encontrado');
+  const amt = prompt('Ingrese monto de abono para ' + c.name);
   if(!amt) return;
   const val = Number(amt);
   if(isNaN(val) || val <= 0) return alert('Monto inválido');
-  const c = (STATE.customers||[]).find(x=> (x.name||'') === name);
-  if(!c) return alert('Cliente no encontrado');
   c.balance = Number((Number(c.balance||0) - val).toFixed(2));
   if(c.balance < 0) c.balance = 0;
   addPendingOp({ type: 'customer', payload: c });
   saveLocalBackup();
   showToast('Abono registrado (cola si offline)');
   renderClients();
+  if(cloudOn && db) processPendingOps();
 }
 
-async function clearDebt(name){
-  if(!confirm('Saldar deuda de: ' + name + ' ?')) return;
-  const c = (STATE.customers||[]).find(x=> (x.name||'') === name);
+async function clearDebt(customerId){
+  const c = (STATE.customers||[]).find(x=> x.id === customerId && !x.deleted);
   if(!c) return alert('Cliente no encontrado');
+  if(!confirm('Saldar deuda de: ' + c.name + ' ?')) return;
   c.balance = 0;
   addPendingOp({ type: 'customer', payload: c });
   saveLocalBackup();
   showToast('Deuda saldada (cola si offline)');
   renderClients();
+  if(cloudOn && db) processPendingOps();
+}
+
+async function deleteCustomer(customerId){
+  const c = (STATE.customers||[]).find(x=> x.id === customerId && !x.deleted);
+  if(!c) return alert('Cliente no encontrado');
+  if(Number(c.balance||0) > 0){
+    const ok = confirm(`El cliente ${c.name} aún tiene deuda S/ ${money(c.balance)}. ¿Eliminar de todas formas?`);
+    if(!ok) return;
+  } else {
+    if(!confirm('Eliminar cliente ' + c.name + ' ?')) return;
+  }
+
+  c.deleted = true;
+  c.deletedAt = new Date().toISOString();
+  c.updatedAt = new Date().toISOString();
+  addPendingOp({ type: 'customer', payload: c });
+  saveLocalBackup();
+  if($('#pos-customer')?.value === c.id) $('#pos-customer').value = '';
+  showToast('Cliente eliminado (cola si offline)');
+  renderClients();
+  renderCreditCustomerOptions();
+  if(cloudOn && db) processPendingOps();
 }
 
 /* =========
@@ -2316,4 +2375,3 @@ setInterval(()=> { try{ saveLocalBackup(); }catch(e){} }, 15000);
 </script>
 </body>
 </html>
-
