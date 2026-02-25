@@ -2140,6 +2140,7 @@ function renderClients(){
     const row = document.createElement('div'); row.className='card flex justify-between items-center'; row.style.padding='8px';
     row.innerHTML = `<div><div style="font-weight:800">${escapeHtml(c.name)}</div><div class="small-muted">Saldo: S/ ${money(c.balance||0)}</div></div>
       <div style="display:flex;gap:6px">
+        <button onclick="openCustomerDebtDetail('${escapeAttr(c.id)}')" class="px-3 py-1 border rounded">Detalle</button>
         <button onclick="promptAddPayment('${escapeAttr(c.id)}')" class="px-3 py-1 border rounded">Abonar</button>
         <button onclick="clearDebt('${escapeAttr(c.id)}')" class="px-3 py-1 border rounded">Saldar</button>
         <button onclick="deleteCustomer('${escapeAttr(c.id)}')" class="px-3 py-1 border rounded bg-red-50 text-red-700">Eliminar</button>
@@ -2147,6 +2148,70 @@ function renderClients(){
     el.appendChild(row);
   });
   renderCreditCustomerOptions();
+}
+
+function openCustomerDebtDetail(customerId){
+  const customer = (STATE.customers||[]).find(x => x.id === customerId && !x.deleted);
+  if(!customer) return alert('Cliente no encontrado');
+
+  const nameKey = String(customer.name||'').trim().toLowerCase();
+  const creditSales = (STATE.sales||[])
+    .filter(s => !s.deleted && String(s.paymentType || s.method || '').toUpperCase() === 'A_CREDITO')
+    .filter(s => {
+      if(s.customerId) return s.customerId === customer.id;
+      const saleName = String(s.customerName || s.customer || '').trim().toLowerCase();
+      return !!saleName && saleName === nameKey;
+    })
+    .sort((a,b)=> new Date(b.date||0) - new Date(a.date||0));
+
+  const totalCredito = creditSales.reduce((acc,s)=> acc + Number(s.total||0), 0);
+  const saldoActual = Number(customer.balance||0);
+  const abonosEstimados = Math.max(0, Number((totalCredito - saldoActual).toFixed(2)));
+
+  const rows = creditSales.map(s => {
+    const items = (s.items||[]).map(it => {
+      const prod = STATE.products.find(p => p.id === it.productId);
+      const name = (prod && prod.name) ? prod.name : (it.rawName || it.productId || 'Producto');
+      return `${name} x${Number(it.qty||1)}`;
+    }).join(' | ');
+    return `<tr>
+      <td>${new Date(s.date).toLocaleString()}</td>
+      <td>${escapeHtml(s.id||'-')}</td>
+      <td style="text-align:right">S/ ${money(s.total||0)}</td>
+      <td>${escapeHtml(items || '-')}</td>
+    </tr>`;
+  }).join('');
+
+  const modal = document.createElement('div');
+  modal.className = 'modal visible';
+  modal.style.zIndex = '140';
+  const sheet = document.createElement('div');
+  sheet.className = 'modal-sheet';
+  sheet.innerHTML = `
+    <div class="flex justify-between items-center mb-3">
+      <h3 class="font-bold">Detalle de deuda: ${escapeHtml(customer.name)}</h3>
+      <button id="close-customer-detail" class="px-3 py-2 border rounded">Cerrar</button>
+    </div>
+
+    <div class="grid grid-cols-3 gap-2 mb-3">
+      <div class="card" style="padding:8px"><div class="small-muted">Total crédito</div><div style="font-weight:800">S/ ${money(totalCredito)}</div></div>
+      <div class="card" style="padding:8px"><div class="small-muted">Abonos estimados</div><div style="font-weight:800">S/ ${money(abonosEstimados)}</div></div>
+      <div class="card" style="padding:8px"><div class="small-muted">Saldo actual</div><div style="font-weight:800">S/ ${money(saldoActual)}</div></div>
+    </div>
+
+    <div class="small-muted mb-2">Historial de ventas a crédito (${creditSales.length})</div>
+    <div style="max-height:42vh;overflow:auto;border:1px solid #e5e7eb;border-radius:10px">
+      <table>
+        <thead><tr><th>Fecha</th><th>ID Venta</th><th style="text-align:right">Total</th><th>Productos</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="4" class="small-muted">No hay ventas a crédito para este cliente</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="small-muted mt-2">Nota: el monto de abonos es referencial, calculado por diferencia entre total crédito y saldo actual.</div>
+  `;
+  modal.appendChild(sheet);
+  document.body.appendChild(modal);
+  sheet.querySelector('#close-customer-detail')?.addEventListener('click', ()=> modal.remove());
+  modal.addEventListener('click', (ev)=> { if(ev.target === modal) modal.remove(); });
 }
 
 /* Abono and Clear debt */
