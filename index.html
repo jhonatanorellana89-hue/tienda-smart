@@ -2164,23 +2164,78 @@ function openCustomerDebtDetail(customerId){
     })
     .sort((a,b)=> new Date(b.date||0) - new Date(a.date||0));
 
+  const fmtDate = (v) => {
+    const d = new Date(v || 0);
+    return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString();
+  };
+  const itemName = (it) => {
+    const prod = STATE.products.find(p => p.id === it.productId);
+    return (prod && prod.name) ? prod.name : (it.rawName || it.productId || 'Producto');
+  };
+
   const totalCredito = creditSales.reduce((acc,s)=> acc + Number(s.total||0), 0);
   const saldoActual = Number(customer.balance||0);
   const abonosEstimados = Math.max(0, Number((totalCredito - saldoActual).toFixed(2)));
 
-  const rows = creditSales.map(s => {
-    const items = (s.items||[]).map(it => {
-      const prod = STATE.products.find(p => p.id === it.productId);
-      const name = (prod && prod.name) ? prod.name : (it.rawName || it.productId || 'Producto');
-      return `${name} x${Number(it.qty||1)}`;
-    }).join(' | ');
-    return `<tr>
-      <td>${new Date(s.date).toLocaleString()}</td>
-      <td>${escapeHtml(s.id||'-')}</td>
-      <td style="text-align:right">S/ ${money(s.total||0)}</td>
-      <td>${escapeHtml(items || '-')}</td>
-    </tr>`;
-  }).join('');
+  const productRowsData = [];
+  creditSales.forEach(s => {
+    const saleDate = fmtDate(s.date);
+    const saleItems = (Array.isArray(s.items) && s.items.length)
+      ? s.items
+      : [{ rawName: 'Sin detalle', qty: 1, unitPrice: Number(s.total||0) }];
+
+    saleItems.forEach(it => {
+      const qty = Number(it.qty||1);
+      const unit = Number(it.unitPrice||0);
+      productRowsData.push({
+        date: saleDate,
+        saleId: s.id || '-',
+        name: itemName(it),
+        qty,
+        unit,
+        subtotal: qty * unit
+      });
+    });
+  });
+
+  const productRowsHtml = productRowsData.map(r => `<tr>
+      <td>${escapeHtml(r.date)}</td>
+      <td>${escapeHtml(r.saleId)}</td>
+      <td>${escapeHtml(r.name)}</td>
+      <td style="text-align:right">${r.qty}</td>
+      <td style="text-align:right">S/ ${money(r.unit)}</td>
+      <td style="text-align:right">S/ ${money(r.subtotal)}</td>
+    </tr>`).join('');
+
+  const receiptLines = [];
+  receiptLines.push('MINIMARKET LA ESQUINA DEL AHORRO');
+  receiptLines.push('RECIBO DE DEUDA A CREDITO');
+  receiptLines.push(`Cliente: ${customer.name || '-'}`);
+  receiptLines.push(`Fecha de emision: ${fmtDate(new Date().toISOString())}`);
+  receiptLines.push('----------------------------------------');
+  if(creditSales.length === 0){
+    receiptLines.push('No hay ventas a credito registradas.');
+  } else {
+    creditSales.forEach((s, idx) => {
+      receiptLines.push(`${idx + 1}) Venta: ${s.id || '-'}  Fecha: ${fmtDate(s.date)}`);
+      const saleItems = (Array.isArray(s.items) && s.items.length)
+        ? s.items
+        : [{ rawName: 'Sin detalle', qty: 1, unitPrice: Number(s.total||0) }];
+      saleItems.forEach(it => {
+        const qty = Number(it.qty||1);
+        const unit = Number(it.unitPrice||0);
+        const subtotal = qty * unit;
+        receiptLines.push(`   - ${itemName(it)} | ${qty} x S/ ${money(unit)} = S/ ${money(subtotal)}`);
+      });
+      receiptLines.push(`   Subtotal venta: S/ ${money(s.total||0)}`);
+      receiptLines.push('');
+    });
+  }
+  receiptLines.push('----------------------------------------');
+  receiptLines.push(`Total credito : S/ ${money(totalCredito)}`);
+  receiptLines.push(`Abonos        : S/ ${money(abonosEstimados)} (referencial)`);
+  receiptLines.push(`Saldo actual  : S/ ${money(saldoActual)}`);
+  const receiptText = receiptLines.join('\n');
 
   const modal = document.createElement('div');
   modal.className = 'modal visible';
@@ -2189,8 +2244,16 @@ function openCustomerDebtDetail(customerId){
   sheet.className = 'modal-sheet';
   sheet.innerHTML = `
     <div class="flex justify-between items-center mb-3">
-      <h3 class="font-bold">Detalle de deuda: ${escapeHtml(customer.name)}</h3>
-      <button id="close-customer-detail" class="px-3 py-2 border rounded">Cerrar</button>
+      <h3 class="font-bold">Recibo de deuda: ${escapeHtml(customer.name)}</h3>
+      <div class="flex gap-2">
+        <button id="copy-customer-receipt" class="px-3 py-2 border rounded">Copiar</button>
+        <button id="close-customer-detail" class="px-3 py-2 border rounded">Cerrar</button>
+      </div>
+    </div>
+
+    <div class="card mb-3" style="padding:10px;border:1px dashed #94a3b8;background:linear-gradient(180deg,#ffffff,#f8fafc);color:#0f172a">
+      <div style="font-weight:800;font-size:12px;letter-spacing:.08em">RECIBO LISTO PARA COPIAR</div>
+      <pre id="customer-receipt-text" style="margin:8px 0 0;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;font-size:12px;line-height:1.45">${escapeHtml(receiptText)}</pre>
     </div>
 
     <div class="grid grid-cols-3 gap-2 mb-3">
@@ -2199,17 +2262,39 @@ function openCustomerDebtDetail(customerId){
       <div class="card" style="padding:8px"><div class="small-muted">Saldo actual</div><div style="font-weight:800">S/ ${money(saldoActual)}</div></div>
     </div>
 
-    <div class="small-muted mb-2">Historial de ventas a crédito (${creditSales.length})</div>
+    <div class="small-muted mb-2">Detalle por producto y fecha (${productRowsData.length} items)</div>
     <div style="max-height:42vh;overflow:auto;border:1px solid #e5e7eb;border-radius:10px">
       <table>
-        <thead><tr><th>Fecha</th><th>ID Venta</th><th style="text-align:right">Total</th><th>Productos</th></tr></thead>
-        <tbody>${rows || '<tr><td colspan="4" class="small-muted">No hay ventas a crédito para este cliente</td></tr>'}</tbody>
+        <thead><tr><th>Fecha</th><th>Venta</th><th>Producto</th><th style="text-align:right">Cant</th><th style="text-align:right">Unit</th><th style="text-align:right">Subtotal</th></tr></thead>
+        <tbody>${productRowsHtml || '<tr><td colspan="6" class="small-muted">No hay ventas a crédito para este cliente</td></tr>'}</tbody>
       </table>
     </div>
-    <div class="small-muted mt-2">Nota: el monto de abonos es referencial, calculado por diferencia entre total crédito y saldo actual.</div>
+    <div class="small-muted mt-2">Nota: abonos estimados = total crédito - saldo actual.</div>
   `;
   modal.appendChild(sheet);
   document.body.appendChild(modal);
+
+  sheet.querySelector('#copy-customer-receipt')?.addEventListener('click', async ()=>{
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(receiptText);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = receiptText;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      showToast('Recibo copiado');
+    }catch(_){
+      showToast('No se pudo copiar automáticamente');
+    }
+  });
+
   sheet.querySelector('#close-customer-detail')?.addEventListener('click', ()=> modal.remove());
   modal.addEventListener('click', (ev)=> { if(ev.target === modal) modal.remove(); });
 }
@@ -2440,3 +2525,4 @@ setInterval(()=> { try{ saveLocalBackup(); }catch(e){} }, 15000);
 </script>
 </body>
 </html>
+
