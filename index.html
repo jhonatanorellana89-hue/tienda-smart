@@ -12,7 +12,7 @@
 <!-- Utilities: XLSX, html2canvas, jsPDF -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudfla<!--  -->re.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <!-- Quagga fallback -->
 <script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
@@ -239,6 +239,146 @@
   .stock-badge.low{background:#fef3c7;color:#92400e}
   .stock-empty{text-align:center;color:#64748b}
 
+  .invoice-sheet{
+    max-width:920px;
+    background:linear-gradient(180deg,#f3f7ff 0%, #ffffff 60%);
+  }
+  .invoice-paper{
+    background:#ffffff;
+    border:1px solid #d9e2ef;
+    border-radius:14px;
+    padding:12px;
+  }
+  .invoice-top{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    align-items:flex-start;
+    border-bottom:2px dashed #d7deea;
+    padding-bottom:10px;
+    margin-bottom:10px;
+  }
+  .invoice-brand-title{
+    font-family:'Sora', sans-serif;
+    font-weight:800;
+    font-size:16px;
+    line-height:1.2;
+    color:#0f172a;
+  }
+  .invoice-brand-sub{
+    margin-top:4px;
+    font-size:11px;
+    color:#64748b;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+  }
+  .invoice-docbox{
+    border:1px solid #c9d6ea;
+    border-radius:12px;
+    background:#f8fbff;
+    padding:8px;
+    min-width:290px;
+  }
+  .invoice-dochead{
+    font-size:11px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:#1d4ed8;
+    font-weight:800;
+    margin-bottom:6px;
+  }
+  .invoice-docfields{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+  }
+  .invoice-grid{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .invoice-note{ grid-column:1 / -1; }
+  .invoice-detail-head{
+    display:grid;
+    grid-template-columns:2.5fr .8fr 1fr 1fr .7fr;
+    gap:8px;
+    padding:8px 10px;
+    border-radius:10px;
+    border:1px solid #d7deea;
+    background:#eef4ff;
+    font-size:11px;
+    font-weight:800;
+    color:#334155;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+  }
+  .invoice-lines{
+    margin-top:8px;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .invoice-line{
+    border:1px solid #dbe4f1;
+    border-radius:12px;
+    background:#fbfdff;
+    padding:10px;
+  }
+  .invoice-line-grid{
+    display:grid;
+    grid-template-columns:2.5fr .8fr 1fr 1fr .7fr;
+    gap:8px;
+    align-items:end;
+  }
+  .invoice-field-label{
+    display:none;
+    font-size:11px;
+    color:#64748b;
+    margin-bottom:4px;
+    font-weight:700;
+  }
+  .invoice-line .input-pro{
+    border-color:#d5deea;
+    border-radius:10px;
+  }
+  .invoice-line-sub{
+    margin-top:8px;
+    text-align:right;
+    font-size:12px;
+    color:#475569;
+  }
+  .invoice-actions{
+    display:flex;
+    justify-content:flex-end;
+    margin-top:10px;
+  }
+  .invoice-summary{
+    margin-top:10px;
+    border:1px solid #d7deea;
+    border-radius:12px;
+    background:#f8fbff;
+    padding:10px;
+  }
+  .invoice-summary-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:13px;
+    color:#475569;
+  }
+  .invoice-summary-total{
+    margin-top:6px;
+    padding-top:6px;
+    border-top:1px dashed #cdd7e7;
+    font-size:16px;
+    font-weight:800;
+    color:#0f172a;
+  }
+  .invoice-submit{
+    margin-top:12px;
+  }
+
   @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   @keyframes pop{from{opacity:.7;transform:scale(.98)}to{opacity:1;transform:scale(1)}}
   .card{animation:rise .25s ease both}
@@ -246,6 +386,14 @@
   @media (max-width:420px){
     :root{--maxw:100vw}
     .modal-sheet{border-radius:14px;padding:12px}
+  }
+  @media (max-width:640px){
+    .invoice-top{flex-direction:column}
+    .invoice-docbox{min-width:0;width:100%}
+    .invoice-grid{grid-template-columns:1fr}
+    .invoice-detail-head{display:none}
+    .invoice-line-grid{grid-template-columns:1fr 1fr}
+    .invoice-field-label{display:block}
   }
 </style>
 </head>
@@ -325,6 +473,7 @@
         <input id="search-inv" class="input-pro pl-10" placeholder="Buscar producto (nombre o código)...">
         <div id="inv-suggestions" class="dropdown-suggestions hidden"></div>
       </div>
+      <button onclick="openIngresoModal()" class="px-3 rounded-xl border bg-white text-sm font-semibold text-emerald-700 whitespace-nowrap">Ingreso</button>
       <button onclick="startScanner()" class="bg-white p-3 rounded-xl border"><i data-lucide="scan-barcode" class="w-5 h-5 text-indigo-600"></i></button>
     </div>
     <div id="inventory-list" class="mt-4"></div>
@@ -448,6 +597,84 @@
         <button type="submit" class="btn-primary w-full">GUARDAR PRODUCTO</button>
         <button type="button" onclick="calculateUnitPrice()" class="px-3 py-2 border rounded">Calcular</button>
       </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Ingreso de Productos -->
+<div id="modal-ingreso" class="modal">
+  <div class="modal-sheet invoice-sheet">
+    <form id="form-ingreso" class="invoice-paper">
+      <div class="flex justify-between items-center mb-2">
+        <div class="small-muted uppercase font-bold text-xs">Registro de Compra</div>
+        <button type="button" onclick="closeModal('modal-ingreso')"><i data-lucide="x"></i></button>
+      </div>
+
+      <div class="invoice-top">
+        <div>
+          <div class="invoice-brand-title">MINIMARKET LA ESQUINA DEL AHORRO</div>
+          <div class="invoice-brand-sub">Comprobante interno de ingreso a stock</div>
+        </div>
+        <div class="invoice-docbox">
+          <div class="invoice-dochead">Comprobante de Ingreso</div>
+          <div class="invoice-docfields">
+            <div>
+              <label class="small-muted">Tipo</label>
+              <select id="ing-doc-type" class="input-pro mt-1">
+                <option value="FACTURA">Factura</option>
+                <option value="BOLETA">Boleta</option>
+                <option value="GUIA">Guia</option>
+                <option value="OTRO">Otro</option>
+              </select>
+            </div>
+            <div>
+              <label class="small-muted">Numero</label>
+              <input id="ing-doc-number" class="input-pro mt-1" placeholder="F001-1234" required>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="invoice-grid">
+        <div>
+          <label class="small-muted">Proveedor</label>
+          <input id="ing-supplier" class="input-pro mt-1" placeholder="Ej: Distribuidora ABC" required>
+        </div>
+        <div>
+          <label class="small-muted">Fecha</label>
+          <input id="ing-date" type="date" class="input-pro mt-1">
+        </div>
+        <div class="invoice-note">
+          <label class="small-muted">Observacion</label>
+          <input id="ing-note" class="input-pro mt-1" placeholder="Detalle adicional de la compra">
+        </div>
+      </div>
+
+      <div class="invoice-detail-head">
+        <div>Producto</div>
+        <div>Cant.</div>
+        <div>Costo</div>
+        <div>Venta</div>
+        <div>Quitar</div>
+      </div>
+      <div id="ingreso-items" class="invoice-lines"></div>
+
+      <div class="invoice-actions">
+        <button type="button" onclick="addIngresoItemRow()" class="px-3 py-2 border rounded text-sm font-semibold">+ Agregar linea</button>
+      </div>
+
+      <div class="invoice-summary">
+        <div class="invoice-summary-row">
+          <span>Items registrados</span>
+          <strong id="ing-summary-items">0</strong>
+        </div>
+        <div class="invoice-summary-row invoice-summary-total">
+          <span>Total compra</span>
+          <span>S/ <span id="ing-summary-total">0.00</span></span>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary w-full invoice-submit">Registrar ingreso</button>
     </form>
   </div>
 </div>
@@ -581,7 +808,7 @@ function escapeAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,
 /* =========
    APP STATE
    ========= */
-let STATE = { products: [], sales: [], customers: [] }; // canonical app state
+let STATE = { products: [], sales: [], customers: [], purchases: [] }; // canonical app state
 let cart = []; let payMethod = 'EFECTIVO'; let db = null; let cloudOn = false; let unsubscribe = null;
 
 /* pendingOps: offline queue persistent in localStorage.
@@ -593,6 +820,15 @@ const LOCAL_BACKUP_KEY = 'tienda_local_backup_v1';
 /* Load persisted state and pending ops */
 try { const b = localStorage.getItem(LOCAL_BACKUP_KEY); if(b) STATE = JSON.parse(b); } catch(e){ console.warn('local parse err', e); }
 try { const p = localStorage.getItem(PENDING_KEY); if(p) pendingOps = JSON.parse(p) || []; } catch(e){ pendingOps = []; }
+
+function ensureStateShape(){
+  if(!STATE || typeof STATE !== 'object') STATE = {};
+  if(!Array.isArray(STATE.products)) STATE.products = [];
+  if(!Array.isArray(STATE.sales)) STATE.sales = [];
+  if(!Array.isArray(STATE.customers)) STATE.customers = [];
+  if(!Array.isArray(STATE.purchases)) STATE.purchases = [];
+}
+ensureStateShape();
 
 /* Persist helpers */
 function saveLocalBackup(){ try { localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(STATE)); } catch(e){} }
@@ -702,6 +938,8 @@ function normalizeRemoteData(remote){
    - merges remote normalized state with local STATE avoiding destructive overwrite
 */
 function mergeState(remoteState){
+  ensureStateShape();
+  const purchasesKeep = Array.isArray(STATE.purchases) ? STATE.purchases : [];
   // Merge products: prefer more recent createdAt, merge movements by id
   const map = new Map(); (STATE.products||[]).forEach(p => map.set(p.id, JSON.parse(JSON.stringify(p))));
   for(const rp of (remoteState.products||[])){
@@ -760,7 +998,7 @@ function mergeState(remoteState){
   }
   const mergedCustomers = Array.from(cMap.values());
 
-  STATE.products = mergedProds; STATE.sales = mergedSales; STATE.customers = mergedCustomers;
+  STATE.products = mergedProds; STATE.sales = mergedSales; STATE.customers = mergedCustomers; STATE.purchases = purchasesKeep;
   try { localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(STATE)); } catch(e){}
 }
 
@@ -2339,6 +2577,8 @@ async function deleteCustomer(customerId){
   }
 
   c.deleted = true;
+
+  
   c.deletedAt = new Date().toISOString();
   c.updatedAt = new Date().toISOString();
   addPendingOp({ type: 'customer', payload: c });
@@ -2349,6 +2589,245 @@ async function deleteCustomer(customerId){
   renderCreditCustomerOptions();
   if(cloudOn && db) processPendingOps();
 }
+
+/* =========
+   INGRESO DE PRODUCTOS (compras)
+   ========= */
+function buildIngresoProductOptions(selectedId = ''){
+  const products = (STATE.products||[]).slice().sort((a,b)=>
+    String(a.name||'').localeCompare(String(b.name||''), 'es', { sensitivity:'base' })
+  );
+  const options = ['<option value="">Seleccionar producto...</option>'];
+  for(const p of products){
+    const selected = p.id === selectedId ? 'selected' : '';
+    options.push(`<option value="${escapeAttr(p.id)}" ${selected}>${escapeHtml(p.name||'')} (Stock: ${Number(p.stock||0)})</option>`);
+  }
+  return options.join('');
+}
+
+function createIngresoItemRow(item = {}){
+  const qty = Number(item.qty || 1);
+  const costPrice = Number(item.costPrice || 0);
+  const salePrice = Number(item.salePrice || 0);
+
+  const row = document.createElement('div');
+  row.className = 'ing-row invoice-line';
+  row.innerHTML = `
+    <div class="invoice-line-grid">
+      <div>
+        <div class="invoice-field-label">Producto</div>
+        <select class="input-pro mt-1" data-ing-field="product">
+          ${buildIngresoProductOptions(item.productId || '')}
+        </select>
+      </div>
+      <div>
+        <div class="invoice-field-label">Cantidad</div>
+        <input type="number" min="1" step="1" class="input-pro mt-1" data-ing-field="qty" value="${Number.isFinite(qty) && qty > 0 ? Math.floor(qty) : 1}">
+      </div>
+      <div>
+        <div class="invoice-field-label">Costo unitario</div>
+        <input type="number" min="0" step="0.01" class="input-pro mt-1" data-ing-field="cost" value="${money(costPrice)}">
+      </div>
+      <div>
+        <div class="invoice-field-label">Precio venta</div>
+        <input type="number" min="0" step="0.01" class="input-pro mt-1" data-ing-field="price" value="${money(salePrice)}">
+      </div>
+      <div class="flex items-end">
+        <button type="button" class="w-full px-3 py-2 border rounded text-red-700 font-semibold" data-ing-field="remove">Quitar</button>
+      </div>
+    </div>
+    <div class="invoice-line-sub">Subtotal linea: <strong>S/ <span data-ing-field="subtotal">0.00</span></strong></div>
+  `;
+
+  const sel = row.querySelector('[data-ing-field="product"]');
+  const qtyInput = row.querySelector('[data-ing-field="qty"]');
+  const costInput = row.querySelector('[data-ing-field="cost"]');
+  const priceInput = row.querySelector('[data-ing-field="price"]');
+  const removeBtn = row.querySelector('[data-ing-field="remove"]');
+
+  sel?.addEventListener('change', ()=>{
+    const p = (STATE.products||[]).find(x => x.id === sel.value);
+    if(p){
+      if(!Number(costInput.value)) costInput.value = money(p.costPrice || 0);
+      if(!Number(priceInput.value)) priceInput.value = money(p.price || 0);
+    }
+    refreshIngresoSummary();
+  });
+  [qtyInput, costInput, priceInput].forEach(el => el?.addEventListener('input', refreshIngresoSummary));
+  removeBtn?.addEventListener('click', ()=>{
+    row.remove();
+    if($$('#ingreso-items .ing-row').length === 0) addIngresoItemRow();
+    refreshIngresoSummary();
+  });
+
+  return row;
+}
+
+function addIngresoItemRow(item = {}){
+  const container = $('#ingreso-items');
+  if(!container) return;
+  container.appendChild(createIngresoItemRow(item));
+  refreshIngresoSummary();
+}
+
+function readIngresoRows(strict = false){
+  const rows = $$('#ingreso-items .ing-row');
+  const items = [];
+  const seen = new Set();
+  rows.forEach((row, idx)=>{
+    const productId = (row.querySelector('[data-ing-field="product"]')?.value || '').trim();
+    const qty = Number(row.querySelector('[data-ing-field="qty"]')?.value || 0);
+    const costPrice = Number(row.querySelector('[data-ing-field="cost"]')?.value || 0);
+    const salePrice = Number(row.querySelector('[data-ing-field="price"]')?.value || 0);
+
+    const hasData = productId || qty || costPrice || salePrice;
+    if(!hasData) return;
+    if(!productId){
+      if(strict) throw new Error(`Selecciona un producto en la fila ${idx + 1}`);
+      return;
+    }
+    if(seen.has(productId)){
+      if(strict) throw new Error(`Producto repetido en la fila ${idx + 1}`);
+      return;
+    }
+    seen.add(productId);
+    if(!Number.isInteger(qty) || qty <= 0){
+      if(strict) throw new Error(`Cantidad invalida en la fila ${idx + 1}`);
+      return;
+    }
+    if(!Number.isFinite(costPrice) || costPrice < 0){
+      if(strict) throw new Error(`Costo invalido en la fila ${idx + 1}`);
+      return;
+    }
+    if(!Number.isFinite(salePrice) || salePrice < 0){
+      if(strict) throw new Error(`Precio de venta invalido en la fila ${idx + 1}`);
+      return;
+    }
+
+    const product = (STATE.products||[]).find(p => p.id === productId);
+    if(!product){
+      if(strict) throw new Error(`Producto no encontrado en la fila ${idx + 1}`);
+      return;
+    }
+
+    items.push({
+      productId,
+      name: product.name,
+      qty,
+      costPrice,
+      salePrice,
+      subtotal: qty * costPrice
+    });
+  });
+  return items;
+}
+
+function refreshIngresoSummary(){
+  const rows = $$('#ingreso-items .ing-row');
+  let total = 0;
+  let count = 0;
+  rows.forEach(row => {
+    const productId = (row.querySelector('[data-ing-field="product"]')?.value || '').trim();
+    const qty = Number(row.querySelector('[data-ing-field="qty"]')?.value || 0);
+    const cost = Number(row.querySelector('[data-ing-field="cost"]')?.value || 0);
+    const subtotal = (Number.isFinite(qty) && qty > 0 ? qty : 0) * (Number.isFinite(cost) && cost >= 0 ? cost : 0);
+    const subEl = row.querySelector('[data-ing-field="subtotal"]');
+    if(subEl) subEl.textContent = money(subtotal);
+    total += subtotal;
+    if(productId && Number.isInteger(qty) && qty > 0) count += 1;
+  });
+  if($('#ing-summary-items')) $('#ing-summary-items').textContent = String(count);
+  if($('#ing-summary-total')) $('#ing-summary-total').textContent = money(total);
+}
+
+function resetIngresoForm(){
+  const form = $('#form-ingreso');
+  if(form) form.reset();
+  if($('#ing-date')) $('#ing-date').value = todayYMD();
+  const container = $('#ingreso-items');
+  if(container) container.innerHTML = '';
+  addIngresoItemRow();
+}
+
+function openIngresoModal(){
+  if((STATE.products||[]).length === 0){
+    alert('Primero registra al menos un producto.');
+    openModal('modal-product');
+    return;
+  }
+  resetIngresoForm();
+  openModal('modal-ingreso');
+}
+
+document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  try{
+    ensureStateShape();
+    const supplier = ($('#ing-supplier')?.value || '').trim();
+    const docType = ($('#ing-doc-type')?.value || 'FACTURA').trim();
+    const docNumber = ($('#ing-doc-number')?.value || '').trim();
+    const date = ($('#ing-date')?.value || todayYMD()).trim();
+    const note = ($('#ing-note')?.value || '').trim();
+
+    if(!supplier) return alert('Proveedor es obligatorio');
+    if(!docNumber) return alert('Numero de comprobante es obligatorio');
+
+    const items = readIngresoRows(true);
+    if(items.length === 0) return alert('Agrega al menos un producto');
+
+    const now = new Date().toISOString();
+    const reference = `${docType} ${docNumber} - ${supplier}`;
+    items.forEach(it => {
+      const p = (STATE.products||[]).find(x => x.id === it.productId);
+      if(!p) return;
+      p.stock = Number(p.stock || 0) + Number(it.qty || 0);
+      p.costPrice = Number(it.costPrice || 0);
+      p.price = Number(it.salePrice || 0);
+      p.updatedAt = now;
+      p.movements = Array.isArray(p.movements) ? p.movements : [];
+      p.movements.unshift({
+        id: uid(),
+        type: 'INGRESO',
+        qty: Number(it.qty || 0),
+        date: now,
+        note: reference,
+        costPrice: Number(it.costPrice || 0),
+        unitPrice: Number(it.salePrice || 0)
+      });
+      addPendingOp({ type: 'product', payload: p, silent: true });
+    });
+
+    const ingreso = {
+      id: uid(),
+      supplier,
+      docType,
+      docNumber,
+      date,
+      note,
+      totalCost: items.reduce((acc, it)=> acc + Number(it.subtotal || 0), 0),
+      items: items.map(it => ({
+        productId: it.productId,
+        name: it.name,
+        qty: it.qty,
+        costPrice: it.costPrice,
+        salePrice: it.salePrice,
+        subtotal: it.subtotal
+      })),
+      createdAt: now
+    };
+    STATE.purchases.unshift(ingreso);
+
+    saveLocalBackup();
+    renderInventoryList();
+    renderDashboard();
+    closeModal('modal-ingreso');
+    showToast(`Ingreso registrado: ${items.length} producto(s)`);
+    if(cloudOn && db) processPendingOps();
+  }catch(err){
+    console.error(err);
+    alert(err.message || 'No se pudo registrar el ingreso');
+  }
+});
 
 /* =========
    PRODUCT CRUD
@@ -2426,6 +2905,9 @@ function openModal(id){
   m.classList.add('visible');
   if(id === 'modal-product'){
     setTimeout(()=> { $('#p-name')?.focus(); }, 40);
+  }
+  if(id === 'modal-ingreso'){
+    setTimeout(()=> { $('#ing-supplier')?.focus(); }, 40);
   }
   // adjust modal position to center even with keyboard: set max-height to visualViewport.height - 40
   const sheet = m.querySelector('.modal-sheet');
@@ -2525,4 +3007,3 @@ setInterval(()=> { try{ saveLocalBackup(); }catch(e){} }, 15000);
 </script>
 </body>
 </html>
-
