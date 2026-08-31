@@ -765,7 +765,7 @@
       <button onclick="requireStockAccess(openDailyStockControl)" class="px-3 rounded-xl border bg-amber-50 text-sm font-semibold text-amber-800 whitespace-nowrap">Control diario</button>
       <button onclick="requireStockAccess(openStockHistoryModal)" class="px-3 rounded-xl border bg-slate-900 text-sm font-semibold text-white whitespace-nowrap">Historial</button>
       <button onclick="openPurchaseHistoryModal()" class="px-3 rounded-xl border bg-white text-sm font-semibold text-sky-700 whitespace-nowrap">Boletas</button>
-      <button onclick="startScanner()" class="bg-white p-3 rounded-xl border"><i data-lucide="scan-barcode" class="w-5 h-5 text-indigo-600"></i></button>
+      <button onclick="startScanner('stock')" class="bg-white p-3 rounded-xl border"><i data-lucide="scan-barcode" class="w-5 h-5 text-indigo-600"></i></button>
     </div>
     <div id="inventory-list" class="mt-4"></div>
   </main>
@@ -846,7 +846,7 @@
 
       <div class="flex gap-2 mt-3">
         <button onclick="completeSale()" class="btn-primary w-full py-3">FINALIZAR VENTA</button>
-        <button onclick="startScanner()" class="px-3 py-3 bg-white border rounded"><i data-lucide="camera"></i></button>
+        <button onclick="startScanner('sale')" class="px-3 py-3 bg-white border rounded"><i data-lucide="camera"></i></button>
       </div>
     </div>
   </div>
@@ -1129,8 +1129,77 @@
       <div id="purchase-history-preview" class="invoice-paper" style="max-height:56vh;overflow:auto"></div>
     </div>
     <div id="purchase-history-action-bar" class="mt-3 hidden">
-      <button id="btn-purchase-use-add" type="button" class="btn-primary w-full" onclick="useSelectedPurchaseForAdd()">ADD+ cargar factura seleccionada</button>
+      <div id="purchase-history-view-actions" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <button id="btn-purchase-edit" type="button" class="px-3 py-3 border rounded font-bold text-sky-800 bg-sky-50" onclick="requestSelectedPurchaseEdit()">Editar datos de boleta</button>
+        <button id="btn-purchase-add-products" type="button" class="btn-primary" onclick="requestSelectedPurchaseAdd()">ADD+ agregar productos</button>
+      </div>
+      <button id="btn-purchase-use-add" type="button" class="btn-primary w-full hidden" onclick="useSelectedPurchaseForAdd()">ADD+ cargar factura seleccionada</button>
+      <div id="purchase-history-action-note" class="small-muted mt-2">La edición no cambia cantidades ni stock ya registrado. Para productos faltantes usa ADD+.</div>
     </div>
+  </div>
+</div>
+
+<!-- Modal: Editar datos de boleta/factura -->
+<div id="modal-purchase-edit" class="modal">
+  <div class="modal-sheet invoice-sheet" style="max-width:760px">
+    <form id="form-purchase-edit" class="invoice-paper">
+      <div class="flex justify-between items-start gap-3 mb-3">
+        <div>
+          <div class="small-muted uppercase font-bold text-xs">Corrección controlada</div>
+          <h3 class="font-bold text-lg">Editar datos de boleta</h3>
+          <div class="small-muted">Las cantidades y movimientos de stock permanecerán protegidos.</div>
+        </div>
+        <button type="button" onclick="closeModal('modal-purchase-edit')"><i data-lucide="x"></i></button>
+      </div>
+      <input id="purchase-edit-id" type="hidden">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div>
+          <label class="small-muted">Tipo</label>
+          <select id="purchase-edit-doc-type" class="input-pro mt-1" required>
+            <option value="FACTURA">Factura</option>
+            <option value="BOLETA">Boleta</option>
+            <option value="GUIA">Guía</option>
+            <option value="OTRO">Otro</option>
+          </select>
+        </div>
+        <div>
+          <label class="small-muted">Número</label>
+          <input id="purchase-edit-doc-number" class="input-pro mt-1" required>
+        </div>
+        <div>
+          <label class="small-muted">Fecha</label>
+          <input id="purchase-edit-date" type="date" class="input-pro mt-1" required>
+        </div>
+      </div>
+      <div class="invoice-box">
+        <div class="invoice-box-title">Proveedor</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div>
+            <label class="small-muted">Nombre proveedor</label>
+            <input id="purchase-edit-supplier-name" class="input-pro mt-1" required>
+          </div>
+          <div>
+            <label class="small-muted">RUC</label>
+            <input id="purchase-edit-supplier-ruc" class="input-pro mt-1" maxlength="11" inputmode="numeric" required>
+          </div>
+        </div>
+      </div>
+      <div class="mt-2">
+        <label class="small-muted">Observación</label>
+        <textarea id="purchase-edit-note" class="input-pro mt-1" rows="2" maxlength="300" placeholder="Detalle adicional de la compra"></textarea>
+      </div>
+      <div class="invoice-box">
+        <div class="flex justify-between items-center gap-2">
+          <div class="invoice-box-title" style="margin:0">Productos protegidos</div>
+          <div id="purchase-edit-items-count" class="small-muted"></div>
+        </div>
+        <div id="purchase-edit-items" class="mt-2" style="max-height:220px;overflow:auto"></div>
+      </div>
+      <div class="flex gap-2 mt-3">
+        <button type="submit" class="btn-primary flex-1">Guardar corrección</button>
+        <button type="button" class="px-3 py-2 border rounded" onclick="closeModal('modal-purchase-edit')">Cancelar</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -3069,7 +3138,7 @@ function appendDailyControlSheets(wb, from = '', to = ''){
     ajustesManuales:Number(it.manualAdjustments||0), stockEsperado:Number(it.expected||0), conteoFisico:it.physical,
     diferencia:Number(it.difference||0), precioVenta:Number(it.price||0), faltanteSoles:it.difference < 0 ?Number((Math.abs(it.difference)*Number(it.price||0)).toFixed(2)):0
   })));
-  let stockAudit = (STATE.auditLogs||[]).filter(log => log && (log.source === 'PRODUCT' || log.source === 'STOCK_CONTROL'));
+  let stockAudit = (STATE.auditLogs||[]).filter(log => log && ['PRODUCT','STOCK_CONTROL','PURCHASE'].includes(log.source));
   if(from && to){
     const boundsStart = getLocalDayBounds(from).start;
     const boundsEnd = getLocalDayBounds(to).end;
@@ -3085,7 +3154,8 @@ function appendDailyControlSheets(wb, from = '', to = ''){
       producto:log.details?.productName||'', stockAntes:log.details?.stockBefore ??'', stockDespues:log.details?.stockAfter ??'',
       diferencia:log.details?.difference ??'', productosConDiferencia:log.details?.differenceCount ??'',
       faltanteValorizado:log.details?.shortageValue ??'', totalVentas:log.details?.salesTotal ??'',
-      diferenciaCaja:log.details?.cashDifference ??'', diferenciaYape:log.details?.yapeDifference ??''
+      diferenciaCaja:log.details?.cashDifference ??'', diferenciaYape:log.details?.yapeDifference ??'',
+      comprobante:log.details?.document||'', productosAgregados:log.details?.addedItems ??'', detalle:JSON.stringify(log.details||{})
     }));
   let stockMovements = buildStockMovementHistory(true);
   if(from && to){
@@ -3106,7 +3176,7 @@ function appendDailyControlSheets(wb, from = '', to = ''){
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(productRows.length ?productRows:[{ nota:'Sin productos vendidos en el periodo' }]), 'Ventas_Producto_Dia');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(closureRows.length ?closureRows:[{ nota:'Sin cierres de stock en el periodo' }]), 'Cierres_Stock');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRows.length ?detailRows:[{ nota:'Sin detalle de cierres en el periodo' }]), 'Detalle_Cierres');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stockAuditRows.length ?stockAuditRows:[{ nota:'Sin cambios manuales de stock en el periodo' }]), 'Auditoria_Stock');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stockAuditRows.length ?stockAuditRows:[{ nota:'Sin eventos de stock o compras en el periodo' }]), 'Auditoria_Stock');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stockMovementRows.length ?stockMovementRows:[{ nota:'Sin modificaciones manuales de stock en el periodo' }]), 'Cambios_Manual_Stock');
   appendShiftControlSheets(wb,from,to);
 }
@@ -4369,6 +4439,7 @@ function registerScanned(){
 const SCANNER = {
   stream: null,
   running: false,
+  context: 'auto',
   devices: [],
   index: 0,
   detector: null,
@@ -4408,6 +4479,12 @@ function resetPosSearchForScanner(){
   }
 }
 
+function scannerIsSaleContext(){
+  if(SCANNER.context === 'sale') return true;
+  if(SCANNER.context === 'stock') return false;
+  return !!$('#modal-sale')?.classList.contains('visible');
+}
+
 function scannerHandleScannedCode(rawCode, source = 'scanner'){
   const code = scannerNormalize(rawCode);
   if(!code) return false;
@@ -4431,6 +4508,11 @@ function scannerHandleScannedCode(rawCode, source = 'scanner'){
     window.stopScanner();
   }
   resetPosSearchForScanner();
+  if(scannerIsSaleContext()){
+    showToast(`Código no registrado: ${code}. No se agregó a la venta.`, 3000);
+    setTimeout(()=>$('#pos-search')?.focus(),60);
+    return false;
+  }
   requireStockAccess(()=>{
     openNewProductModal('',code);
     $('#p-name')?.focus();
@@ -4618,7 +4700,8 @@ window.switchScannerCamera = async function switchScannerCamera(){
   await window.restartScanner();
 };
 
-window.startScanner = async function startScanner(){
+window.startScanner = async function startScanner(context = 'auto'){
+  SCANNER.context = ['sale','stock'].includes(context) ?context:'auto';
   openModal('modal-scan');
   await window.restartScanner();
 };
@@ -5250,15 +5333,26 @@ function getSelectedPurchaseFromHistory(){
 function updatePurchaseHistoryModeUI(selectedPurchase = null){
   const title = $('#purchase-history-title');
   const actionBar = $('#purchase-history-action-bar');
-  const btn = $('#btn-purchase-use-add');
+  const viewActions = $('#purchase-history-view-actions');
+  const pickerButton = $('#btn-purchase-use-add');
+  const editButton = $('#btn-purchase-edit');
+  const addButton = $('#btn-purchase-add-products');
+  const note = $('#purchase-history-action-note');
   const isAdd = purchaseHistoryMode === 'add';
   if(title) title.textContent = isAdd ?'Seleccionar Factura para ADD+' : 'Boletas y Facturas Registradas';
-  if(actionBar) actionBar.classList.toggle('hidden', !isAdd);
-  if(btn){
+  if(actionBar) actionBar.classList.toggle('hidden', !selectedPurchase);
+  if(viewActions) viewActions.classList.toggle('hidden', isAdd || !selectedPurchase);
+  if(pickerButton){
     const label = selectedPurchase ?`${selectedPurchase.docType} ${selectedPurchase.docNumber}` : 'factura';
-    btn.textContent = isAdd ?`ADD+ cargar ${label}` : 'ADD+ cargar factura seleccionada';
-    btn.disabled = !isAdd || !selectedPurchase;
+    pickerButton.textContent = `ADD+ cargar ${label}`;
+    pickerButton.disabled = !isAdd || !selectedPurchase;
+    pickerButton.classList.toggle('hidden', !isAdd || !selectedPurchase);
   }
+  if(editButton) editButton.disabled = !selectedPurchase;
+  if(addButton) addButton.disabled = !selectedPurchase;
+  if(note) note.textContent = isAdd
+    ?'Selecciona el comprobante correcto. Los productos nuevos quedarán ligados a su número y aumentarán el stock.'
+    :'La edición no cambia cantidades ni stock ya registrado. Para productos faltantes usa ADD+.';
 }
 
 function buildPurchaseInvoiceHTML(purchase){
@@ -5406,6 +5500,109 @@ function openPurchaseHistoryModal(mode = 'view'){
   openModal('modal-purchase-history');
   safeCreateIcons();
 }
+
+function requestSelectedPurchaseEdit(){
+  const selected = getSelectedPurchaseFromHistory();
+  if(!selected) return alert('Selecciona una boleta o factura');
+  requireStockAccess(()=>openPurchaseEditModal(selected.id));
+}
+
+function requestSelectedPurchaseAdd(){
+  const selected = getSelectedPurchaseFromHistory();
+  if(!selected) return alert('Selecciona una boleta o factura');
+  requireStockAccess(()=>useSelectedPurchaseForAdd());
+}
+
+function openPurchaseEditModal(purchaseId){
+  const purchase = (STATE.purchases||[]).find(p=>p && !p.deleted && String(p.id||'')===String(purchaseId||''));
+  if(!purchase) return alert('No se encontró el comprobante seleccionado');
+  const view = normalizePurchaseForView(purchase);
+  purchaseHistorySelectedId = view.id;
+  $('#purchase-edit-id').value = view.id;
+  const type = String(view.docType||'').trim().toUpperCase();
+  const typeSelect = $('#purchase-edit-doc-type');
+  if(typeSelect) typeSelect.value = ['FACTURA','BOLETA','GUIA','OTRO'].includes(type) ?type:'OTRO';
+  $('#purchase-edit-doc-number').value = view.docNumber||'';
+  $('#purchase-edit-date').value = view.date||todayYMD();
+  $('#purchase-edit-supplier-name').value = view.supplierName||'';
+  $('#purchase-edit-supplier-ruc').value = String(view.supplierRuc||'').replace(/\D/g,'');
+  $('#purchase-edit-note').value = view.note||'';
+  $('#purchase-edit-items-count').textContent = `${view.items.length} producto(s) - S/ ${money(view.totalCost)}`;
+  $('#purchase-edit-items').innerHTML = view.items.map((item,index)=>`
+    <div class="purchase-row" style="cursor:default">
+      <div class="flex justify-between items-start gap-2">
+        <div><strong>${index+1}. ${escapeHtml(item.name||'Producto')}</strong><div class="small-muted">Cantidad protegida: ${formatStockQty(item.qty)} | Stock final registrado: ${item.stockAfter===null?'-':formatStockQty(item.stockAfter)}</div></div>
+        <div style="text-align:right"><div>Costo S/ ${money(item.costPrice)}</div><div class="small-muted">Venta S/ ${money(item.salePrice)}</div></div>
+      </div>
+    </div>
+  `).join('') || '<div class="small-muted">Sin productos registrados.</div>';
+  openModal('modal-purchase-edit');
+  safeCreateIcons();
+  setTimeout(()=>$('#purchase-edit-doc-number')?.focus(),40);
+}
+
+document.getElementById('form-purchase-edit')?.addEventListener('submit',event=>{
+  event.preventDefault();
+  ensureStateShape();
+  const id = ($('#purchase-edit-id')?.value||'').trim();
+  const purchase = (STATE.purchases||[]).find(p=>p && !p.deleted && String(p.id||'')===id);
+  if(!purchase) return alert('No se encontró el comprobante que deseas editar');
+
+  const docType = ($('#purchase-edit-doc-type')?.value||'OTRO').trim().toUpperCase();
+  const docNumber = ($('#purchase-edit-doc-number')?.value||'').trim();
+  const date = ($('#purchase-edit-date')?.value||'').trim();
+  const supplierName = ($('#purchase-edit-supplier-name')?.value||'').trim();
+  const supplierRuc = ($('#purchase-edit-supplier-ruc')?.value||'').replace(/\D/g,'');
+  const note = ($('#purchase-edit-note')?.value||'').trim();
+  if(!docNumber) return alert('Ingresa el número del comprobante');
+  if(!date) return alert('Selecciona la fecha del comprobante');
+  if(!supplierName) return alert('Ingresa el nombre del proveedor');
+  if(supplierRuc.length!==11) return alert('El RUC debe tener 11 dígitos');
+
+  const existingByRuc = (STATE.suppliers||[]).find(s=>!s.deleted && String(s.ruc||'')===supplierRuc) || null;
+  const currentSupplier = getSupplierById(purchase.supplierId);
+  const supplier = existingByRuc || currentSupplier || {id:uid(),createdAt:new Date().toISOString()};
+  const isNewSupplier = !(STATE.suppliers||[]).some(s=>String(s.id||'')===String(supplier.id||''));
+
+  const duplicate = (STATE.purchases||[]).find(other=>{
+    if(!other||other.deleted||String(other.id||'')===id) return false;
+    return String(other.supplierId||'')===String(supplier.id||'')
+      && String(other.docType||'').trim().toUpperCase()===docType
+      && String(other.docNumber||'').trim().toUpperCase()===docNumber.toUpperCase();
+  });
+  if(duplicate) return alert('Ya existe otro comprobante con ese proveedor, tipo y número');
+
+  const before = {
+    docType:purchase.docType||'',docNumber:purchase.docNumber||'',date:purchase.date||'',
+    supplierId:purchase.supplierId||'',supplierName:purchase.supplierName||purchase.supplier||'',
+    supplierRuc:purchase.supplierRuc||'',note:purchase.note||''
+  };
+  const now = new Date().toISOString();
+  supplier.name = supplierName;
+  supplier.ruc = supplierRuc;
+  supplier.updatedAt = now;
+  if(isNewSupplier) STATE.suppliers.unshift(supplier);
+  purchase.docType = docType;
+  purchase.docNumber = docNumber;
+  purchase.date = date;
+  purchase.supplierId = supplier.id;
+  purchase.supplierName = supplierName;
+  purchase.supplier = supplierName;
+  purchase.supplierRuc = supplierRuc;
+  purchase.note = note;
+  purchase.updatedAt = now;
+  purchase.updatedBy = getCurrentActor();
+  const after = {docType,docNumber,date,supplierId:supplier.id,supplierName,supplierRuc,note};
+  STATE.auditLogs.unshift({
+    id:uid(),ts:now,source:'PURCHASE',action:'EDIT_PURCHASE_HEADER',entity:'purchase',entityId:id,
+    actor:getCurrentActor(),note:`Datos corregidos: ${docType} ${docNumber}`,details:{before,after,stockChanged:false}
+  });
+  saveLocalBackup();
+  renderIngresoSupplierOptions(supplier.id);
+  renderPurchaseHistoryList();
+  closeModal('modal-purchase-edit');
+  showToast('Datos de la boleta actualizados sin cambiar el stock');
+});
 
 function clearIngresoAddMode(){
   ingresoTargetPurchaseId = '';
@@ -6558,6 +6755,18 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
       };
       STATE.purchases.unshift(ingreso);
     }
+
+    STATE.auditLogs.unshift({
+      id:uid(),ts:now,source:'PURCHASE',action:existingPurchase?'ADD_PURCHASE_ITEMS':'CREATE_PURCHASE',
+      entity:'purchase',entityId:purchaseId,actor:getCurrentActor(),
+      note:existingPurchase ?`Productos agregados a ${docType} ${docNumber}`:`Ingreso registrado: ${docType} ${docNumber}`,
+      details:{
+        document:`${docType} ${docNumber}`,supplier:supplier.name,supplierRuc:supplier.ruc||'',
+        addedItems:anchoredItems.length,addedTotal:Number(anchoredTotal.toFixed(2)),
+        products:anchoredItems.map(item=>({productId:item.productId,name:item.name,qty:item.qty,costPrice:item.costPrice,salePrice:item.salePrice})),
+        stockChanged:true,mode:existingPurchase?'ADD_PLUS':'NEW_PURCHASE'
+      }
+    });
 
     saveLocalBackup();
     renderInventoryList();
