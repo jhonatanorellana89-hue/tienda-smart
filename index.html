@@ -765,7 +765,7 @@
       <button onclick="requireStockAccess(openDailyStockControl)" class="px-3 rounded-xl border bg-amber-50 text-sm font-semibold text-amber-800 whitespace-nowrap">Control diario</button>
       <button onclick="requireStockAccess(openStockHistoryModal)" class="px-3 rounded-xl border bg-slate-900 text-sm font-semibold text-white whitespace-nowrap">Historial</button>
       <button onclick="openPurchaseHistoryModal()" class="px-3 rounded-xl border bg-white text-sm font-semibold text-sky-700 whitespace-nowrap">Boletas</button>
-      <button onclick="startScanner('stock')" class="bg-white p-3 rounded-xl border"><i data-lucide="scan-barcode" class="w-5 h-5 text-indigo-600"></i></button>
+      <button onclick="startScanner('sale')" class="bg-white p-3 rounded-xl border"><i data-lucide="scan-barcode" class="w-5 h-5 text-indigo-600"></i></button>
     </div>
     <div id="inventory-list" class="mt-4"></div>
   </main>
@@ -857,10 +857,11 @@
   <div class="modal-sheet">
     <div class="flex justify-between items-center mb-3">
       <h3 class="font-bold text-lg">Gestionar Producto</h3>
-      <button onclick="closeModal('modal-product')"><i data-lucide="x"></i></button>
+      <button type="button" onclick="cancelProductModal()"><i data-lucide="x"></i></button>
     </div>
 
     <form id="form-p">
+      <div id="p-scanner-banner" class="ing-add-banner hidden"></div>
       <input type="hidden" id="p-id">
       <input id="p-name" class="input-pro" placeholder="Nombre del producto" required>
       <div class="grid grid-cols-2 gap-2 mt-2">
@@ -4449,6 +4450,7 @@ const SCANNER = {
   frameCanvas: document.createElement('canvas'),
   readers: ["code_128_reader","ean_reader","ean_8_reader","upc_reader","upc_e_reader"]
 };
+let scannerPendingProductCode = '';
 
 function scannerNormalize(code){
   return String(code || '').trim().replace(/\s+/g, '');
@@ -4479,12 +4481,6 @@ function resetPosSearchForScanner(){
   }
 }
 
-function scannerIsSaleContext(){
-  if(SCANNER.context === 'sale') return true;
-  if(SCANNER.context === 'stock') return false;
-  return !!$('#modal-sale')?.classList.contains('visible');
-}
-
 function scannerHandleScannedCode(rawCode, source = 'scanner'){
   const code = scannerNormalize(rawCode);
   if(!code) return false;
@@ -4508,15 +4504,11 @@ function scannerHandleScannedCode(rawCode, source = 'scanner'){
     window.stopScanner();
   }
   resetPosSearchForScanner();
-  if(scannerIsSaleContext()){
-    showToast(`Código no registrado: ${code}. No se agregó a la venta.`, 3000);
-    setTimeout(()=>$('#pos-search')?.focus(),60);
-    return false;
-  }
   requireStockAccess(()=>{
-    openNewProductModal('',code);
+    scannerPendingProductCode = code;
+    openNewProductModal('',code,true);
     $('#p-name')?.focus();
-    showToast(`Código no registrado (${source}). Registrar producto.`);
+    showToast(`Código no registrado (${source}). Completa el producto en Stock.`,2600);
   });
   return false;
 }
@@ -6786,7 +6778,23 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
 /* =========
    PRODUCT CRUD
    ========= */
-function openNewProductModal(prefillName = '', prefillBarcode = ''){
+function clearScannerProductRegistration(){
+  scannerPendingProductCode = '';
+  const banner = $('#p-scanner-banner');
+  if(banner){
+    banner.innerHTML = '';
+    banner.classList.add('hidden');
+  }
+}
+
+function cancelProductModal(){
+  clearScannerProductRegistration();
+  closeModal('modal-product');
+}
+
+function openNewProductModal(prefillName = '', prefillBarcode = '', fromScanner = false){
+  if(fromScanner) scannerPendingProductCode = scannerNormalize(prefillBarcode);
+  else clearScannerProductRegistration();
   const form = $('#form-p');
   if(form) form.reset();
   $('#p-id').value = '';
@@ -6803,6 +6811,11 @@ function openNewProductModal(prefillName = '', prefillBarcode = ''){
   $('#p-stock-reason-wrap').classList.add('hidden');
   $('#p-stock-help').textContent = 'El motivo será obligatorio únicamente si cambias la cantidad.';
   $('#btn-delete-p').classList.add('hidden');
+  const banner = $('#p-scanner-banner');
+  if(banner && fromScanner){
+    banner.innerHTML = `<span><strong>Código nuevo detectado:</strong> ${escapeHtml(scannerPendingProductCode)}</span><span>Completa los datos para volver a Venta.</span>`;
+    banner.classList.remove('hidden');
+  }
   openModal('modal-product');
   setTimeout(()=>$('#p-name')?.focus(),40);
 }
@@ -6812,6 +6825,8 @@ document.getElementById('form-p')?.addEventListener('submit', async (e)=>{
   try{
     const id = $('#p-id').value || uid();
     const current = (STATE.products||[]).find(p => p.id === id) || null;
+    const enteredBarcode = $('#p-barcode').value.trim();
+    const createdFromScanner = !current && !!scannerPendingProductCode && scannerNormalize(enteredBarcode) === scannerNormalize(scannerPendingProductCode);
     const now = new Date().toISOString();
     const previousStock = Number(current?.stock || 0);
     const nextStock = current?.parentProductId ?previousStock:(Number($('#p-stock').value) || 0);
@@ -6833,7 +6848,7 @@ document.getElementById('form-p')?.addEventListener('submit', async (e)=>{
       ...(current || {}),
       id,
       name: productName,
-      barcode: $('#p-barcode').value.trim(),
+      barcode: enteredBarcode,
       category: $('#p-cat').value.trim(),
       costPrice: Number($('#p-cost').value) || 0,
       price: Number($('#p-price').value) || 0,
@@ -6854,9 +6869,22 @@ document.getElementById('form-p')?.addEventListener('submit', async (e)=>{
     if(current && Math.abs(stockDifference)>=1e-9) invalidateStockHistoryCache();
     saveLocalBackup();
     addPendingOp({ type: 'product', payload: prod });
-    showToast('Producto guardado (cola si offline)');
     renderInventoryList(); renderDashboard();
+    clearScannerProductRegistration();
     closeModal('modal-product');
+    if(createdFromScanner){
+      if(!$('#modal-sale')?.classList.contains('visible')) openModal('modal-sale');
+      if($('#modal-sale')?.classList.contains('visible') && getAvailableQtyForSale(prod)>0){
+        addToCart(prod);
+        showToast(`Producto registrado y agregado a la venta: ${prod.name}`,2600);
+      }else if(getAvailableQtyForSale(prod)<=0){
+        showToast(`Producto registrado sin stock: ${prod.name}`,2600);
+      }else{
+        showToast(`Producto registrado. Abre un turno para vender: ${prod.name}`,2600);
+      }
+    }else{
+      showToast('Producto guardado (cola si offline)');
+    }
     if(current && Math.abs(stockDifference)>=1e-9 && $('#modal-stock-history')?.classList.contains('visible')) refreshStockHistoryData(false);
   }catch(e){ console.error(e); alert('Error guardando producto: '+ (e.message||e)); }
 });
@@ -6867,6 +6895,7 @@ function editProduct(id){
 
 function editProductAuthorized(id){
   const p = (STATE.products||[]).find(x=> x.id === id && !x.deleted); if(!p) return alert('Producto no encontrado');
+  clearScannerProductRegistration();
   $('#p-id').value = p.id; $('#p-name').value = p.name; $('#p-barcode').value = p.barcode; $('#p-cat').value = p.category;
   $('#p-cost').value = p.costPrice||0; $('#p-price').value = p.price||0; $('#p-stock').value = p.stock||0;
   const linkedStock = !!p.parentProductId;
@@ -7532,5 +7561,7 @@ setInterval(()=> { try{ saveLocalBackup(); }catch(e){} }, 15000);
 </script>
 </body>
 </html>
+
+
 
 
