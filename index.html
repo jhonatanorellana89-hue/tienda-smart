@@ -2135,12 +2135,14 @@ function ensureStateShape(){
     if(!Array.isArray(c.salesSummary)) c.salesSummary = [];
   });
   (STATE.staff||[]).forEach(person => {
+    if(!person || typeof person!=='object') return;
     if(!person.id) person.id = 'PERSONAL-' + uid();
     person.name = String(person.name || '').trim();
     person.username = String(person.username || '').trim().toLowerCase();
     person.active = person.active !== false;
   });
   (STATE.shifts||[]).forEach(shift => {
+    if(!shift || typeof shift!=='object') return;
     if(!shift.id) shift.id = 'TURNO-' + uid();
     if(!shift.status) shift.status = shift.closedAt ?'CLOSED':'OPEN';
     if(!shift.openedAt) shift.openedAt = shift.createdAt || new Date().toISOString();
@@ -7865,7 +7867,7 @@ function getActiveShiftForCurrentUser(){
 
 function getShiftSales(shift){
   if(!shift) return [];
-  return (STATE.sales||[]).filter(s => !s.deleted && String(s.shiftId||'') === String(shift.id||''));
+  return (Array.isArray(STATE.sales)?STATE.sales:[]).filter(s => s && typeof s==='object' && !s.deleted && String(s.shiftId||'') === String(shift.id||''));
 }
 
 function calculateShiftSummary(shift){
@@ -7876,7 +7878,8 @@ function calculateShiftSummary(shift){
     const raw = String(sale.paymentType || sale.method || 'EFECTIVO').toUpperCase();
     const payment = Object.prototype.hasOwnProperty.call(payments,raw) ?raw:'OTROS';
     payments[payment] += Number(sale.total||0);
-    (sale.items||[]).forEach(it => {
+    const saleItems=Array.isArray(sale.items)?sale.items:[];
+    saleItems.filter(it=>it && typeof it==='object').forEach(it => {
       const product = getProductById(it.productId) || { name:it.rawName||it.productId||'Producto' };
       const key = String(it.productId || product.name);
       if(!products.has(key)) products.set(key,{ productId:it.productId||'', name:product.name||'Producto', qty:0, amount:0 });
@@ -8039,17 +8042,22 @@ function renderShiftHistory(){
   const box = $('#shift-history');
   if(!box) return;
   const staffId = getCurrentSessionStaffId();
-  let shifts = (STATE.shifts||[]).slice();
+  let shifts = (Array.isArray(STATE.shifts)?STATE.shifts:[]).filter(shift=>shift && typeof shift==='object').slice();
   if(!isAdminSession()) shifts = shifts.filter(s=>String(s.staffId||'')===staffId);
   shifts.sort((a,b)=>new Date(b.openedAt||0)-new Date(a.openedAt||0));
   box.innerHTML = shifts.slice(0,30).map(shift=>{
-    const open = shift.status==='OPEN';
-    const currentSummary = calculateShiftSummary(shift);
-    const closedTotal = Number(shift.salesTotal??currentSummary.total);
-    const postCloseChange = Number((currentSummary.total-closedTotal).toFixed(2));
-    const postCloseCashChange = Number((currentSummary.payments.EFECTIVO-Number(shift.paymentSummary?.EFECTIVO??currentSummary.payments.EFECTIVO)).toFixed(2));
-    const postCloseYapeChange = Number((currentSummary.payments.YAPE-Number(shift.paymentSummary?.YAPE??currentSummary.payments.YAPE)).toFixed(2));
-    return `<div class="daily-history-row"><div class="flex justify-between gap-2"><strong>${escapeHtml(shift.staffName||shift.username||'Personal')}</strong><span class="staff-badge ${open?'':'off'}">${open?'ABIERTO':'CERRADO'}</span></div><div class="small-muted">Apertura: ${new Date(shift.openedAt||0).toLocaleString()}${shift.closedAt?` · Cierre: ${new Date(shift.closedAt).toLocaleString()}`:''}</div><div class="small-muted">Ventas: ${currentSummary.sales.length} · Total actual S/ ${money(currentSummary.total)}${!open?` · Dif. caja S/ ${money(shift.cashDifference||0)} · Dif. Yape S/ ${money(shift.yapeDifference||0)}`:''}</div>${!open&&(Math.abs(postCloseChange)>=0.01||Math.abs(postCloseCashChange)>=0.01||Math.abs(postCloseYapeChange)>=0.01)?`<div class="daily-diff-bad small-muted">ALERTA POST-CIERRE: total ${money(postCloseChange)}, efectivo ${money(postCloseCashChange)}, Yape ${money(postCloseYapeChange)}.</div>`:''}</div>`;
+    try{
+      const open = shift.status==='OPEN';
+      const currentSummary = calculateShiftSummary(shift);
+      const closedTotal = Number(shift.salesTotal??currentSummary.total);
+      const postCloseChange = Number((currentSummary.total-closedTotal).toFixed(2));
+      const postCloseCashChange = Number((currentSummary.payments.EFECTIVO-Number(shift.paymentSummary?.EFECTIVO??currentSummary.payments.EFECTIVO)).toFixed(2));
+      const postCloseYapeChange = Number((currentSummary.payments.YAPE-Number(shift.paymentSummary?.YAPE??currentSummary.payments.YAPE)).toFixed(2));
+      return `<div class="daily-history-row"><div class="flex justify-between gap-2"><strong>${escapeHtml(shift.staffName||shift.username||'Personal')}</strong><span class="staff-badge ${open?'':'off'}">${open?'ABIERTO':'CERRADO'}</span></div><div class="small-muted">Apertura: ${new Date(shift.openedAt||0).toLocaleString()}${shift.closedAt?` · Cierre: ${new Date(shift.closedAt).toLocaleString()}`:''}</div><div class="small-muted">Ventas: ${currentSummary.sales.length} · Total actual S/ ${money(currentSummary.total)}${!open?` · Dif. caja S/ ${money(shift.cashDifference||0)} · Dif. Yape S/ ${money(shift.yapeDifference||0)}`:''}</div>${!open&&(Math.abs(postCloseChange)>=0.01||Math.abs(postCloseCashChange)>=0.01||Math.abs(postCloseYapeChange)>=0.01)?`<div class="daily-diff-bad small-muted">ALERTA POST-CIERRE: total ${money(postCloseChange)}, efectivo ${money(postCloseCashChange)}, Yape ${money(postCloseYapeChange)}.</div>`:''}</div>`;
+    }catch(error){
+      console.warn('Turno histórico omitido por datos incompletos',shift?.id,error);
+      return `<div class="daily-history-row"><strong>${escapeHtml(shift.staffName||shift.username||'Turno anterior')}</strong><div class="small-muted text-amber-700">Registro antiguo incompleto. No afecta los turnos actuales.</div></div>`;
+    }
   }).join('') || '<div class="small-muted mt-2">No hay turnos registrados.</div>';
 }
 
@@ -8099,7 +8107,11 @@ function renderShiftModal(){
     const productRows = summary.products.map(row=>`<tr><td>${escapeHtml(row.name)}</td><td style="text-align:right">${formatStockQty(row.qty)}</td><td style="text-align:right">S/ ${money(row.amount)}</td></tr>`).join('');
     content.innerHTML = `<div class="shift-summary-grid"><div class="shift-summary-card"><span class="small-muted">Ventas</span><strong>${summary.sales.length}</strong></div><div class="shift-summary-card"><span class="small-muted">Total vendido</span><strong>S/ ${money(summary.total)}</strong></div><div class="shift-summary-card"><span class="small-muted">Efectivo ventas</span><strong>S/ ${money(summary.payments.EFECTIVO)}</strong></div><div class="shift-summary-card"><span class="small-muted">Caja esperada</span><strong>S/ ${money(summary.expectedCash)}</strong></div><div class="shift-summary-card"><span class="small-muted">Yape</span><strong>S/ ${money(summary.payments.YAPE)}</strong></div><div class="shift-summary-card"><span class="small-muted">Crédito</span><strong>S/ ${money(summary.payments.A_CREDITO)}</strong></div></div><div class="card mt-3"><div class="font-bold mb-2">Productos vendidos en el turno</div><div class="daily-table-wrap"><table class="daily-table"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Importe</th></tr></thead><tbody>${productRows||'<tr><td colspan="3" class="small-muted">Todavía no hay ventas.</td></tr>'}</tbody></table></div></div><div class="card"><div class="font-bold">Cerrar turno</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2"><div><label class="small-muted">Efectivo contado</label><input id="shift-actual-cash" type="number" min="0" step="0.01" class="input-pro mt-1" placeholder="0.00"></div><div><label class="small-muted">Yape verificado</label><input id="shift-actual-yape" type="number" min="0" step="0.01" class="input-pro mt-1" placeholder="0.00"></div></div><div class="mt-2"><label class="small-muted">Observación</label><textarea id="shift-close-note" class="input-pro mt-1" rows="2" placeholder="Obligatoria si existe diferencia"></textarea></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3"><button type="button" onclick="closeCurrentShift(false)" class="btn-primary">CERRAR TURNO</button><button type="button" onclick="closeCurrentShift(true)" class="px-3 py-2 border rounded">CERRAR Y SALIR</button></div></div>`;
   }
-  renderShiftHistory();
+  try{ renderShiftHistory(); }
+  catch(error){
+    console.warn('No se pudo mostrar el historial de turnos',error);
+    if($('#shift-history')) $('#shift-history').innerHTML='<div class="small-muted mt-2">El historial antiguo contiene un registro incompleto. Los turnos actuales siguen disponibles arriba.</div>';
+  }
 }
 
 function selectOpenShiftForResume(shiftId,focusPin=true){
@@ -8592,11 +8604,5 @@ setInterval(()=> { try{ saveLocalBackup(); }catch(e){} }, 15000);
 </script>
 </body>
 </html>
-
-
-
-
-
-
 
 

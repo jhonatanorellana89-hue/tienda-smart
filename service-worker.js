@@ -1,6 +1,6 @@
 ﻿'use strict';
 
-const CACHE_NAME = 'tiendasmart-github-v1';
+const CACHE_NAME = 'tiendasmart-github-v3';
 const APP_SHELL = [
   './',
   './index.html',
