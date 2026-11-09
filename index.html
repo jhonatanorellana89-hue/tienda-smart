@@ -928,6 +928,52 @@
     color:#64748b;
     box-shadow:none;
   }
+  .shift-resume-panel{
+    border:1px solid #fdba74;
+    border-radius:16px;
+    padding:14px;
+    background:linear-gradient(180deg,#fff7ed,#fff);
+    box-shadow:0 10px 24px rgba(230,81,0,.08);
+  }
+  .shift-flow-title{display:flex;align-items:center;gap:9px;font-weight:900;color:#7c2d12}
+  .shift-flow-icon{width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex:0 0 34px;border-radius:10px;background:#e65100;color:#fff}
+  .shift-flow-icon svg{width:18px;height:18px}
+  .shift-open-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+  .shift-open-card{
+    width:100%;
+    min-width:0;
+    padding:11px;
+    border:1px solid #e5e7eb;
+    border-radius:13px;
+    background:#fff;
+    color:#334155;
+    text-align:left;
+  }
+  .shift-open-card:hover{border-color:#fb923c;background:#fffaf5}
+  .shift-open-card.selected{border-color:#e65100;background:#fff0e5;box-shadow:0 0 0 2px rgba(230,81,0,.13)}
+  .shift-open-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .shift-open-card-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:900;color:#172033}
+  .shift-open-pill{padding:3px 7px;border-radius:999px;background:#dcfce7;color:#166534;font-size:9px;font-weight:900}
+  .shift-open-meta{margin-top:6px;color:#64748b;font-size:11px;line-height:1.45}
+  .shift-open-kpis{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+  .shift-open-kpis span{padding:4px 7px;border-radius:8px;background:#f8fafc;color:#475569;font-size:10px;font-weight:800}
+  .shift-open-card.selected .shift-open-kpis span{background:#fff}
+  .shift-resume-form{margin-top:10px;padding:11px;border:1px dashed #fb923c;border-radius:13px;background:#fff}
+  .shift-resume-selected{margin-bottom:8px;color:#9a3412;font-size:12px;font-weight:800}
+  .shift-resume-grid{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+  .shift-resume-error{margin-top:7px;color:#b91c1c;font-size:11px;font-weight:700}
+  .shift-new-details{margin-top:12px;border:1px solid #e2e8f0;border-radius:15px;background:#fff;overflow:hidden}
+  .shift-new-details>summary{display:flex;align-items:center;gap:8px;padding:13px;cursor:pointer;color:#334155;font-size:13px;font-weight:900;list-style:none}
+  .shift-new-details>summary::-webkit-details-marker{display:none}
+  .shift-new-details>summary:after{content:'+';margin-left:auto;color:#e65100;font-size:20px;line-height:1}
+  .shift-new-details[open]>summary:after{content:'−'}
+  .shift-new-body{padding:0 13px 13px}
+  .shift-no-new{padding:12px;border-radius:12px;background:#f8fafc;color:#64748b;font-size:12px}
+  @media(max-width:640px){
+    .shift-open-list{grid-template-columns:1fr}
+    .shift-resume-grid{grid-template-columns:1fr}
+    .shift-resume-grid .btn-primary{width:100%}
+  }
 </style>
 </head>
 <body>
@@ -1659,7 +1705,7 @@
     </div>
     <div id="shift-modal-content"></div>
     <div class="card mt-3">
-      <div class="font-bold">Últimos turnos</div>
+      <div class="font-bold">Historial reciente</div>
       <div id="shift-history" style="max-height:220px;overflow:auto"></div>
     </div>
   </div>
@@ -2032,6 +2078,7 @@ const PENDING_KEY = 'tienda_pending_ops_v1';
 const LOCAL_BACKUP_KEY = 'tienda_local_backup_v1';
 const LOCAL_BACKUP_PREV_KEY = 'tienda_local_backup_v1_prev';
 const ACTIVE_SHIFT_KEY = 'tienda_active_shift_id_v1';
+const ACTIVE_SHIFT_UNLOCK_KEY = 'tienda_active_shift_unlocked_v1';
 const WORK_MODE_KEY = 'tienda_work_mode_v1';
 const DEVICE_ID_KEY = 'tienda_device_id_v1';
 const LAST_SYNC_KEY = 'tienda_last_sync_v1';
@@ -7779,6 +7826,23 @@ function getCurrentSessionName(){
   return (localStorage.getItem('auth_name') || localStorage.getItem('auth_user') || 'USUARIO').trim();
 }
 
+function getUnlockedShiftId(){
+  try{ return (sessionStorage.getItem(ACTIVE_SHIFT_UNLOCK_KEY)||'').trim(); }
+  catch(e){ return ''; }
+}
+
+function activateShiftLocally(shiftId){
+  const id=String(shiftId||'').trim();
+  if(!id) return;
+  localStorage.setItem(ACTIVE_SHIFT_KEY,id);
+  try{ sessionStorage.setItem(ACTIVE_SHIFT_UNLOCK_KEY,id); }catch(e){}
+}
+
+function clearActiveShiftUnlock(removeSelection=true){
+  if(removeSelection) localStorage.removeItem(ACTIVE_SHIFT_KEY);
+  try{ sessionStorage.removeItem(ACTIVE_SHIFT_UNLOCK_KEY); }catch(e){}
+}
+
 function enforceCurrentStaffAccess(){
   if(isAdminSession() || !localStorage.getItem('auth_token')) return;
   const staffId = getCurrentSessionStaffId();
@@ -7792,18 +7856,10 @@ function getActiveShiftForCurrentUser(){
   const selectedShiftId = (localStorage.getItem(ACTIVE_SHIFT_KEY) || '').trim();
   if(selectedShiftId){
     const selectedShift = (STATE.shifts||[]).find(shift => shift && shift.status === 'OPEN' && String(shift.id||'') === selectedShiftId);
-    if(selectedShift) return selectedShift;
-    localStorage.removeItem(ACTIVE_SHIFT_KEY);
+    if(selectedShift && getUnlockedShiftId()===selectedShiftId) return selectedShift;
+    if(!selectedShift) clearActiveShiftUnlock(true);
   }
-
-  // Al volver a ingresar, una trabajadora recupera solamente su propio turno abierto.
-  const staffId = getCurrentSessionStaffId();
-  if(!staffId || isAdminSession()) return null;
-  const ownShift = (STATE.shifts||[])
-    .filter(shift => shift && shift.status === 'OPEN' && String(shift.staffId||'') === staffId)
-    .sort((a,b)=>new Date(b.openedAt||0)-new Date(a.openedAt||0))[0] || null;
-  if(ownShift) localStorage.setItem(ACTIVE_SHIFT_KEY,String(ownShift.id));
-  return ownShift;
+  return null;
 }
 
 function getShiftSales(shift){
@@ -8001,19 +8057,41 @@ function renderShiftModal(){
   const active = getActiveShiftForCurrentUser();
   const subtitle = $('#shift-modal-subtitle');
   const content = $('#shift-modal-content');
-  if(subtitle) subtitle.textContent = active ?`${active.staffName||active.username||'Personal'} · abierto ${new Date(active.openedAt).toLocaleString()}`:'Selecciona quién estará a cargo de caja';
+  if(subtitle) subtitle.textContent = active ?`${active.staffName||active.username||'Personal'} · abierto ${new Date(active.openedAt).toLocaleString()}`:'Retoma un turno pendiente o abre uno nuevo';
   if(!content) return;
   if(!active){
     const staff = (STATE.staff||[])
       .filter(person=>person && !person.deleted && person.active!==false)
       .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'es',{sensitivity:'base'}));
+    const openShifts = (STATE.shifts||[])
+      .filter(shift=>shift && shift.status==='OPEN')
+      .sort((a,b)=>new Date(b.openedAt||0)-new Date(a.openedAt||0));
+    const openStaffIds = new Set(openShifts.map(shift=>String(shift.staffId||'')));
+    const availableStaff = staff.filter(person=>!openStaffIds.has(String(person.id||'')));
+    const selectedBefore = (localStorage.getItem(ACTIVE_SHIFT_KEY)||'').trim();
+    const ownStaffId = getCurrentSessionStaffId();
+    const preferredShift = openShifts.find(shift=>String(shift.id||'')===selectedBefore)
+      || openShifts.find(shift=>String(shift.staffId||'')===ownStaffId)
+      || openShifts[0]
+      || null;
+    const openCards = openShifts.map(shift=>{
+      const summary = calculateShiftSummary(shift);
+      const opened = new Date(shift.openedAt||0);
+      const anotherDevice = shift.deviceId && shift.deviceId!==getDeviceId();
+      return `<button type="button" class="shift-open-card" data-resume-shift-id="${escapeAttr(shift.id)}" onclick="selectOpenShiftForResume('${escapeAttr(shift.id)}')"><div class="shift-open-card-head"><span class="shift-open-card-name">${escapeHtml(shift.staffName||shift.username||'Personal')}</span><span class="shift-open-pill">ABIERTO</span></div><div class="shift-open-meta">Desde ${opened.toLocaleString()}${anotherDevice?' · Otro equipo':''}</div><div class="shift-open-kpis"><span>${summary.sales.length} venta${summary.sales.length===1?'':'s'}</span><span>S/ ${money(summary.total)}</span><span>Fondo S/ ${money(shift.openingCash)}</span></div></button>`;
+    }).join('');
+    const resumePanel = openShifts.length ?`<section class="shift-resume-panel"><div class="shift-flow-title"><span class="shift-flow-icon"><i data-lucide="history"></i></span><div><div>Retomar turno abierto</div><div class="small-muted">Selecciona el turno y confirma el PIN de esa persona.</div></div></div><div class="shift-open-list">${openCards}</div><div class="shift-resume-form"><input id="shift-resume-id" type="hidden"><div id="shift-resume-selected" class="shift-resume-selected">Selecciona un turno</div><div class="shift-resume-grid"><div><label class="small-muted">PIN o contraseña de la trabajadora</label><input id="shift-resume-pin" type="password" class="input-pro mt-1" placeholder="Ingresa su PIN" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();resumeSelectedOpenShift();}"></div><button id="btn-resume-shift" type="button" onclick="resumeSelectedOpenShift()" class="btn-primary">RETOMAR TURNO</button></div><div id="shift-resume-error" class="shift-resume-error hidden"></div></div></section>`
+      :`<div class="card"><div class="font-bold">No hay turnos pendientes</div><div class="small-muted mt-1">Puedes abrir un turno nuevo para comenzar a vender.</div></div>`;
     if(!staff.length){
-      content.innerHTML = `<div class="card"><div class="font-bold">No hay personal activo</div><div class="small-muted mt-1">Primero registra a las trabajadoras y crea el PIN de cada una desde el botón PERSONAL.</div></div>`;
+      content.innerHTML = resumePanel + `<div class="card mt-3"><div class="font-bold">No hay personal activo</div><div class="small-muted mt-1">Primero registra a las trabajadoras y crea el PIN de cada una desde PERSONAL.</div></div>`;
     }else{
       const sessionStaffId = getCurrentSessionStaffId();
-      const options = staff.map(person=>`<option value="${escapeAttr(person.id)}" ${String(person.id)===sessionStaffId?'selected':''}>${escapeHtml(person.name||'Sin nombre')} · @${escapeHtml(person.username||'usuario')}</option>`).join('');
-      content.innerHTML = `<div class="card"><div class="font-bold">Abrir turno de caja</div><div class="small-muted mt-1">La persona elegida debe confirmar el inicio con el PIN creado en PERSONAL.</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3"><div><label class="small-muted">Persona que inicia el turno</label><select id="shift-staff-id" class="input-pro mt-1" onchange="updateShiftOpeningHint()">${options}</select></div><div><label class="small-muted">PIN personal</label><input id="shift-staff-pin" type="password" class="input-pro mt-1" placeholder="Ingresa su PIN" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();openCurrentShift();}"></div></div><div class="mt-3"><label class="small-muted">Fondo inicial de caja</label><input id="shift-opening-cash" type="number" min="0" step="0.01" value="0.00" class="input-pro mt-1"></div><div id="shift-opening-hint" class="small-muted mt-2"></div><button id="btn-confirm-open-shift" type="button" onclick="openCurrentShift()" class="btn-primary w-full mt-3">VALIDAR PIN Y ABRIR TURNO</button></div>`;
-      setTimeout(updateShiftOpeningHint,0);
+      const options = availableStaff.map(person=>`<option value="${escapeAttr(person.id)}" ${String(person.id)===sessionStaffId?'selected':''}>${escapeHtml(person.name||'Sin nombre')} · @${escapeHtml(person.username||'usuario')}</option>`).join('');
+      const newShiftBody = availableStaff.length ?`<div class="shift-new-body"><div class="small-muted">Solo aparece el personal que no tiene otro turno abierto.</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3"><div><label class="small-muted">Persona que inicia el turno</label><select id="shift-staff-id" class="input-pro mt-1" onchange="updateShiftOpeningHint()">${options}</select></div><div><label class="small-muted">PIN personal</label><input id="shift-staff-pin" type="password" class="input-pro mt-1" placeholder="Ingresa su PIN" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();openCurrentShift();}"></div></div><div class="mt-3"><label class="small-muted">Fondo inicial de caja</label><input id="shift-opening-cash" type="number" min="0" step="0.01" value="0.00" class="input-pro mt-1"></div><div id="shift-opening-hint" class="small-muted mt-2"></div><button id="btn-confirm-open-shift" type="button" onclick="openCurrentShift()" class="btn-primary w-full mt-3">VALIDAR PIN Y ABRIR TURNO</button></div>`
+        :`<div class="shift-new-body"><div class="shift-no-new">Todo el personal activo ya tiene un turno abierto. Selecciona uno arriba para retomarlo.</div></div>`;
+      content.innerHTML = resumePanel + `<details class="shift-new-details" ${openShifts.length?'':'open'}><summary><i data-lucide="circle-plus" class="w-4 h-4 text-orange-600"></i>Abrir un turno nuevo</summary>${newShiftBody}</details>`;
+      if(availableStaff.length) setTimeout(()=>updateShiftOpeningHint(!openShifts.length),0);
+      if(preferredShift) setTimeout(()=>selectOpenShiftForResume(preferredShift.id,false),0);
     }
   }else{
     const summary = calculateShiftSummary(active);
@@ -8021,6 +8099,24 @@ function renderShiftModal(){
     content.innerHTML = `<div class="shift-summary-grid"><div class="shift-summary-card"><span class="small-muted">Ventas</span><strong>${summary.sales.length}</strong></div><div class="shift-summary-card"><span class="small-muted">Total vendido</span><strong>S/ ${money(summary.total)}</strong></div><div class="shift-summary-card"><span class="small-muted">Efectivo ventas</span><strong>S/ ${money(summary.payments.EFECTIVO)}</strong></div><div class="shift-summary-card"><span class="small-muted">Caja esperada</span><strong>S/ ${money(summary.expectedCash)}</strong></div><div class="shift-summary-card"><span class="small-muted">Yape</span><strong>S/ ${money(summary.payments.YAPE)}</strong></div><div class="shift-summary-card"><span class="small-muted">Crédito</span><strong>S/ ${money(summary.payments.A_CREDITO)}</strong></div></div><div class="card mt-3"><div class="font-bold mb-2">Productos vendidos en el turno</div><div class="daily-table-wrap"><table class="daily-table"><thead><tr><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Importe</th></tr></thead><tbody>${productRows||'<tr><td colspan="3" class="small-muted">Todavía no hay ventas.</td></tr>'}</tbody></table></div></div><div class="card"><div class="font-bold">Cerrar turno</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2"><div><label class="small-muted">Efectivo contado</label><input id="shift-actual-cash" type="number" min="0" step="0.01" class="input-pro mt-1" placeholder="0.00"></div><div><label class="small-muted">Yape verificado</label><input id="shift-actual-yape" type="number" min="0" step="0.01" class="input-pro mt-1" placeholder="0.00"></div></div><div class="mt-2"><label class="small-muted">Observación</label><textarea id="shift-close-note" class="input-pro mt-1" rows="2" placeholder="Obligatoria si existe diferencia"></textarea></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3"><button type="button" onclick="closeCurrentShift(false)" class="btn-primary">CERRAR TURNO</button><button type="button" onclick="closeCurrentShift(true)" class="px-3 py-2 border rounded">CERRAR Y SALIR</button></div></div>`;
   }
   renderShiftHistory();
+}
+
+function selectOpenShiftForResume(shiftId,focusPin=true){
+  const shift = (STATE.shifts||[]).find(item=>item && item.status==='OPEN' && String(item.id||'')===String(shiftId||''));
+  if(!shift) return;
+  if($('#shift-resume-id')) $('#shift-resume-id').value=String(shift.id);
+  if($('#shift-resume-selected')) $('#shift-resume-selected').textContent=`Turno seleccionado: ${shift.staffName||shift.username||'Personal'}`;
+  $$('.shift-open-card').forEach(card=>card.classList.toggle('selected',String(card.dataset.resumeShiftId||'')===String(shift.id)));
+  const error=$('#shift-resume-error');
+  if(error){ error.textContent=''; error.classList.add('hidden'); }
+  const pin=$('#shift-resume-pin');
+  if(pin){ pin.value=''; if(focusPin) setTimeout(()=>pin.focus(),0); }
+}
+
+function showShiftResumeError(message){
+  const error=$('#shift-resume-error');
+  if(error){ error.textContent=message; error.classList.remove('hidden'); }
+  else alert(message);
 }
 
 function openShiftModal(){
@@ -8034,7 +8130,7 @@ function getSelectedShiftPerson(){
   return (STATE.staff||[]).find(person=>!person.deleted && String(person.id||'')===staffId && person.active!==false) || null;
 }
 
-function updateShiftOpeningHint(){
+function updateShiftOpeningHint(focusPin=true){
   const person = getSelectedShiftPerson();
   const hint = $('#shift-opening-hint');
   const openingCash = $('#shift-opening-cash');
@@ -8054,8 +8150,73 @@ function updateShiftOpeningHint(){
     hint.textContent = 'El fondo inicial se registra una sola vez al abrir este turno.';
     button.textContent = 'VALIDAR PIN Y ABRIR TURNO';
   }
-  $('#shift-staff-pin').value = '';
-  $('#shift-staff-pin').focus();
+  const pin=$('#shift-staff-pin');
+  if(pin){ pin.value=''; if(focusPin) pin.focus(); }
+}
+
+function attachOpenShiftToCurrentSession(existing,person){
+  if(!existing || existing.status!=='OPEN' || !person) return false;
+  const previousDeviceId=existing.deviceId||'';
+  const anotherDevice=previousDeviceId && previousDeviceId!==getDeviceId();
+  if(anotherDevice){
+    const continueRemote=confirm('Este turno figura abierto en otro equipo. ¿Deseas asumirlo aquí sin crear uno nuevo? La acción quedará auditada.');
+    if(!continueRemote) return false;
+  }
+  const now=new Date().toISOString();
+  if(anotherDevice){
+    const conflict={id:`SHIFT-DEVICE-${existing.id}-${getDeviceId()}`,type:'SHIFT_OTHER_DEVICE',shiftId:existing.id,staffId:person.id,previousDeviceId,currentDeviceId:getDeviceId(),status:'OPEN',createdAt:now};
+    if(!(STATE.syncConflicts||[]).some(item=>item.id===conflict.id)) STATE.syncConflicts.unshift(conflict);
+    addPendingOp({id:`CONFLICT-${conflict.id}`,type:'syncConflict',payload:conflict,silent:true});
+    existing.previousDeviceId=previousDeviceId;
+  }
+  existing.deviceId=getDeviceId();
+  existing.deviceLabel=navigator.userAgent.slice(0,120);
+  existing.lastResumedAt=now;
+  existing.lastResumedBy=getCurrentActor();
+  existing.resumeCount=Number(existing.resumeCount||0)+1;
+  existing.updatedAt=now;
+  existing.syncStatus='PENDING';
+  STATE.auditLogs.unshift({
+    id:uid(),ts:now,source:'SHIFT',action:anotherDevice?'TAKEOVER_SHIFT':'RESUME_SHIFT',entity:'shift',entityId:existing.id,
+    actor:getCurrentActor(),note:`Turno de ${person.name} retomado${anotherDevice?' desde otro equipo':''}`,
+    details:{staffId:person.id,staffName:person.name,previousDeviceId,currentDeviceId:getDeviceId(),resumeCount:existing.resumeCount}
+  });
+  activateShiftLocally(existing.id);
+  saveLocalBackup();
+  addPendingOp({id:`SHIFT-RESUME-${existing.id}-${now}`,type:'shift',payload:{...existing},silent:true});
+  processPendingOps();
+  updateShiftUI();
+  renderShiftModal();
+  safeCreateIcons();
+  showToast(`Turno de ${person.name} recuperado`);
+  return true;
+}
+
+async function resumeSelectedOpenShift(){
+  if(getActiveShiftForCurrentUser()) return showShiftResumeError('Ya hay un turno activo en este equipo.');
+  const shiftId=($('#shift-resume-id')?.value||'').trim();
+  const existing=(STATE.shifts||[]).find(shift=>shift && shift.status==='OPEN' && String(shift.id||'')===shiftId);
+  if(!existing) return showShiftResumeError('Selecciona un turno abierto de la lista.');
+  const person=(STATE.staff||[]).find(item=>item && !item.deleted && item.active!==false && String(item.id||'')===String(existing.staffId||''));
+  if(!person) return showShiftResumeError('La trabajadora de este turno no está activa. Revisa PERSONAL.');
+  const pinInput=$('#shift-resume-pin');
+  const pin=(pinInput?.value||'').trim();
+  if(!pin){ pinInput?.focus(); return showShiftResumeError('Ingresa el PIN de la trabajadora seleccionada.'); }
+  if(shiftOpeningInProgress) return;
+  shiftOpeningInProgress=true;
+  const button=$('#btn-resume-shift');
+  if(button) button.disabled=true;
+  let validPin=false;
+  try{ validPin=await verifyStaffSecret(person,pin); }
+  finally{
+    shiftOpeningInProgress=false;
+    if(button?.isConnected) button.disabled=false;
+  }
+  if(!person.passwordHash || !validPin){
+    if(pinInput){ pinInput.value=''; pinInput.focus(); }
+    return showShiftResumeError('PIN incorrecto. Verifica el PIN de la trabajadora.');
+  }
+  attachOpenShiftToCurrentSession(existing,person);
 }
 
 async function openCurrentShift(){
@@ -8084,25 +8245,7 @@ async function openCurrentShift(){
     .filter(shift=>shift && shift.status==='OPEN' && String(shift.staffId||'')===String(person.id||''))
     .sort((a,b)=>new Date(b.openedAt||0)-new Date(a.openedAt||0))[0] || null;
   if(existing){
-    if(existing.deviceId && existing.deviceId!==getDeviceId()){
-      const continueRemote=confirm('Este turno figura abierto en otro equipo. ¿Deseas asumirlo en este equipo sin crear uno nuevo? Esta acción quedará auditada.');
-      if(!continueRemote) return;
-      const now=new Date().toISOString();
-      const conflict={id:`SHIFT-DEVICE-${existing.id}-${getDeviceId()}`,type:'SHIFT_OTHER_DEVICE',shiftId:existing.id,staffId:person.id,previousDeviceId:existing.deviceId,currentDeviceId:getDeviceId(),status:'OPEN',createdAt:now};
-      if(!(STATE.syncConflicts||[]).some(item=>item.id===conflict.id)) STATE.syncConflicts.unshift(conflict);
-      existing.previousDeviceId=existing.deviceId;
-      existing.deviceId=getDeviceId();
-      existing.deviceLabel=navigator.userAgent.slice(0,120);
-      existing.updatedAt=now;
-      existing.syncStatus='PENDING';
-      addPendingOp({id:`CONFLICT-${conflict.id}`,type:'syncConflict',payload:conflict,silent:true});
-      addPendingOp({id:`SHIFT-TAKEOVER-${existing.id}-${now}`,type:'shift',payload:{...existing},silent:true});
-      saveLocalBackup();
-    }
-    localStorage.setItem(ACTIVE_SHIFT_KEY,String(existing.id));
-    updateShiftUI();
-    renderShiftModal();
-    showToast(`Turno de ${person.name} recuperado`);
+    attachOpenShiftToCurrentSession(existing,person);
     return;
   }
   const openingCash = Number($('#shift-opening-cash')?.value||0);
@@ -8114,7 +8257,7 @@ async function openCurrentShift(){
     deviceId:getDeviceId(),deviceLabel:navigator.userAgent.slice(0,120),syncStatus:'PENDING'
   };
   STATE.shifts.unshift(shift);
-  localStorage.setItem(ACTIVE_SHIFT_KEY,String(shift.id));
+  activateShiftLocally(shift.id);
   STATE.auditLogs.unshift({id:uid(),ts:now,source:'SHIFT',action:'OPEN_SHIFT',entity:'shift',entityId:shift.id,actor:getCurrentActor(),note:`Turno de ${shift.staffName} abierto con S/ ${money(openingCash)}`,details:{staffId:shift.staffId,staffName:shift.staffName,openingCash:shift.openingCash}});
   saveLocalBackup();
   addPendingOp({type:'shift',payload:shift,silent:true});
@@ -8146,7 +8289,7 @@ function closeCurrentShift(exitAfter = false){
     salesCount:summary.sales.length, salesTotal:Number(summary.total.toFixed(2)), paymentSummary:{...summary.payments}, productsSummary:summary.products, closeNote:note, closedBy:getCurrentActor()
   });
   STATE.auditLogs.unshift({id:uid(),ts:now,source:'SHIFT',action:'CLOSE_SHIFT',entity:'shift',entityId:shift.id,actor:getCurrentActor(),note:`Turno cerrado. Caja dif. S/ ${money(cashDifference)}`,details:{staffId:shift.staffId,staffName:shift.staffName,salesTotal:shift.salesTotal,cashDifference,yapeDifference}});
-  localStorage.removeItem(ACTIVE_SHIFT_KEY);
+  clearActiveShiftUnlock(true);
   saveLocalBackup();
   addPendingOp({type:'shift',payload:shift,silent:true});
   processPendingOps();
@@ -8232,6 +8375,7 @@ $('#btn-login')?.addEventListener('click', async ()=> {
 
 function performLogout(){
   ['auth_token','auth_user','auth_name','auth_role','auth_staff_id',ACTIVE_SHIFT_KEY].forEach(key=>localStorage.removeItem(key));
+  clearActiveShiftUnlock(false);
   location.reload();
 }
 
@@ -8419,6 +8563,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     });
   }else{
     ['auth_token','auth_user','auth_name','auth_role','auth_staff_id',ACTIVE_SHIFT_KEY].forEach(key=>localStorage.removeItem(key));
+    clearActiveShiftUnlock(false);
     $('#login-screen').style.display = 'flex';
     loadPersonnelForLoginFromCloud(false);
   }
@@ -8430,6 +8575,8 @@ setInterval(()=> { try{ saveLocalBackup(); }catch(e){} }, 15000);
 </script>
 </body>
 </html>
+
+
 
 
 
