@@ -4666,7 +4666,8 @@ function buildDailySalesSummary(dateYmd){
     workers[responsible].total += Number(sale.total || 0);
     workers[responsible][payment] += Number(sale.total || 0);
 
-    (sale.items||[]).forEach(it => {
+    const saleItems = Array.isArray(sale.items) ?sale.items:[];
+    saleItems.forEach(it => {
       const product = getProductById(it.productId) || { id:it.productId || it.rawName || 'SIN-ID', name:it.rawName || 'Producto eliminado' };
       const key = String(product.id || it.productId || it.rawName || 'SIN-ID');
       if(!productsMap.has(key)){
@@ -8120,9 +8121,24 @@ function showShiftResumeError(message){
 }
 
 function openShiftModal(){
-  renderShiftModal();
   openModal('modal-shift');
-  safeCreateIcons();
+  try{
+    renderShiftModal();
+    safeCreateIcons();
+  }catch(error){
+    console.error('No se pudo mostrar Turnos',error);
+    if($('#shift-modal-subtitle')) $('#shift-modal-subtitle').textContent='La ventana se abrió, pero un dato necesita actualizarse';
+    if($('#shift-modal-content')) $('#shift-modal-content').innerHTML=`<div class="card"><div class="font-bold text-red-700">No se pudieron leer los turnos</div><div class="small-muted mt-1">Actualiza los datos e inténtalo nuevamente. Ningún turno ni venta fue eliminado.</div><button type="button" onclick="openShiftModal()" class="btn-primary w-full mt-3">ACTUALIZAR Y REINTENTAR</button></div>`;
+    showToast('No se pudieron leer los turnos. Intenta actualizar.');
+  }
+  if(navigator.onLine && isCloudAllowed()){
+    loadPersonnelForLoginFromCloud(false).then(()=>{
+      if($('#modal-shift')?.classList.contains('visible')){
+        try{ renderShiftModal(); safeCreateIcons(); }
+        catch(error){ console.error('Turnos sincronizados no se pudieron mostrar',error); }
+      }
+    });
+  }
 }
 
 function getSelectedShiftPerson(){
@@ -8503,7 +8519,8 @@ async function forceSync(){
 async function registerPWA(){
   if(!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return false;
   try{
-    await navigator.serviceWorker.register('./service-worker.js',{scope:'./'});
+    const registration=await navigator.serviceWorker.register('./service-worker.js?v=20261109-turnos-v3',{scope:'./',updateViaCache:'none'});
+    registration.update().catch(()=>{});
     return true;
   }catch(error){ console.warn('No se pudo registrar el service worker',error); return false; }
 }
@@ -8575,6 +8592,8 @@ setInterval(()=> { try{ saveLocalBackup(); }catch(e){} }, 15000);
 </script>
 </body>
 </html>
+
+
 
 
 
