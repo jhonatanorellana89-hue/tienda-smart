@@ -3,36 +3,43 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
-<title>MINIMARKET LA ESQUINA DEL AHORRO — TiendaSmart (Producción)</title>
+<meta name="theme-color" content="#e65100"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<link rel="manifest" href="./manifest.webmanifest"/>
+<link rel="icon" href="./assets/icon-192.png" type="image/png" sizes="192x192"/>
+<link rel="apple-touch-icon" href="./assets/icon-192.png" sizes="192x192"/>
+<title>MINIMARKET EL ERIZO | TiendaSmart</title>
 
-<!-- Tailwind + lucide (icons) -->
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/lucide@latest"></script>
+<!-- Dependencias locales: la caja debe poder iniciar sin Internet. -->
+<script src="./libs/tailwindcss-3.4.17.js"></script>
+<script src="./libs/lucide-0.468.0.min.js"></script>
 
 <!-- Utilities: XLSX, html2canvas, jsPDF -->
 <script src="./libs/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="./libs/html2canvas-1.4.1.min.js"></script>
+<script src="./libs/jspdf-2.5.1.umd.min.js"></script>
 
 <!-- Quagga fallback -->
-<script src="https://unpkg.com/quagga/dist/quagga.min.js"></script>
+<script src="./libs/quagga2-1.8.4.min.js"></script>
 
 <!-- Firebase compat -->
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="./libs/firebase-app-9.22.2-compat.js"></script>
+<script src="./libs/firebase-auth-9.22.2-compat.js"></script>
+<script src="./libs/firebase-firestore-9.22.2-compat.js"></script>
+<script src="./pos-offline.js"></script>
 
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700;800&family=Work+Sans:wght@300;400;500;600;700&display=swap');
   :root{
-    --primary:#0f766e;
-    --primary-2:#0b3b38;
+    --primary:#e65100;
+    --primary-2:#e65100;
     --accent:#f59e0b;
     --success:#16a34a;
     --danger:#ef4444;
     --bg:#f5f7fb;
     --card:#ffffff;
     --maxw:420px;
-    --ring:rgba(15,118,110,0.18);
+    --ring:rgba(230,81,0,0.18);
     --shadow:0 12px 30px rgba(15,23,42,0.10);
   }
   *{box-sizing:border-box}
@@ -92,6 +99,53 @@
     font-family:'Sora', sans-serif;
     font-weight:800;
     font-size:18px;
+    line-height:1.08;
+  }
+  .brand-lockup{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:0;
+    flex:1 1 250px;
+  }
+  .brand-copy{min-width:0}
+  .brand-logo{
+    width:72px;
+    height:72px;
+    flex:0 0 72px;
+    object-fit:contain;
+    object-position:center;
+    padding:2px;
+    border-radius:14px;
+    background:#fff;
+    border:1px solid rgba(255,101,0,0.16);
+    box-shadow:0 7px 18px rgba(255,101,0,0.16);
+  }
+  .login-logo-wrap{
+    width:200px;
+    height:200px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:6px;
+    margin-bottom:18px;
+    border-radius:28px;
+    background:#fff;
+    border:1px solid rgba(255,101,0,0.16);
+    box-shadow:0 18px 44px rgba(234,88,12,0.16);
+  }
+  .login-logo{
+    display:block;
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    object-position:center;
+  }
+  .login-app-name{
+    max-width:360px;
+    text-align:center;
+    line-height:1.12;
+    color:#172033;
   }
   .card{
     background:var(--card);
@@ -106,6 +160,7 @@
     color:#fff;
     border:none;
   }
+  .stat-hero .small-muted{color:#fff}
   .stat-card{
     background:rgba(255,255,255,0.9);
   }
@@ -132,7 +187,7 @@
     align-items:center;
     justify-content:center;
     gap:8px;
-    box-shadow:0 10px 18px rgba(15,118,110,0.25);
+    box-shadow:0 10px 18px rgba(230,81,0,0.25);
   }
   .modal{
     position:fixed;
@@ -199,8 +254,8 @@
   .pay-btn{font-weight:700;transition:all .15s ease}
   .pay-btn.active{
     border-color:var(--primary) !important;
-    background:rgba(15,118,110,0.12) !important;
-    box-shadow:inset 0 0 0 1px var(--primary), 0 6px 14px rgba(15,118,110,0.18);
+    background:rgba(230,81,0,0.12) !important;
+    box-shadow:inset 0 0 0 1px var(--primary), 0 6px 14px rgba(230,81,0,0.18);
   }
   .qty-input{
     width:72px;
@@ -405,7 +460,7 @@
   .invoice-sub-toggle{
     border:1px solid #99f6e4;
     background:#f0fdfa;
-    color:#0f766e;
+    color:#e65100;
     border-radius:10px;
     padding:8px 10px;
     font-size:12px;
@@ -659,6 +714,10 @@
 
   @media (max-width:420px){
     :root{--maxw:100vw}
+    .brand-lockup{gap:8px;flex-basis:220px}
+    .brand-logo{width:60px;height:60px;flex-basis:60px;border-radius:12px}
+    .app-sub{font-size:15px}
+    .login-logo-wrap{width:170px;height:170px;border-radius:24px}
     .modal-sheet{border-radius:14px;padding:12px}
   }
   @media (max-width:640px){
@@ -680,6 +739,195 @@
     .stock-history-kpis{grid-template-columns:1fr}
     .export-period{grid-template-columns:1fr}
   }
+
+  /* Encabezado compacto y alineado para la identidad de EL ERIZO. */
+  header{
+    align-items:stretch;
+    flex-direction:column;
+    padding:14px;
+  }
+  .brand-lockup{
+    width:100%;
+    flex:0 0 auto;
+    gap:14px;
+  }
+  .brand-logo-frame{
+    width:112px;
+    height:112px;
+    flex:0 0 112px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    border:1px solid rgba(255,101,0,.22);
+    border-radius:22px;
+    background:#fff;
+    box-shadow:0 12px 26px rgba(230,81,0,.16);
+  }
+  .brand-logo-frame .brand-logo{
+    width:100%;
+    height:100%;
+    flex:0 0 100%;
+    padding:0;
+    border:0;
+    border-radius:0;
+    box-shadow:none;
+    transform:scale(1.08);
+    transform-origin:center;
+  }
+  .brand-copy{
+    display:flex;
+    min-width:0;
+    flex-direction:column;
+    justify-content:center;
+  }
+  .app-title{
+    font-size:12px;
+    letter-spacing:.22em;
+    color:#64748b;
+  }
+  .app-sub{
+    margin-top:5px;
+    font-size:30px;
+    line-height:1;
+    letter-spacing:-.02em;
+    color:#172033;
+    white-space:nowrap;
+  }
+  .header-actions{
+    width:100%;
+    display:grid !important;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+    margin-top:12px;
+  }
+  #current-user-label{
+    grid-column:1/-1;
+    margin:0;
+    padding:10px 12px;
+    border:1px solid #fed7aa;
+    border-radius:12px;
+    background:#fff7ed;
+    color:#9a3412;
+    font-size:13px;
+    font-weight:700;
+    text-align:left;
+  }
+  .header-actions button{
+    width:100%;
+    min-width:0;
+    min-height:42px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    white-space:normal;
+  }
+  .login-logo-wrap{overflow:hidden}
+  .login-logo{transform:scale(1.08);transform-origin:center}
+
+  @media (max-width:360px){
+    .brand-logo-frame{width:100px;height:100px;flex-basis:100px}
+    .app-sub{font-size:26px}
+    .app-title{font-size:10px}
+  }
+
+  .header-actions{
+    position:relative;
+    display:block !important;
+  }
+  .admin-menu-trigger{
+    width:100%;
+    min-height:54px !important;
+    display:flex !important;
+    align-items:center;
+    justify-content:space-between !important;
+    gap:12px;
+    padding:10px 13px;
+    border:1px solid #fed7aa;
+    border-radius:14px;
+    background:linear-gradient(180deg,#fffaf5,#fff2e8);
+    color:#9a3412;
+    text-align:left;
+    box-shadow:0 8px 20px rgba(230,81,0,.08);
+  }
+  .admin-menu-trigger:hover{border-color:#fb923c;background:#fff0e5}
+  .admin-trigger-icon{
+    width:36px;
+    height:36px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 36px;
+    border-radius:11px;
+    background:#e65100;
+    color:#fff;
+  }
+  .admin-trigger-copy{display:flex;min-width:0;flex:1;flex-direction:column}
+  .admin-trigger-kicker{font-size:9px;font-weight:800;letter-spacing:.12em;color:#c2410c}
+  #current-user-label{
+    margin:2px 0 0;
+    padding:0;
+    border:0;
+    border-radius:0;
+    background:transparent;
+    color:#7c2d12;
+    font-size:14px;
+    font-weight:800;
+    text-align:left;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .admin-menu-chevron{width:19px;height:19px;flex:0 0 19px;transition:transform .18s ease}
+  .admin-menu-trigger[aria-expanded="true"] .admin-menu-chevron{transform:rotate(180deg)}
+  .administration-menu{
+    position:absolute;
+    z-index:95;
+    top:calc(100% + 8px);
+    left:0;
+    right:0;
+    display:grid;
+    grid-template-columns:1fr;
+    gap:7px;
+    padding:10px;
+    border:1px solid #fed7aa;
+    border-radius:16px;
+    background:rgba(255,255,255,.98);
+    box-shadow:0 20px 44px rgba(69,35,18,.20);
+    backdrop-filter:blur(12px);
+  }
+  .administration-menu.hidden{display:none !important}
+  .admin-menu-title{padding:3px 5px 6px;color:#9a3412;font-size:10px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+  .admin-menu-item{
+    width:100%;
+    min-height:46px !important;
+    display:flex !important;
+    align-items:center;
+    justify-content:flex-start !important;
+    gap:10px;
+    padding:10px 12px !important;
+    border:1px solid #e5e7eb !important;
+    border-radius:12px !important;
+    background:#fff !important;
+    color:#334155 !important;
+    font-size:12px !important;
+    font-weight:800 !important;
+    text-align:left;
+  }
+  .admin-menu-item:hover{border-color:#fdba74 !important;background:#fff7ed !important;color:#9a3412 !important}
+  .admin-menu-item svg{width:18px;height:18px;flex:0 0 18px;color:#e65100}
+  #btn-shift.admin-menu-item.open{border-color:#86efac !important;background:#f0fdf4 !important;color:#166534 !important}
+  #btn-shift.admin-menu-item.open svg{color:#16a34a}
+  .admin-sync-status{margin-top:2px;padding-top:8px;border-top:1px solid #f1f5f9}
+  #cloud-status.admin-status-button{
+    min-height:38px;
+    justify-content:flex-start;
+    padding:8px 10px;
+    border-radius:10px;
+    background:#f8fafc;
+    color:#64748b;
+    box-shadow:none;
+  }
 </style>
 </head>
 <body>
@@ -688,21 +936,36 @@
 
   <!-- Header -->
   <header>
-    <div>
-      <div class="app-title">MINIMARKET</div>
-      <p class="app-sub">LA ESQUINA DEL AHORRO</p>
-    </div>
-    <div class="header-actions flex items-center gap-2 flex-wrap" style="justify-content:flex-end">
-      <div id="current-user-label" class="small-muted px-2">Sin usuario</div>
-      <div id="cloud-status" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100">
-        <span id="dot" class="status-dot" style="background:#ef4444"></span>
-        <span id="cloud-text" class="small-muted">Desconectado</span>
+    <div class="brand-lockup">
+      <div class="brand-logo-frame">
+        <img class="brand-logo" src="./assets/logo-minimarket.png" alt="Logo de MINIMARKET EL ERIZO" width="112" height="112">
       </div>
-      <button id="btn-shift" type="button" onclick="openShiftModal()" class="shift-status-btn closed">ABRIR TURNO</button>
-      <button id="btn-personnel" type="button" class="px-3 py-2 bg-white rounded-lg border small-muted">PERSONAL</button>
-      <button id="btn-gestion" class="px-3 py-2 bg-white rounded-lg border small-muted">GESTIÓN</button>
-      <button id="btn-open-clients" class="px-3 py-2 bg-white rounded-lg border small-muted">CLIENTES</button>
-      <button id="btn-sync" class="px-3 py-2 bg-white rounded-lg border small-muted">SYNC</button>
+      <div class="brand-copy">
+        <div class="app-title">MINIMARKET</div>
+        <p class="app-sub">EL ERIZO</p>
+      </div>
+    </div>
+    <div id="header-administration" class="header-actions">
+      <button id="admin-menu-trigger" type="button" class="admin-menu-trigger" onclick="toggleAdministrationMenu()" aria-expanded="false" aria-controls="administration-menu">
+        <span class="admin-trigger-icon"><i data-lucide="shield-check"></i></span>
+        <span class="admin-trigger-copy"><span class="admin-trigger-kicker">MENÚ DE ADMINISTRACIÓN</span><strong id="current-user-label">Sin usuario</strong></span>
+        <i data-lucide="chevron-down" class="admin-menu-chevron"></i>
+      </button>
+      <div id="administration-menu" class="administration-menu hidden">
+        <div class="admin-menu-title">Opciones administrativas</div>
+        <button id="btn-personnel" type="button" class="admin-menu-item" onclick="closeAdministrationMenu()"><i data-lucide="users"></i><span>PERSONAL</span></button>
+        <button id="btn-gestion" type="button" class="admin-menu-item" onclick="closeAdministrationMenu()"><i data-lucide="clipboard-pen-line"></i><span>GESTIÓN</span></button>
+        <button id="btn-open-clients" type="button" class="admin-menu-item" onclick="closeAdministrationMenu()"><i data-lucide="contact-round"></i><span>CLIENTES</span></button>
+        <button id="btn-shift" type="button" onclick="closeAdministrationMenu();openShiftModal()" class="admin-menu-item shift-status-btn closed"><i data-lucide="clock-3"></i><span id="btn-shift-label">ABRIR TURNO</span></button>
+        <button id="btn-sync" type="button" class="admin-menu-item" onclick="closeAdministrationMenu()"><i data-lucide="refresh-cw"></i><span>SYNC</span></button>
+        <div class="admin-sync-status">
+          <button id="cloud-status" type="button" onclick="closeAdministrationMenu();openSyncCenter()" class="admin-status-button" title="Abrir centro de sincronización">
+            <span id="dot" class="status-dot" style="background:#ef4444"></span>
+            <span id="cloud-text" class="small-muted">Desconectado</span>
+            <span id="pending-count" class="hidden text-xs font-bold bg-amber-100 text-amber-800 rounded-full px-1.5">0</span>
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -916,7 +1179,7 @@
 
       <div class="invoice-top">
         <div>
-          <div class="invoice-brand-title">MINIMARKET LA ESQUINA DEL AHORRO</div>
+              <div class="invoice-brand-title">MINIMARKET EL ERIZO</div>
           <div class="invoice-brand-sub">Comprobante interno de ingreso a stock</div>
         </div>
         <div class="invoice-docbox">
@@ -1108,7 +1371,7 @@
         </div>
       </div>
 
-      <button type="submit" class="btn-primary w-full invoice-submit">Registrar ingreso</button>
+      <button id="btn-submit-ingreso" type="submit" class="btn-primary w-full invoice-submit">Registrar ingreso</button>
     </form>
   </div>
 </div>
@@ -1290,19 +1553,31 @@
   <div class="modal-sheet" style="max-width:420px">
     <div class="flex justify-between items-center mb-3">
       <h3 class="font-bold">Escáner</h3>
-      <button onclick="closeModal('modal-scan')"><i data-lucide="x"></i></button>
+      <button type="button" onclick="cancelScanner()"><i data-lucide="x"></i></button>
     </div>
     <div id="scanner-preview" style="position:relative;height:44vh;background:#000;border-radius:12px;overflow:hidden;">
       <video id="video" autoplay muted playsinline style="width:100%;height:100%;object-fit:cover"></video>
       <canvas id="scan-canvas" style="position:absolute;left:0;top:0;right:0;bottom:0;pointer-events:none"></canvas>
     </div>
-    <div class="mt-2 flex gap-2">
+    <div id="scanner-status" class="mt-2 rounded-xl bg-slate-50 border px-3 py-2 text-sm" role="status">Apunta al código y mantenlo dentro del recuadro.</div>
+    <div class="mt-2 flex gap-2 flex-wrap">
       <button id="btn-scan-switch" onclick="switchScannerCamera()" class="px-3 py-2 border rounded text-sm">Cambiar cámara</button>
-      <button onclick="restartScanner()" class="px-3 py-2 border rounded text-sm">Reiniciar</button>
+      <button id="btn-scan-torch" type="button" onclick="toggleScannerTorch()" class="hidden px-3 py-2 border rounded text-sm">Linterna</button>
+      <label id="scan-zoom-wrap" class="hidden flex items-center gap-2 text-xs">Zoom <input id="scan-zoom" type="range" oninput="setScannerZoom(this.value)" style="width:90px"></label>
     </div>
-    <div class="mt-2 flex gap-2">
+    <button id="btn-scan-difficult" type="button" onclick="toggleDifficultScanMode()" class="mt-2 w-full px-3 py-2.5 border rounded-xl text-sm font-bold bg-amber-50 text-amber-900 border-amber-200">
+      Envase curvo / plástico
+    </button>
+    <div id="scanner-difficult-help" class="hidden mt-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
+      Inclina el producto unos 10-15 grados y aléjalo un poco. Evita que el reflejo blanco tape las barras.
+    </div>
+    <div class="mt-2">
       <input id="scanned-code" class="input-pro" placeholder="Código detectado" readonly>
-      <button onclick="registerScanned()" class="btn-primary px-4">Registrar</button>
+    </div>
+    <div id="scanner-actions" class="mt-2 grid grid-cols-2 gap-2">
+      <button type="button" onclick="rescanBarcode()" class="px-3 py-2 border rounded-xl font-semibold">Volver a escanear</button>
+      <button type="button" onclick="openManualProductSearch()" class="px-3 py-2 border rounded-xl font-semibold">Buscar manualmente</button>
+      <button type="button" onclick="cancelScanner()" class="col-span-2 px-3 py-2 rounded-xl bg-slate-100 font-semibold">Cancelar</button>
     </div>
   </div>
 </div>
@@ -1493,13 +1768,45 @@
   </div>
 </div>
 
+<!-- Modal: Centro de sincronización -->
+<div id="modal-sync-center" class="modal">
+  <div class="modal-sheet" style="max-width:520px">
+    <div class="flex justify-between items-center mb-3">
+      <div>
+        <h3 class="font-bold text-lg">Centro de sincronización</h3>
+        <p class="small-muted">Control local, cola pendiente y respaldo</p>
+      </div>
+      <button type="button" onclick="closeModal('modal-sync-center')"><i data-lucide="x"></i></button>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mb-3">
+      <button id="sync-mode-auto" type="button" onclick="setWorkMode('auto')" class="px-3 py-3 rounded-xl border text-sm font-semibold">Automático</button>
+      <button id="sync-mode-local" type="button" onclick="setWorkMode('local')" class="px-3 py-3 rounded-xl border text-sm font-semibold">Solo sin conexión</button>
+    </div>
+    <div class="rounded-2xl bg-slate-50 border p-3 space-y-2 text-sm">
+      <div class="flex justify-between gap-3"><span class="small-muted">Estado</span><strong id="sync-center-status">Local</strong></div>
+      <div class="flex justify-between gap-3"><span class="small-muted">Operaciones pendientes</span><strong id="sync-center-pending">0</strong></div>
+      <div class="flex justify-between gap-3"><span class="small-muted">Última confirmación</span><strong id="sync-center-last" class="text-right">Nunca</strong></div>
+      <div id="sync-center-error-row" class="hidden border-t pt-2 text-red-700"><strong>Último error:</strong> <span id="sync-center-error"></span></div>
+    </div>
+    <div id="sync-conflicts-box" class="hidden mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+      <div class="font-semibold text-amber-900">Conflictos por revisar: <span id="sync-conflicts-count">0</span></div>
+      <div id="sync-conflicts-list" class="small-muted mt-2 max-h-28 overflow-auto"></div>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <button type="button" onclick="syncNow()" class="btn-primary">Sincronizar ahora</button>
+      <button type="button" onclick="downloadDataBackup()" class="px-3 py-2 rounded-xl border bg-white font-semibold">Exportar respaldo JSON</button>
+    </div>
+    <p class="small-muted mt-3">En modo local las ventas continúan y quedan en cola. No cierres ni borres los datos del navegador antes de exportar un respaldo.</p>
+  </div>
+</div>
+
 <!-- Modal: Login -->
 <div id="login-screen" class="fixed inset-0 z-[200] bg-white flex flex-col items-center justify-center p-8">
-  <div class="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center mb-6">
-    <i data-lucide="store" class="text-white w-10 h-10"></i>
+  <div class="login-logo-wrap">
+    <img class="login-logo" src="./assets/logo-minimarket.png" alt="Logo de MINIMARKET EL ERIZO" width="200" height="200">
   </div>
-  <h2 class="text-2xl font-bold mb-1">TiendaSmart</h2>
-  <p class="small-muted mb-4">Ingresa con tu usuario personal para registrar tu turno</p>
+  <h2 class="login-app-name text-2xl font-bold mb-1">MINIMARKET EL ERIZO</h2>
+  <p class="small-muted mb-4 text-center">TiendaSmart · Ingresa con tu usuario personal para registrar tu turno</p>
   <div class="w-full max-w-sm space-y-3">
     <input id="l-user" class="input-pro" placeholder="Usuario">
     <input id="l-pass" type="password" class="input-pro" placeholder="Contraseña">
@@ -1538,7 +1845,7 @@ const DB = { col: "MODO DE PREODUCCIÓN", colFallback: "MODO DE PREODUCCIÃ“N"
 /* Shortcuts */
 const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
-const uid = ()=> 'id-'+Math.random().toString(36).slice(2,9);
+const uid = ()=> (window.crypto?.randomUUID ?window.crypto.randomUUID():('id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,11)));
 const money = v => Number(v||0).toFixed(2);
 const todayYMD = ()=> { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const isSameLocalDay = (dateStr, ref = new Date()) => {
@@ -1551,8 +1858,14 @@ const isSameLocalDay = (dateStr, ref = new Date()) => {
 };
 
 /* Stock access guard */
-const STOCK_AUTH_PASS = 'agua';
+const STOCK_AUTH_PASS_SHA256 = '5f1da0912e1756518e5f198da382dc5b32a11dcc459f6b694d74ab5b830e2d01';
 let stockAuthPendingAction = null;
+
+async function sha256Text(value){
+  const data = new TextEncoder().encode(String(value||''));
+  const digest = await crypto.subtle.digest('SHA-256',data);
+  return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+}
 
 function requireStockAccess(onSuccess = null){
   stockAuthPendingAction = typeof onSuccess === 'function' ?onSuccess : null;
@@ -1567,11 +1880,12 @@ function requireStockAccess(onSuccess = null){
   return false;
 }
 
-function submitStockAuth(ev){
+async function submitStockAuth(ev){
   if(ev) ev.preventDefault();
   const pass = ($('#stock-auth-pass')?.value || '').trim();
   const err = $('#stock-auth-error');
-  if(pass === STOCK_AUTH_PASS){
+  const valid = window.crypto?.subtle ?await sha256Text(pass)===STOCK_AUTH_PASS_SHA256:false;
+  if(valid){
     const cb = stockAuthPendingAction;
     stockAuthPendingAction = null;
     closeModal('modal-stock-auth');
@@ -1672,10 +1986,7 @@ async function ensureLucideLoaded(){
   if(window.lucide && typeof window.lucide.createIcons === 'function') return true;
   const test = ()=> !!(window.lucide && window.lucide.createIcons);
   const sources = [
-    './libs/lucide.min.js',
-    './lucide.min.js',
-    'https://cdn.jsdelivr.net/npm/lucide@latest',
-    'https://unpkg.com/lucide@latest'
+    './libs/lucide-0.468.0.min.js'
   ];
   for(const src of sources){
     const ok = await loadExternalScript(src, test);
@@ -1689,10 +2000,7 @@ async function ensureXLSXLoaded(showError = true){
   if(test()) return true;
   showToast('Cargando módulo de Excel...');
   const sources = [
-    './libs/xlsx.full.min.js',
-    './xlsx.full.min.js',
-    'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
+    './libs/xlsx.full.min.js'
   ];
   for(const src of sources){
     if(await loadExternalScript(src,test)) return true;
@@ -1703,11 +2011,7 @@ async function ensureXLSXLoaded(showError = true){
 
 async function ensureFirebaseLoaded(){
   if(window.firebase && typeof window.firebase.initializeApp === 'function' && window.firebase.firestore) return true;
-  if(!navigator.onLine) return false;
-  const okApp = await loadExternalScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js', ()=> !!(window.firebase && window.firebase.initializeApp));
-  if(!okApp) return false;
-  const okFs = await loadExternalScript('https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js', ()=> !!(window.firebase && window.firebase.firestore));
-  return !!okFs;
+  return false;
 }
 
 /* Simple escape for safety in HTML rendering */
@@ -1717,8 +2021,9 @@ function escapeAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,
 /* =========
    APP STATE
    ========= */
-let STATE = { products: [], sales: [], customers: [], purchases: [], suppliers: [], auditLogs: [], stockClosures: [], staff: [], shifts: [] }; // canonical app state
+let STATE = { products: [], sales: [], customers: [], purchases: [], suppliers: [], auditLogs: [], stockClosures: [], staff: [], shifts: [], stockMovements: [], syncConflicts: [] }; // canonical app state
 let cart = []; let payMethod = 'EFECTIVO'; let db = null; let cloudOn = false; let unsubscribe = null;
+let saleSubmitInProgress = false;
 
 /* pendingOps: offline queue persistent in localStorage.
    Each op has shape { id, type: 'sale'|'product'|'customer', payload, ts, retries } */
@@ -1727,6 +2032,16 @@ const PENDING_KEY = 'tienda_pending_ops_v1';
 const LOCAL_BACKUP_KEY = 'tienda_local_backup_v1';
 const LOCAL_BACKUP_PREV_KEY = 'tienda_local_backup_v1_prev';
 const ACTIVE_SHIFT_KEY = 'tienda_active_shift_id_v1';
+const WORK_MODE_KEY = 'tienda_work_mode_v1';
+const DEVICE_ID_KEY = 'tienda_device_id_v1';
+const LAST_SYNC_KEY = 'tienda_last_sync_v1';
+const LAST_SYNC_ERROR_KEY = 'tienda_last_sync_error_v1';
+
+function getDeviceId(){
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if(!id){ id = `EQUIPO-${uid()}`; localStorage.setItem(DEVICE_ID_KEY,id); }
+  return id;
+}
 
 /* Load persisted state and pending ops */
 try { const b = localStorage.getItem(LOCAL_BACKUP_KEY); if(b) STATE = JSON.parse(b); } catch(e){ console.warn('local parse err', e); }
@@ -1743,6 +2058,8 @@ function ensureStateShape(){
   if(!Array.isArray(STATE.stockClosures)) STATE.stockClosures = [];
   if(!Array.isArray(STATE.staff)) STATE.staff = [];
   if(!Array.isArray(STATE.shifts)) STATE.shifts = [];
+  if(!Array.isArray(STATE.stockMovements)) STATE.stockMovements = [];
+  if(!Array.isArray(STATE.syncConflicts)) STATE.syncConflicts = [];
   (STATE.products||[]).forEach(p => {
     if(!p || typeof p !== 'object') return;
     p.id = String(p.id || uid());
@@ -1793,14 +2110,72 @@ function ensureStateShape(){
 ensureStateShape();
 
 /* Persist helpers */
+function queueUnsentAuditLogs(){
+  let queued=false;
+  (STATE.auditLogs||[]).forEach(log=>{
+    if(!log?.id || log.syncQueuedAt) return;
+    log.syncQueuedAt=new Date().toISOString();
+    const opId=`AUDIT-${log.id}`;
+    if(!pendingOps.some(op=>op.id===opId)) pendingOps.push({id:opId,type:'audit',payload:{...log},ts:log.ts||log.syncQueuedAt,retries:0,status:'pending',silent:true});
+    queued=true;
+  });
+  return queued;
+}
+
 function saveLocalBackup(){
+  const queuedAudit=queueUnsentAuditLogs();
   try{
     const prev = localStorage.getItem(LOCAL_BACKUP_KEY);
     if(prev) localStorage.setItem(LOCAL_BACKUP_PREV_KEY, prev);
     localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(STATE));
   }catch(e){}
+  if(window.POSStorage) POSStorage.scheduleStateSave(STATE);
+  if(queuedAudit) savePending();
 }
-function savePending(){ try { localStorage.setItem(PENDING_KEY, JSON.stringify(pendingOps)); } catch(e){} }
+function savePending(){
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(pendingOps)); } catch(e){}
+  if(window.POSStorage) POSStorage.schedulePendingSave(pendingOps);
+  renderSyncCenter();
+}
+
+async function initializeLocalPersistence(){
+  ensureStateShape();
+  if(!window.POSStorage) return;
+  try{
+    const loaded = await POSStorage.initialize(STATE,pendingOps);
+    if(loaded?.state){
+      const currentScore = stateDataScore(STATE);
+      const indexedScore = stateDataScore(loaded.state);
+      if(indexedScore >= currentScore) STATE = loaded.state;
+      else await POSStorage.saveState(STATE);
+    }
+    const opMap = new Map();
+    [...(loaded?.ops||[]),...(pendingOps||[])].forEach(op=>{
+      if(op?.id) opMap.set(op.id,op);
+    });
+    pendingOps = Array.from(opMap.values()).sort((a,b)=>String(a.ts||'').localeCompare(String(b.ts||'')));
+    ensureStateShape();
+    saveLocalBackup();
+    savePending();
+    window.STATE = STATE;
+    window.pendingOps = pendingOps;
+  }catch(error){
+    console.warn('IndexedDB no disponible; se conserva el respaldo local',error);
+  }
+}
+
+function queueLegacyCloudRecords(){
+  let changed=false;
+  [['purchase','purchases'],['supplier','suppliers']].forEach(([type,key])=>{
+    (STATE[key]||[]).forEach(record=>{
+      if(!record?.id || record.cloudMigrationQueuedAt) return;
+      record.cloudMigrationQueuedAt=new Date().toISOString();
+      addPendingOp({id:`MIGRATE-${type}-${record.id}`,type,payload:{...record},silent:true});
+      changed=true;
+    });
+  });
+  if(changed) saveLocalBackup();
+}
 
 function stateDataScore(st){
   if(!st || typeof st !== 'object') return 0;
@@ -1831,8 +2206,10 @@ function parseStateCandidate(raw){
       const stockClosures = Array.isArray(b.stockClosures) ?b.stockClosures : [];
       const staff = Array.isArray(b.staff) ?b.staff : [];
       const shifts = Array.isArray(b.shifts) ?b.shifts : [];
+      const stockMovements = Array.isArray(b.stockMovements) ?b.stockMovements : [];
+      const syncConflicts = Array.isArray(b.syncConflicts) ?b.syncConflicts : [];
       if(products.length || sales.length || customers.length || purchases.length || staff.length || shifts.length){
-      return { products, sales, customers, purchases, suppliers, auditLogs, stockClosures, staff, shifts };
+      return { products, sales, customers, purchases, suppliers, auditLogs, stockClosures, staff, shifts, stockMovements, syncConflicts };
     }
   }
   return null;
@@ -1986,9 +2363,24 @@ function normalizeRemoteData(remote){
 */
 function mergeState(remoteState){
   ensureStateShape();
-  const purchasesKeep = Array.isArray(STATE.purchases) ?STATE.purchases : [];
-  const suppliersKeep = Array.isArray(STATE.suppliers) ?STATE.suppliers : [];
-  const auditKeep = Array.isArray(STATE.auditLogs) ?STATE.auditLogs : [];
+  const mergeRecordsById = (localRows,remoteRows)=>{
+    const rows = new Map();
+    (localRows||[]).forEach(row=>{ if(row?.id) rows.set(String(row.id),row); });
+    (remoteRows||[]).forEach(row=>{
+      if(!row?.id) return;
+      const key = String(row.id);
+      const current = rows.get(key);
+      const localAt = new Date(current?.updatedAt||current?.createdAt||current?.date||0).getTime();
+      const remoteAt = new Date(row.updatedAt||row.createdAt||row.date||0).getTime();
+      if(!current || remoteAt >= localAt) rows.set(key,row);
+    });
+    return Array.from(rows.values());
+  };
+  const purchasesMerged = mergeRecordsById(STATE.purchases,remoteState.purchases);
+  const suppliersMerged = mergeRecordsById(STATE.suppliers,remoteState.suppliers);
+  const auditMerged = mergeRecordsById(STATE.auditLogs,remoteState.auditLogs);
+  const stockMovementsMerged = mergeRecordsById(STATE.stockMovements,remoteState.stockMovements);
+  const conflictsMerged = mergeRecordsById(STATE.syncConflicts,remoteState.syncConflicts);
   const closuresMap = new Map();
   (STATE.stockClosures||[]).forEach(c => { if(c?.id) closuresMap.set(String(c.id), c); });
   (remoteState.stockClosures||[]).forEach(c => {
@@ -2030,11 +2422,29 @@ function mergeState(remoteState){
     else {
       const ldt = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
       const rdt = new Date(rp.updatedAt || rp.createdAt || 0).getTime();
-      const base = rdt >= ldt ?rp : existing;
+      let base = rdt >= ldt ?{...rp}:{...existing};
       // unify movements
-      const mm = new Map(); (existing.movements||[]).forEach(m=> mm.set(m.id||JSON.stringify(m), m)); (rp.movements||[]).forEach(m=> mm.set(m.id||JSON.stringify(m), m));
+      const mm = new Map();
+      const remoteMovementIds = new Set();
+      (rp.movements||[]).forEach(m=>remoteMovementIds.add(String(m.id||m.movementId||JSON.stringify(m))));
+      (existing.movements||[]).forEach(m=> mm.set(m.id||m.movementId||JSON.stringify(m), m));
+      (rp.movements||[]).forEach(m=> mm.set(m.id||m.movementId||JSON.stringify(m), m));
       base.movements = Array.from(mm.values());
-      // prefer non-zero stock? keep remote? we'll take the base (latest)
+      const localOnly = (existing.movements||[]).filter(m=>!remoteMovementIds.has(String(m.id||m.movementId||JSON.stringify(m))));
+      const hasPendingLocal = pendingOps.some(op=>
+        (op.type==='product' && String(op.payload?.id||'')===String(rp.id)) ||
+        (op.type==='purchaseBundle' && (op.payload?.products||[]).some(p=>String(p.id||'')===String(rp.id)))
+      );
+      if(hasPendingLocal && localOnly.length){
+        base = {...base,stock:roundStock(Number(rp.stock||0)+localOnly.reduce((sum,m)=>sum+getMovementStockDelta(m),0)),movements:Array.from(mm.values())};
+      }
+      if(hasPendingLocal && Number(existing.stock||0)!==Number(rp.stock||0)){
+        const conflictId = `STOCK-${rp.id}-${String(existing.updatedAt||'local')}-${String(rp.updatedAt||'remote')}`.replaceAll('/','_');
+        if(!conflictsMerged.some(item=>item.id===conflictId)) conflictsMerged.push({
+          id:conflictId,type:'STOCK_CONCURRENT',productId:rp.id,productName:existing.name||rp.name||'',
+          localStock:Number(existing.stock||0),remoteStock:Number(rp.stock||0),status:'OPEN',createdAt:new Date().toISOString()
+        });
+      }
       map.set(base.id, base);
     }
   }
@@ -2076,7 +2486,16 @@ function mergeState(remoteState){
   }
   const mergedCustomers = Array.from(cMap.values());
 
-  STATE.products = mergedProds; STATE.sales = mergedSales; STATE.customers = mergedCustomers; STATE.purchases = purchasesKeep; STATE.suppliers = suppliersKeep; STATE.auditLogs = auditKeep; STATE.stockClosures = Array.from(closuresMap.values()); STATE.staff = Array.from(staffMap.values()); STATE.shifts = Array.from(shiftMap.values());
+  stockMovementsMerged.forEach(movement=>{
+    const product = mergedProds.find(p=>String(p.id||'')===String(movement.productId||''));
+    if(!product) return;
+    product.movements = Array.isArray(product.movements)?product.movements:[];
+    if(!product.movements.some(m=>String(m.id||m.movementId||'')===String(movement.id||movement.movementId||''))) product.movements.push(movement);
+  });
+  STATE.products = mergedProds; STATE.sales = mergedSales; STATE.customers = mergedCustomers;
+  STATE.purchases = purchasesMerged; STATE.suppliers = suppliersMerged; STATE.auditLogs = auditMerged;
+  STATE.stockMovements = stockMovementsMerged; STATE.syncConflicts = conflictsMerged;
+  STATE.stockClosures = Array.from(closuresMap.values()); STATE.staff = Array.from(staffMap.values()); STATE.shifts = Array.from(shiftMap.values());
   ensureStateShape();
   try { localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(STATE)); } catch(e){}
 }
@@ -2095,10 +2514,14 @@ function initFirebase(){
   }catch(e){ console.error('initFirebase', e); db = null; }
 }
 
-const SUBCOLS = { products: 'products', customers: 'customers', sales: 'sales', stockClosures: 'stockClosures', staff: 'staff', shifts: 'shifts' };
+const SUBCOLS = {
+  products:'products', customers:'customers', sales:'sales', purchases:'purchases', suppliers:'suppliers',
+  auditLogs:'auditLogs', stockMovements:'stockMovements', stockClosures:'stockClosures', staff:'staff', shifts:'shifts',
+  syncConflicts:'syncConflicts'
+};
 const MIGRATION_KEY = 'tienda_migration_v1';
 let syncInProgress = false;
-let unsubscribers = { products: null, customers: null, sales: null, stockClosures: null, staff: null, shifts: null };
+let unsubscribers = Object.fromEntries(Object.keys(SUBCOLS).map(key=>[key,null]));
 let activeDbCol = DB.col;
 
 function parentDocRef(){
@@ -2180,6 +2603,44 @@ async function upsertShift(shift){
   return true;
 }
 
+function firestoreDocId(value){
+  return String(value || uid()).replaceAll('/','_');
+}
+
+async function upsertGenericRecord(subcollection,record,prefix='REG'){
+  if(!db) return false;
+  const id = firestoreDocId(record?.id || `${prefix}-${uid()}`);
+  const payload = { ...record, id, updatedAt:record?.updatedAt || new Date().toISOString() };
+  await subcolRef(subcollection).doc(id).set(payload,{merge:true});
+  return true;
+}
+
+const upsertPurchase = purchase => upsertGenericRecord(SUBCOLS.purchases,purchase,'COMPRA');
+const upsertSupplier = supplier => upsertGenericRecord(SUBCOLS.suppliers,supplier,'PROVEEDOR');
+const upsertAuditLog = log => upsertGenericRecord(SUBCOLS.auditLogs,log,'AUDITORIA');
+const upsertStockMovement = movement => upsertGenericRecord(SUBCOLS.stockMovements,movement,'MOV');
+const upsertSyncConflict = conflict => upsertGenericRecord(SUBCOLS.syncConflicts,conflict,'CONFLICTO');
+
+async function upsertPurchaseBundle(bundle){
+  if(!db) return false;
+  const writes = [];
+  if(bundle?.purchase) writes.push([SUBCOLS.purchases,bundle.purchase]);
+  if(bundle?.supplier) writes.push([SUBCOLS.suppliers,bundle.supplier]);
+  (bundle?.auditLogs||[]).forEach(item=>writes.push([SUBCOLS.auditLogs,item]));
+  (bundle?.products||[]).forEach(item=>writes.push([SUBCOLS.products,item]));
+  (bundle?.stockMovements||[]).forEach(item=>writes.push([SUBCOLS.stockMovements,item]));
+  if(writes.length > 450) throw new Error('La compra supera el límite seguro de 450 registros por envío');
+  const batch = db.batch();
+  const syncedAt = new Date().toISOString();
+  writes.forEach(([collection,item])=>{
+    if(!item?.id) throw new Error(`Registro sin ID en ${collection}`);
+    const payload = {...item,id:firestoreDocId(item.id),syncedAt};
+    batch.set(subcolRef(collection).doc(payload.id),payload,{merge:true});
+  });
+  await batch.commit();
+  return true;
+}
+
 async function fetchSubcollectionDocs(name){
   const snap = await subcolRef(name).get();
   return snap.docs.map(d => d.data());
@@ -2245,13 +2706,18 @@ async function migrateOldDataToSubcollections(){
 }
 
 function mergeFromSubcollection(name, docs){
-  const partial = { products: [], sales: [], customers: [], stockClosures: [], staff: [], shifts: [] };
+  const partial = { products: [], sales: [], customers: [], purchases: [], suppliers: [], auditLogs: [], stockMovements: [], stockClosures: [], staff: [], shifts: [], syncConflicts: [] };
   if(name === SUBCOLS.products) partial.products = docs;
   if(name === SUBCOLS.sales) partial.sales = docs;
   if(name === SUBCOLS.customers) partial.customers = docs;
   if(name === SUBCOLS.stockClosures) partial.stockClosures = docs;
   if(name === SUBCOLS.staff) partial.staff = docs;
   if(name === SUBCOLS.shifts) partial.shifts = docs;
+  if(name === SUBCOLS.purchases) partial.purchases = docs;
+  if(name === SUBCOLS.suppliers) partial.suppliers = docs;
+  if(name === SUBCOLS.auditLogs) partial.auditLogs = docs;
+  if(name === SUBCOLS.stockMovements) partial.stockMovements = docs;
+  if(name === SUBCOLS.syncConflicts) partial.syncConflicts = docs;
   mergeState(partial);
 }
 
@@ -2262,15 +2728,20 @@ async function startFirestoreSync(){
 
   // initial fetch from subcollections
   try{
-    const [products, customers, sales, stockClosures, staff, shifts] = await Promise.all([
+    const [products, customers, sales, stockClosures, staff, shifts, purchases, suppliers, auditLogs, stockMovements, syncConflicts] = await Promise.all([
       fetchSubcollectionDocs(SUBCOLS.products),
       fetchSubcollectionDocs(SUBCOLS.customers),
       fetchSubcollectionDocs(SUBCOLS.sales),
       fetchSubcollectionDocs(SUBCOLS.stockClosures).catch(err => { console.warn('stockClosures read unavailable', err); return []; }),
       fetchSubcollectionDocs(SUBCOLS.staff).catch(err => { console.warn('staff read unavailable', err); return []; }),
       fetchSubcollectionDocs(SUBCOLS.shifts).catch(err => { console.warn('shifts read unavailable', err); return []; }),
+      fetchSubcollectionDocs(SUBCOLS.purchases).catch(err => { console.warn('purchases read unavailable', err); return []; }),
+      fetchSubcollectionDocs(SUBCOLS.suppliers).catch(err => { console.warn('suppliers read unavailable', err); return []; }),
+      fetchSubcollectionDocs(SUBCOLS.auditLogs).catch(err => { console.warn('auditLogs read unavailable', err); return []; }),
+      fetchSubcollectionDocs(SUBCOLS.stockMovements).catch(err => { console.warn('stockMovements read unavailable', err); return []; }),
+      fetchSubcollectionDocs(SUBCOLS.syncConflicts).catch(err => { console.warn('syncConflicts read unavailable', err); return []; }),
     ]);
-    mergeState({ products, customers, sales, stockClosures, staff, shifts });
+    mergeState({ products, customers, sales, stockClosures, staff, shifts, purchases, suppliers, auditLogs, stockMovements, syncConflicts });
     renderAll();
     updateOnline(true);
   }catch(e){
@@ -2280,12 +2751,7 @@ async function startFirestoreSync(){
 
   // realtime listeners
   try{
-    if(unsubscribers.products) try{ unsubscribers.products(); }catch(_){}
-    if(unsubscribers.customers) try{ unsubscribers.customers(); }catch(_){}
-    if(unsubscribers.sales) try{ unsubscribers.sales(); }catch(_){}
-    if(unsubscribers.stockClosures) try{ unsubscribers.stockClosures(); }catch(_){}
-    if(unsubscribers.staff) try{ unsubscribers.staff(); }catch(_){}
-    if(unsubscribers.shifts) try{ unsubscribers.shifts(); }catch(_){}
+    Object.values(unsubscribers).forEach(unsubscribe=>{ if(unsubscribe) try{ unsubscribe(); }catch(_){} });
 
     unsubscribers.products = subcolRef(SUBCOLS.products).onSnapshot(snap => {
       const docs = snap.docs.map(d => d.data());
@@ -2330,11 +2796,27 @@ async function startFirestoreSync(){
       updateShiftUI();
       if($('#modal-shift')?.classList.contains('visible')) renderShiftModal();
     }, err => { console.warn('shifts onSnapshot unavailable; turnos quedan locales', err); });
+
+    [SUBCOLS.purchases,SUBCOLS.suppliers,SUBCOLS.auditLogs,SUBCOLS.stockMovements,SUBCOLS.syncConflicts].forEach(name=>{
+      const key = Object.keys(SUBCOLS).find(k=>SUBCOLS[k]===name);
+      unsubscribers[key] = subcolRef(name).onSnapshot(snap=>{
+        mergeFromSubcollection(name,snap.docs.map(d=>d.data()));
+        saveLocalBackup();
+        if(name===SUBCOLS.purchases && $('#modal-purchase-history')?.classList.contains('visible')) renderPurchaseHistoryList();
+        renderSyncCenter();
+        updateOnline(true);
+      },err=>console.warn(`${name} onSnapshot unavailable; datos quedan locales`,err));
+    });
   }catch(e){ console.error('startFirestoreSync err', e); updateOnline(false); }
 }
 
 async function bootstrapCloudSync(showFeedback = false){
   try{
+    if(!isCloudAllowed()){
+      updateOnline(false);
+      if(showFeedback) showToast('Modo solo local activo');
+      return false;
+    }
     if(!navigator.onLine){
       updateOnline(false);
       if(showFeedback) showToast('Sin internet: trabajando en modo local');
@@ -2369,8 +2851,10 @@ function bindConnectivityEvents(){
   if(connectivityEventsBound) return;
   connectivityEventsBound = true;
   window.addEventListener('online', async ()=>{
-    showToast('Internet detectado, sincronizando...');
-    await bootstrapCloudSync(false);
+    if(isCloudAllowed()){
+      showToast('Internet detectado, sincronizando...');
+      await bootstrapCloudSync(false);
+    }else updateOnline(false);
     await ensureLucideLoaded();
     safeCreateIcons();
   });
@@ -2390,89 +2874,77 @@ function addPendingOp(op){
   op.id = op.id || uid();
   op.ts = op.ts || new Date().toISOString();
   op.retries = op.retries || 0;
-  pendingOps.push(op);
+  op.status = 'pending';
+  op.lastError = '';
+  const existingIndex = pendingOps.findIndex(item=>item.id===op.id);
+  if(existingIndex >= 0) pendingOps[existingIndex] = {...pendingOps[existingIndex],...op};
+  else pendingOps.push(op);
   savePending();
-  if(!op.silent) showToast('Operación en cola (offline)');
+  if(!op.silent) showToast(isCloudAllowed() && navigator.onLine ?'Operación guardada; esperando confirmación':'Operación guardada en cola local');
+  if(db && isCloudAllowed() && navigator.onLine) processPendingOps();
 }
 
-/* Try to flush pending ops; updates STATE locally on success and removes op */
+async function executePendingOperation(op){
+  if(op.type === 'sale') return upsertSale(op.payload);
+  if(op.type === 'product') return upsertProduct(op.payload);
+  if(op.type === 'customer') return upsertCustomer(op.payload);
+  if(op.type === 'stockClosure') return upsertStockClosure(op.payload);
+  if(op.type === 'staff') return upsertStaff(op.payload);
+  if(op.type === 'shift') return upsertShift(op.payload);
+  if(op.type === 'purchase') return upsertPurchase(op.payload);
+  if(op.type === 'supplier') return upsertSupplier(op.payload);
+  if(op.type === 'audit') return upsertAuditLog(op.payload);
+  if(op.type === 'stockMovement') return upsertStockMovement(op.payload);
+  if(op.type === 'syncConflict') return upsertSyncConflict(op.payload);
+  if(op.type === 'purchaseBundle') return upsertPurchaseBundle(op.payload);
+  throw new Error(`Tipo de operación no soportado: ${op.type||'vacío'}`);
+}
+
+/* Solo se retira una operación después de que Firestore confirma la escritura. */
 async function processPendingOps(){
-  if(!db) return;
+  if(!db || !navigator.onLine || !isCloudAllowed()) return;
   if(pendingOps.length === 0) return;
   if(syncInProgress) return;
   syncInProgress = true;
   try{
-    // We will attempt to apply ops sequentially
     for(let i = 0; i < pendingOps.length; ){
       const op = pendingOps[i];
+      if(op.nextAttemptAt && new Date(op.nextAttemptAt).getTime() > Date.now()){ i += 1; continue; }
       try{
-        if(op.type === 'sale'){
-          const sale = op.payload;
-          await upsertSale(sale);
-          // op succeeded -> remove
-          pendingOps.splice(i,1);
-          savePending();
-          if(!op.silent) showToast('Operación pendiente enviada');
-          // do not increment i: new element now at same index
-          continue;
-        } else if(op.type === 'product'){
-          // product upsert
-          const product = op.payload;
-          await upsertProduct(product);
-          pendingOps.splice(i,1);
-          savePending();
-          continue;
-        } else if(op.type === 'customer'){
-          const cust = op.payload;
-          await upsertCustomer(cust);
-          pendingOps.splice(i,1);
-          savePending();
-          continue;
-        } else if(op.type === 'stockClosure'){
-          await upsertStockClosure(op.payload);
-          pendingOps.splice(i,1);
-          savePending();
-          continue;
-        } else if(op.type === 'staff'){
-          await upsertStaff(op.payload);
-          pendingOps.splice(i,1);
-          savePending();
-          continue;
-        } else if(op.type === 'shift'){
-          await upsertShift(op.payload);
-          pendingOps.splice(i,1);
-          savePending();
-          continue;
-        } else {
-          // unknown op type -> remove (to avoid infinite loop)
-          console.warn('Unknown pending op type, discarding', op.type);
-          pendingOps.splice(i,1);
-          savePending();
-          continue;
-        }
-      }catch(err){
-        // operation failed: increase retry counter and break to try later
-        console.warn('Op failed, will retry later', pendingOps[i], err);
-        if(['stockClosure','staff','shift'].includes(pendingOps[i]?.type)){
-          const failedType = pendingOps[i]?.type;
-          pendingOps.splice(i,1);
-          savePending();
-          showToast(`${failedType === 'staff' ?'Personal':failedType === 'shift' ?'Turno':'Cierre'} guardado localmente; Firebase no autorizó su sincronización`, 2600);
-          continue;
-        }
-        pendingOps[i].retries = (pendingOps[i].retries || 0) + 1;
+        op.status = 'processing';
+        op.lastAttemptAt = new Date().toISOString();
         savePending();
-        // backoff behavior: break loop and wait for next reconnection
-        break;
+        await executePendingOperation(op);
+        op.status = 'confirmed';
+        op.confirmedAt = new Date().toISOString();
+        localStorage.setItem(LAST_SYNC_KEY,op.confirmedAt);
+        localStorage.removeItem(LAST_SYNC_ERROR_KEY);
+        savePending();
+        pendingOps.splice(i,1);
+        savePending();
+        if(!op.silent) showToast('Operación confirmada en la nube');
+        continue;
+      }catch(err){
+        console.warn('Op failed, retained for retry',op,err);
+        op.retries = (op.retries || 0) + 1;
+        op.status = 'error';
+        op.lastError = String(err?.message||err||'Error desconocido');
+        op.lastErrorCode = String(err?.code||'');
+        const waitMs = Math.min(300000,Math.max(5000,Math.pow(2,Math.min(op.retries,8))*1000));
+        op.nextAttemptAt = new Date(Date.now()+waitMs).toISOString();
+        localStorage.setItem(LAST_SYNC_ERROR_KEY,op.lastError);
+        savePending();
+        i += 1;
+        if(/network|unavailable|offline/i.test(`${op.lastErrorCode} ${op.lastError}`)) break;
       }
     }
   }catch(e){
     console.error('processPendingOps err', e);
   } finally {
     syncInProgress = false;
-    // save local state
     saveLocalBackup();
-    renderAll();
+    renderSyncCenter();
+    updateOnline(cloudOn);
   }
 }
 
@@ -2482,13 +2954,87 @@ setInterval(()=>{ if(cloudOn) processPendingOps(); }, 15000);
 /* =========
    ONLINE UI
    ========= */
+function getWorkMode(){ return localStorage.getItem(WORK_MODE_KEY)==='local' ?'local':'auto'; }
+function isCloudAllowed(){ return getWorkMode()==='auto'; }
+
+async function setWorkMode(mode){
+  localStorage.setItem(WORK_MODE_KEY,mode==='local'?'local':'auto');
+  if(mode==='local'){
+    Object.values(unsubscribers).forEach(unsubscribe=>{ if(unsubscribe) try{ unsubscribe(); }catch(_){} });
+    Object.keys(unsubscribers).forEach(key=>unsubscribers[key]=null);
+    cloudOn = false;
+    updateOnline(false);
+    showToast('Modo solo local activado');
+  }else{
+    updateOnline(false);
+    showToast('Modo automático activado');
+    if(navigator.onLine) await bootstrapCloudSync(true);
+  }
+  renderSyncCenter();
+}
+
+function renderSyncCenter(){
+  const mode = getWorkMode();
+  const pending = pendingOps.filter(op=>op.status!=='confirmed').length;
+  const errors = pendingOps.filter(op=>op.status==='error').length;
+  const badge = $('#pending-count');
+  if(badge){ badge.textContent=String(pending); badge.classList.toggle('hidden',pending===0); }
+  $('#sync-center-pending') && ($('#sync-center-pending').textContent=errors?`${pending} (${errors} con error)`:String(pending));
+  $('#sync-center-status') && ($('#sync-center-status').textContent=mode==='local'?'Solo local':cloudOn?'Conectado y confirmado':navigator.onLine?'Conectando':'Sin Internet');
+  const last = localStorage.getItem(LAST_SYNC_KEY);
+  $('#sync-center-last') && ($('#sync-center-last').textContent=last?new Date(last).toLocaleString():'Nunca');
+  const error = localStorage.getItem(LAST_SYNC_ERROR_KEY)||'';
+  $('#sync-center-error-row')?.classList.toggle('hidden',!error);
+  $('#sync-center-error') && ($('#sync-center-error').textContent=error);
+  $('#sync-mode-auto')?.classList.toggle('bg-emerald-50',mode==='auto');
+  $('#sync-mode-auto')?.classList.toggle('border-emerald-500',mode==='auto');
+  $('#sync-mode-local')?.classList.toggle('bg-amber-50',mode==='local');
+  $('#sync-mode-local')?.classList.toggle('border-amber-500',mode==='local');
+  const conflicts = (STATE.syncConflicts||[]).filter(item=>item.status!=='RESOLVED');
+  $('#sync-conflicts-box')?.classList.toggle('hidden',conflicts.length===0);
+  $('#sync-conflicts-count') && ($('#sync-conflicts-count').textContent=String(conflicts.length));
+  if($('#sync-conflicts-list')) $('#sync-conflicts-list').innerHTML=conflicts.slice(0,20).map(item=>`<div>${escapeHtml(item.productName||item.type||'Conflicto')}: local ${escapeHtml(item.localStock??'')} / nube ${escapeHtml(item.remoteStock??'')}</div>`).join('');
+}
+
+function openSyncCenter(){ renderSyncCenter(); openModal('modal-sync-center'); safeCreateIcons(); }
+
+async function syncNow(){
+  if(!isCloudAllowed()) return alert('Activa el modo Automático para sincronizar con la nube.');
+  if(!navigator.onLine) return alert('No hay conexión a Internet. Los cambios permanecen seguros en este equipo.');
+  const ready = db ?true:await bootstrapCloudSync(true);
+  if(ready || db){
+    pendingOps.forEach(op=>{ if(op.status==='error') op.nextAttemptAt=null; });
+    savePending();
+    await processPendingOps();
+    renderSyncCenter();
+  }
+}
+
+async function downloadDataBackup(){
+  try{
+    const backup = window.POSStorage ?await POSStorage.createBackup(STATE,pendingOps,{deviceId:getDeviceId(),workMode:getWorkMode()}):{createdAt:new Date().toISOString(),state:STATE,pendingOps};
+    const blob = new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `TiendaSmart_respaldo_${todayYMD()}_${Date.now()}.json`;
+    link.click();
+    setTimeout(()=>URL.revokeObjectURL(link.href),1000);
+    showToast('Respaldo JSON exportado');
+  }catch(error){ alert('No se pudo exportar el respaldo: '+(error.message||error)); }
+}
+
 function updateOnline(on){
   cloudOn = !!on;
-  $('#dot').style.background = on ?'#10b981' : '#ef4444';
-  $('#cloud-text').textContent = on ?'Online' : 'Desconectado';
-  if(on) {
+  const localOnly = !isCloudAllowed();
+  const pending = pendingOps.filter(op=>op.status!=='confirmed').length;
+  if($('#dot')) $('#dot').style.background = localOnly?'#64748b':on?(pending?'#f59e0b':'#10b981'):'#ef4444';
+  if($('#cloud-text')) $('#cloud-text').textContent = localOnly?'Solo local':on?(pending?`Pendientes ${pending}`:'Sincronizado'):(navigator.onLine?'Sin confirmar':'Sin Internet');
+  if(on){
+    localStorage.setItem(LAST_SYNC_KEY,new Date().toISOString());
+    localStorage.removeItem(LAST_SYNC_ERROR_KEY);
     processPendingOps();
   }
+  renderSyncCenter();
 }
 
 /* =========
@@ -2844,6 +3390,8 @@ function setPayMethod(m, ev){
    - when online: tries to push to Firestore and process pendingOps
    ========== */
 async function completeSale(){
+  if(saleSubmitInProgress) return;
+  saleSubmitInProgress=true;
   try{
     if(cart.length === 0) return alert('El carrito está vacío');
     const activeShift = getActiveShiftForCurrentUser();
@@ -2892,7 +3440,7 @@ async function completeSale(){
 
     // assemble sale object with customerId handling
     const sale = {
-      id: 'V-' + Date.now(),
+      id: 'V-' + uid(),
       date: new Date().toISOString(),
       total: cart.reduce((a,b)=> a + (b.price*b.qty), 0),
       paymentType: payMethod,
@@ -2903,7 +3451,7 @@ async function completeSale(){
       shiftId:activeShift.id,
       createdBy: getCurrentActor(),
       items: cart.map(i=> ({ productId: i.id, qty: i.qty, unitPrice: i.price })),
-      meta: { origin: 'pos', device: navigator.userAgent, responsible }
+      meta: { origin: 'pos', deviceId:getDeviceId(), device: navigator.userAgent, responsible }
     };
 
     // handle credit: must use an already registered customer
@@ -2921,7 +3469,7 @@ async function completeSale(){
         return;
       }
       customer.balance = Number((Number(customer.balance||0) + Number(sale.total)).toFixed(2));
-      addPendingOp({ type: 'customer', payload: { id: customer.id, name: customer.name, balance: customer.balance } });
+      addPendingOp({ id:`CUSTOMER-${sale.id}-${customer.id}`,type: 'customer', payload: { id: customer.id, name: customer.name, balance: customer.balance } });
       sale.customerId = customer.id;
       sale.customerName = customer.name;
     }
@@ -2936,6 +3484,14 @@ async function completeSale(){
 
     // Add sale locally
     STATE.sales.unshift(sale);
+    touchedProductIds.forEach(id=>{
+      const product=getProductById(id);
+      const movement=(product?.movements||[]).find(item=>item.saleId===sale.id);
+      if(!movement) return;
+      const stockMovement={...movement,id:movement.id||`SALE-MOV-${sale.id}-${id}`,movementId:movement.id||`SALE-MOV-${sale.id}-${id}`,productId:id,productName:product.name,shiftId:sale.shiftId,staffId:sale.staffId,deviceId:getDeviceId()};
+      if(!(STATE.stockMovements||[]).some(item=>item.id===stockMovement.id)) STATE.stockMovements.unshift(stockMovement);
+      addPendingOp({id:`STOCK-MOV-${stockMovement.id}`,type:'stockMovement',payload:stockMovement,silent:true});
+    });
     saveLocalBackup();
 
     // post-sale UI updates (close modal immediately)
@@ -2948,12 +3504,12 @@ async function completeSale(){
     if($('#pos-customer')) $('#pos-customer').value = '';
 
     // Build op and either process immediately or queue
-    const op = { type: 'sale', payload: sale };
+    const op = { id:`SALE-${sale.id}`,type: 'sale', payload: sale };
     addPendingOp(op);
     if(touchedProductIds.size > 0){
       touchedProductIds.forEach(id => {
         const p = getProductById(id);
-        if(p) addPendingOp({ type: 'product', payload: p, silent: true });
+        if(p) addPendingOp({ id:`PRODUCT-${sale.id}-${p.id}`,type: 'product', payload: p, silent: true });
       });
     } else {
       queueProductSyncFromItems(sale.items);
@@ -2962,11 +3518,13 @@ async function completeSale(){
       showToast('Venta guardada offline. Se sincronizará cuando haya conexión.');
     } else {
       processPendingOps();
-      showToast('Venta registrada y sincronizada');
+      showToast('Venta registrada; esperando confirmación de nube');
     }
   }catch(e){
     console.error('completeSale err', e);
     alert('Error registrando venta: ' + (e && e.message || ''));
+  }finally{
+    saleSubmitInProgress=false;
   }
 }
 
@@ -3427,7 +3985,7 @@ function polishWorkbook(wb){
     }
     ws['!cols']=cols;
   });
-  wb.Props={...(wb.Props||{}),Title:'Reporte Minimarket La Esquina del Ahorro',Author:'TiendaSmart',CreatedDate:new Date()};
+  wb.Props={...(wb.Props||{}),Title:'Reporte Minimarket El Erizo',Author:'TiendaSmart',CreatedDate:new Date()};
 }
 
 function writeWorkbookFile(wb, filename){
@@ -3664,7 +4222,7 @@ function generateReportData(from,to){
 function renderReportSummary(from,to){
   const { groups, grand, totalOps, sales } = generateReportData(from,to);
   const parts = [];
-  parts.push(`<div style="display:flex;justify-content:space-between;align-items:center"><div><h2 style="margin:0">MINIMARKET — LA ESQUINA DEL AHORRO</h2><div class="small-muted">${from} → ${to}</div></div><div style="text-align:right"><div style="font-weight:800">Total S/ ${money(grand)}</div><div class="small-muted">${totalOps} ventas</div></div></div><hr/>`);
+  parts.push(`<div style="display:flex;justify-content:space-between;align-items:center"><div><h2 style="margin:0">MINIMARKET EL ERIZO</h2><div class="small-muted">${from} → ${to}</div></div><div style="text-align:right"><div style="font-weight:800">Total S/ ${money(grand)}</div><div class="small-muted">${totalOps} ventas</div></div></div><hr/>`);
   parts.push(`<div style="display:flex;gap:8px;margin-top:8px">`);
   ['EFECTIVO','YAPE','A_CREDITO','OTHER'].forEach(k=>{
     const lbl = k==='A_CREDITO' ?'A CREDITO' : (k==='OTHER' ?'OTROS' : k);
@@ -3741,7 +4299,7 @@ function getMovementStockDelta(movement){
   const type = String(movement?.type || '').trim().toUpperCase();
   const qty = Number(movement?.qty || 0);
   if(!Number.isFinite(qty)) return 0;
-  if(type === 'INGRESO' || type === 'INGRESO_SUB' || type === 'IN' || type === 'ENTRADA') return qty;
+  if(type === 'INGRESO' || type === 'INGRESO_SUB' || type === 'PURCHASE_IN' || type === 'PURCHASE_IN_SUB' || type === 'IN' || type === 'ENTRADA') return qty;
   if(type === 'MANUAL_ADJUSTMENT' || type === 'INITIAL_STOCK') return qty;
   if(['OUT','EDIT_SALE','ROLLBACK','SALE','VENTA','PRODUCT_DELETED'].includes(type)) return -qty;
   return 0;
@@ -4352,91 +4910,7 @@ async function exportDailyStockXLSX(){
   }
 }
 
-/* =========
-   SCANNER (BarcodeDetector preferred; Quagga fallback)
-   - auto-close camera when registered
-   - if product not found -> open product modal with barcode pre-filled
-   ========= */
-let videoStream = null, detecting = false;
-async function startScanner(){
-  openModal('modal-scan');
-  try{
-    const constraints = { video: { facingMode: { ideal: 'environment' }, width: { ideal:1280 }, height: { ideal:720 } }, audio:false };
-    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
-    $('#video').srcObject = videoStream;
-    await $('#video').play();
-    detecting = true;
-    detectionLoop();
-  }catch(e){
-    console.warn('camera access err', e);
-    alert('No se pudo acceder a la cámara: ' + (e && e.message || ''));
-  }
-}
-
-async function stopScanner(){
-  detecting = false;
-  if(videoStream){ videoStream.getTracks().forEach(t=> t.stop()); videoStream = null; }
-  if($('#video')) $('#video').srcObject = null;
-}
-
-async function detectionLoop(){
-  const video = $('#video');
-  while(detecting && video && !video.paused){
-    try{
-      if('BarcodeDetector' in window){
-        const detector = new BarcodeDetector({ formats: ['ean_13','code_128','upc_e','upc_a','ean_8'] });
-        const barcodes = await detector.detect(video);
-        if(barcodes && barcodes.length){
-          const code = barcodes[0].rawValue;
-          $('#scanned-code').value = code;
-          showToast('Código detectado: ' + code, 800);
-          setTimeout(()=> registerScanned(), 400);
-          break;
-        }
-      } else if(typeof Quagga !== 'undefined'){
-        if(!Quagga.initialized){
-          Quagga.init({
-            inputStream: { name: "Live", type: "LiveStream", target: document.querySelector('#video') },
-            decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","upc_reader","upc_e_reader"] },
-            locate: true,
-          }, function(err){
-            if(err){ console.error(err); return; }
-            Quagga.initialized = true; Quagga.start();
-          });
-          Quagga.onDetected(data => {
-            const code = data.codeResult.code;
-            $('#scanned-code').value = code;
-            showToast('Código (Quagga): ' + code, 800);
-            setTimeout(()=> registerScanned(), 400);
-          });
-        }
-      }
-    }catch(e){ console.warn('detect loop err', e); }
-    await new Promise(r=>setTimeout(r, 300));
-  }
-}
-
-function registerScanned(){
-  const code = $('#scanned-code').value.trim();
-  if(!code) return alert('No hay código detectado');
-  const found = (STATE.products||[]).find(p=> !p.deleted && (p.barcode === code || (p.barcode||'').replace(/\D/g,'') === code.replace(/\D/g,'')));
-  if(found){
-    addToCart(found);
-    showToast('Agregado: ' + found.name);
-    closeModal('modal-scan');
-    stopScanner();
-  } else {
-    // open product modal with code prefilled
-    closeModal('modal-scan');
-    stopScanner();
-    requireStockAccess(()=>{
-      openNewProductModal('',code);
-      showToast('Código nuevo - complete registro');
-    });
-  }
-}
-
-/* Scanner override: robust mobile camera + detector fallback */
+/* Scanner robusto: BarcodeDetector nativo con Quagga2 local como respaldo. */
 const SCANNER = {
   stream: null,
   running: false,
@@ -4447,24 +4921,79 @@ const SCANNER = {
   lastCode: '',
   lastAt: 0,
   debounceMs: 1200,
+  candidateCode: '',
+  candidateAt: 0,
+  candidateReads: 0,
+  session: 0,
+  torchOn: false,
+  nativeUnavailable: false,
+  difficultMode: false,
+  difficultAuto: false,
+  noReadFrames: 0,
+  frameNumber: 0,
+  modeStartedAt: 0,
+  capabilities: {},
   frameCanvas: document.createElement('canvas'),
-  readers: ["code_128_reader","ean_reader","ean_8_reader","upc_reader","upc_e_reader"]
+  workCanvas: document.createElement('canvas'),
+  readers: ["code_128_reader","code_39_reader","ean_reader","ean_8_reader","upc_reader","upc_e_reader"]
 };
-let scannerPendingProductCode = '';
 
 function scannerNormalize(code){
-  return String(code || '').trim().replace(/\s+/g, '');
+  return String(code || '').trim().replace(/[\r\n\t ]+/g, '');
+}
+
+function validateGtinChecksum(code){
+  const value = String(code||'');
+  if(!/^\d+$/.test(value) || ![8,12,13,14].includes(value.length)) return false;
+  const body = value.slice(0,-1).split('').reverse();
+  const sum = body.reduce((total,digit,index)=>total+(Number(digit)*(index%2===0?3:1)),0);
+  return (10-(sum%10))%10 === Number(value.at(-1));
+}
+
+function expandUpce(code){
+  const value = String(code||'');
+  if(!/^\d{8}$/.test(value)) return '';
+  const ns=value[0], body=value.slice(1,7), check=value[7], last=body[5];
+  let manufacturer='',product='';
+  if(['0','1','2'].includes(last)){ manufacturer=body.slice(0,2)+last+'00'; product='00'+body.slice(2,5); }
+  else if(last==='3'){ manufacturer=body.slice(0,3)+'00'; product='000'+body.slice(3,5); }
+  else if(last==='4'){ manufacturer=body.slice(0,4)+'0'; product='0000'+body[4]; }
+  else { manufacturer=body.slice(0,5); product='0000'+last; }
+  const expanded = ns+manufacturer+product+check;
+  return validateGtinChecksum(expanded)?expanded:'';
+}
+
+function validateBarcodeCandidate(rawCode,format=''){
+  const code = scannerNormalize(rawCode);
+  const normalizedFormat = String(format||'').toLowerCase();
+  if(!code || code.length<4 || code.length>48) return {valid:false,code,reason:'longitud'};
+  if(!/^[0-9A-Za-z\-_.\/]+$/.test(code)) return {valid:false,code,reason:'caracteres'};
+  if(/^\d+$/.test(code) && [8,12,13,14].includes(code.length) && !validateGtinChecksum(code)) return {valid:false,code,reason:'checksum'};
+  if(/ean_13|ean-13/.test(normalizedFormat) && code.length!==13) return {valid:false,code,reason:'formato'};
+  if(/ean_8|ean-8/.test(normalizedFormat) && code.length!==8) return {valid:false,code,reason:'formato'};
+  if(/upc_a|upc-a/.test(normalizedFormat) && code.length!==12) return {valid:false,code,reason:'formato'};
+  if(/upc_e|upc-e/.test(normalizedFormat) && code.length!==8) return {valid:false,code,reason:'formato'};
+  return {valid:true,code,format:normalizedFormat};
+}
+
+function barcodeAliases(rawCode){
+  const code = scannerNormalize(rawCode);
+  const aliases = new Set([code]);
+  if(/^\d{12}$/.test(code) && validateGtinChecksum(code)) aliases.add('0'+code);
+  if(/^0\d{12}$/.test(code) && validateGtinChecksum(code)) aliases.add(code.slice(1));
+  const expanded = expandUpce(code);
+  if(expanded) aliases.add(expanded);
+  return aliases;
 }
 
 function scannerFindProductByCode(rawCode){
   const code = scannerNormalize(rawCode);
   if(!code) return null;
-  const digits = code.replace(/\D/g,'');
+  const aliases = barcodeAliases(code);
   return (STATE.products||[]).find(p => {
     if(p.deleted) return false;
     const bc = scannerNormalize(p.barcode);
-    const bDigits = bc.replace(/\D/g,'');
-    return bc === code || (digits && bDigits && bDigits === digits);
+    return barcodeAliases(bc).has(code) || aliases.has(bc);
   }) || null;
 }
 
@@ -4481,11 +5010,31 @@ function resetPosSearchForScanner(){
   }
 }
 
-function scannerHandleScannedCode(rawCode, source = 'scanner'){
-  const code = scannerNormalize(rawCode);
-  if(!code) return false;
+function setScannerStatus(message,type='info'){
+  const status = $('#scanner-status');
+  if(!status) return;
+  status.textContent = message;
+  status.style.background = type==='error'?'#fef2f2':type==='success'?'#ecfdf5':'#f8fafc';
+  status.style.color = type==='error'?'#b91c1c':type==='success'?'#047857':'#334155';
+  status.style.borderColor = type==='error'?'#fecaca':type==='success'?'#a7f3d0':'#e2e8f0';
+}
+
+function scannerHandleScannedCode(rawCode, source = 'scanner', format = ''){
+  const validated = validateBarcodeCandidate(rawCode,format);
+  const code = validated.code;
+  if(!validated.valid){
+    if(!$('#modal-scan')?.classList.contains('visible')) openModal('modal-scan');
+    setScannerStatus('NO SE PUDO LEER EL CÓDIGO. INTENTA NUEVAMENTE','error');
+    return false;
+  }
   const found = scannerFindProductByCode(code);
   if(found){
+    if(!getActiveShiftForCurrentUser()){
+      SCANNER.running = false;
+      setScannerStatus('ABRE UN TURNO ANTES DE REGISTRAR UNA VENTA.','error');
+      showToast('No se puede vender sin un turno abierto',2200);
+      return false;
+    }
     if(!$('#modal-sale')?.classList.contains('visible')){
       openModal('modal-sale');
     }
@@ -4499,17 +5048,12 @@ function scannerHandleScannedCode(rawCode, source = 'scanner'){
     return true;
   }
 
-  if($('#modal-scan')?.classList.contains('visible')){
-    closeModal('modal-scan');
-    window.stopScanner();
-  }
-  resetPosSearchForScanner();
-  requireStockAccess(()=>{
-    scannerPendingProductCode = code;
-    openNewProductModal('',code,true);
-    $('#p-name')?.focus();
-    showToast(`Código no registrado (${source}). Completa el producto en Stock.`,2600);
-  });
+  SCANNER.running = false;
+  scannerStopTracks();
+  if(!$('#modal-scan')?.classList.contains('visible')) openModal('modal-scan');
+  if($('#scanned-code')) $('#scanned-code').value=code;
+  setScannerStatus('PRODUCTO NO ENCONTRADO','error');
+  showToast(`Producto no encontrado (${source})`,1800);
   return false;
 }
 
@@ -4552,13 +5096,24 @@ function scannerDrawGuide(){
   const ctx = canvas.getContext('2d');
   if(!ctx) return;
   ctx.clearRect(0, 0, w, h);
-  const boxW = Math.floor(w * 0.78);
-  const boxH = Math.floor(h * 0.28);
+  const boxW = Math.floor(w * (SCANNER.difficultMode ?0.9:0.78));
+  const boxH = Math.floor(h * (SCANNER.difficultMode ?0.42:0.28));
   const x = Math.floor((w - boxW) / 2);
   const y = Math.floor((h - boxH) / 2);
-  ctx.strokeStyle = 'rgba(16,185,129,0.95)';
+  ctx.strokeStyle = SCANNER.difficultMode ?'rgba(245,158,11,0.98)':'rgba(16,185,129,0.95)';
   ctx.lineWidth = 3;
   ctx.strokeRect(x, y, boxW, boxH);
+  if(SCANNER.difficultMode){
+    ctx.save();
+    ctx.setLineDash([8,7]);
+    ctx.lineWidth=1.5;
+    ctx.strokeStyle='rgba(255,255,255,0.8)';
+    ctx.beginPath();
+    ctx.moveTo(x,y+(boxH*0.34)); ctx.lineTo(x+boxW,y+(boxH*0.34));
+    ctx.moveTo(x,y+(boxH*0.66)); ctx.lineTo(x+boxW,y+(boxH*0.66));
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function scannerStopTracks(){
@@ -4573,7 +5128,7 @@ function scannerStopTracks(){
 async function scannerStartVideo(deviceId){
   const video = $('#video');
   if(!video) throw new Error('No se encontro el elemento de video');
-  const base = { width: { ideal: 1280 }, height: { ideal: 720 } };
+  const base = { width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 }, frameRate:{ideal:30,min:20} };
   const preferred = deviceId ?{ ...base, deviceId: { exact: deviceId } } : { ...base, facingMode: { ideal: 'environment' } };
   let stream = null;
   try{
@@ -4584,74 +5139,214 @@ async function scannerStartVideo(deviceId){
   SCANNER.stream = stream;
   video.srcObject = stream;
   await video.play();
+  const track = stream.getVideoTracks()[0];
+  const capabilities = track?.getCapabilities?.() || {};
+  SCANNER.capabilities=capabilities;
+  const continuousSettings=[['focusMode','continuous'],['exposureMode','continuous'],['whiteBalanceMode','continuous']];
+  for(const [setting,value] of continuousSettings){
+    try{
+      if(Array.isArray(capabilities[setting]) && capabilities[setting].includes(value)) await track.applyConstraints({advanced:[{[setting]:value}]});
+    }catch(error){ console.debug(`${setting} no disponible`,error); }
+  }
+  const torchButton = $('#btn-scan-torch');
+  if(torchButton) torchButton.classList.toggle('hidden',!capabilities.torch);
+  const zoomWrap = $('#scan-zoom-wrap');
+  const zoomInput = $('#scan-zoom');
+  if(zoomWrap) zoomWrap.classList.toggle('hidden',!capabilities.zoom);
+  if(capabilities.zoom && zoomInput){
+    zoomInput.min=capabilities.zoom.min; zoomInput.max=capabilities.zoom.max;
+    zoomInput.step=capabilities.zoom.step||0.1; zoomInput.value=track.getSettings?.().zoom||capabilities.zoom.min;
+  }
+  await applyDifficultCameraSettings(SCANNER.difficultMode);
 }
 
-function scannerOnDetected(raw, source){
-  const code = scannerNormalize(raw);
-  if(!code || scannerIsRepeated(code)) return;
+function scannerUpdateDifficultUI(){
+  const button=$('#btn-scan-difficult');
+  const help=$('#scanner-difficult-help');
+  if(button){
+    button.textContent=SCANNER.difficultMode
+      ?`Modo curvo/plástico ACTIVO${SCANNER.difficultAuto?' (automático)':''}`
+      :'Envase curvo / plástico';
+    button.classList.toggle('bg-amber-500',SCANNER.difficultMode);
+    button.classList.toggle('text-white',SCANNER.difficultMode);
+    button.classList.toggle('bg-amber-50',!SCANNER.difficultMode);
+    button.classList.toggle('text-amber-900',!SCANNER.difficultMode);
+  }
+  help?.classList.toggle('hidden',!SCANNER.difficultMode);
+}
+
+async function applyDifficultCameraSettings(enabled){
+  const track=SCANNER.stream?.getVideoTracks?.()[0];
+  if(!track) return;
+  const capabilities=track.getCapabilities?.()||SCANNER.capabilities||{};
+  if(enabled && SCANNER.torchOn){
+    try{ await track.applyConstraints({advanced:[{torch:false}]}); }catch(_){ }
+    SCANNER.torchOn=false;
+    if($('#btn-scan-torch')) $('#btn-scan-torch').textContent='Linterna';
+  }
+  if(capabilities.exposureCompensation){
+    const min=Number(capabilities.exposureCompensation.min||0);
+    const max=Number(capabilities.exposureCompensation.max||0);
+    const step=Number(capabilities.exposureCompensation.step||0.1);
+    const rawTarget=enabled ?Math.max(min,Math.min(max,-0.7)):Math.max(min,Math.min(max,0));
+    const target=Math.max(min,Math.min(max,min+(Math.round((rawTarget-min)/step)*step)));
+    try{ await track.applyConstraints({advanced:[{exposureCompensation:target}]}); }catch(_){ }
+  }
+}
+
+async function setDifficultScanMode(enabled,automatic=false){
+  SCANNER.difficultMode=!!enabled;
+  SCANNER.difficultAuto=!!enabled && !!automatic;
+  SCANNER.modeStartedAt=Date.now();
+  SCANNER.noReadFrames=0;
+  scannerUpdateDifficultUI();
+  await applyDifficultCameraSettings(SCANNER.difficultMode);
+  if(SCANNER.difficultMode){
+    setScannerStatus(automatic
+      ?'Lectura reforzada activada. Inclina un poco el envase para sacar el reflejo.'
+      :'Modo curvo/plástico activo. Inclina el envase y mantén visibles todas las barras.');
+  }else setScannerStatus('Lectura normal activa. Apunta al código y mantenlo dentro del recuadro.');
+}
+
+window.toggleDifficultScanMode=function toggleDifficultScanMode(){
+  return setDifficultScanMode(!SCANNER.difficultMode,false);
+};
+
+function scannerOnDetected(raw, source, format=''){
+  const validated = validateBarcodeCandidate(raw,format);
+  if(!validated.valid){
+    setScannerStatus('NO SE PUDO LEER EL CÓDIGO. INTENTA NUEVAMENTE','error');
+    SCANNER.candidateCode=''; SCANNER.candidateReads=0;
+    return;
+  }
+  const code = validated.code;
+  const now = Date.now();
+  const stableWindow=SCANNER.difficultMode?2800:1400;
+  if(code===SCANNER.candidateCode && now-SCANNER.candidateAt<stableWindow) SCANNER.candidateReads+=1;
+  else { SCANNER.candidateCode=code; SCANNER.candidateReads=1; }
+  SCANNER.candidateAt=now;
+  const isCameraQuagga=String(source).startsWith('quagga');
+  const checksumProtected=/^\d+$/.test(code) && [8,12,13,14].includes(code.length) && validateGtinChecksum(code);
+  const requiredReads=isCameraQuagga?(checksumProtected?2:3):source==='detector'?2:1;
+  setScannerStatus(`Leyendo ${code} (${SCANNER.candidateReads}/${requiredReads})...`);
+  if(SCANNER.candidateReads<requiredReads || scannerIsRepeated(code)) return;
   const input = $('#scanned-code');
   if(input) input.value = code;
-  showToast(`Codigo detectado (${source}): ${code}`, 600);
   if(navigator.vibrate) try{ navigator.vibrate(60); }catch(_){}
-  scannerHandleScannedCode(code, source);
+  scannerHandleScannedCode(code, source, format);
 }
 
 async function scannerDetectWithNative(video){
-  if(!('BarcodeDetector' in window)) return null;
-  if(!SCANNER.detector){
-    SCANNER.detector = new BarcodeDetector({ formats: ['ean_13','code_128','upc_e','upc_a','ean_8'] });
+  if(!('BarcodeDetector' in window) || SCANNER.nativeUnavailable) return null;
+  try{
+    if(!SCANNER.detector){
+      try{ SCANNER.detector = new BarcodeDetector({ formats: ['ean_13','code_128','code_39','upc_e','upc_a','ean_8'] }); }
+      catch(_){ SCANNER.detector = new BarcodeDetector(); }
+    }
+    const list = await SCANNER.detector.detect(video);
+    if(!list || list.length === 0) return null;
+    return {code:list[0]?.rawValue||'',format:list[0]?.format||''};
+  }catch(error){
+    console.warn('BarcodeDetector no disponible; se usará Quagga local',error);
+    SCANNER.nativeUnavailable=true;
+    return null;
   }
-  const list = await SCANNER.detector.detect(video);
-  if(!list || list.length === 0) return null;
-  return list[0]?.rawValue || null;
 }
 
-function scannerDetectWithQuagga(video){
+function scannerBuildEnhancedFrame(video,variant=0){
+  const sourceW=video.videoWidth||0;
+  const sourceH=video.videoHeight||0;
+  if(sourceW<=0||sourceH<=0) return null;
+  const wide=variant===1?0.98:0.9;
+  const tall=variant===1?0.62:0.48;
+  const scanW=Math.floor(sourceW*wide);
+  const scanH=Math.floor(sourceH*tall);
+  const verticalOffsets=[0,0.12,-0.12];
+  const centerY=(sourceH-scanH)/2+(sourceH*verticalOffsets[variant%verticalOffsets.length]);
+  const sx=Math.max(0,Math.floor((sourceW-scanW)/2));
+  const sy=Math.max(0,Math.min(sourceH-scanH,Math.floor(centerY)));
+  const outputW=Math.min(1400,scanW);
+  const outputH=Math.max(280,Math.floor(scanH*(outputW/scanW)));
+  const canvas=SCANNER.frameCanvas;
+  canvas.width=outputW; canvas.height=outputH;
+  const ctx=canvas.getContext('2d',{willReadFrequently:false});
+  if(!ctx) return null;
+  ctx.clearRect(0,0,outputW,outputH);
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality='high';
+  ctx.filter=variant===0?'contrast(1.12) saturate(0.8)':variant===1?'grayscale(1) contrast(1.55) brightness(0.9)':'grayscale(1) contrast(1.85) brightness(0.82)';
+  if(variant!==2){
+    ctx.drawImage(video,sx,sy,scanW,scanH,0,0,outputW,outputH);
+  }else{
+    // Estira suavemente los extremos comprimidos por botellas y envases cilíndricos.
+    const weights=[1.22,1.12,1.04,1,1.04,1.12,1.22];
+    const weightTotal=weights.reduce((sum,value)=>sum+value,0);
+    const sourceSlice=scanW/weights.length;
+    let targetX=0;
+    weights.forEach((weight,index)=>{
+      const targetW=index===weights.length-1?outputW-targetX:Math.round(outputW*(weight/weightTotal));
+      ctx.drawImage(video,sx+(index*sourceSlice),sy,sourceSlice,scanH,targetX,0,targetW,outputH);
+      targetX+=targetW;
+    });
+  }
+  ctx.filter='none';
+  return canvas;
+}
+
+function scannerDetectWithQuagga(video,variant=0){
   if(typeof Quagga === 'undefined') return Promise.resolve(null);
-  const w = video.videoWidth || 0;
-  const h = video.videoHeight || 0;
-  if(w <= 0 || h <= 0) return Promise.resolve(null);
-  const scanW = Math.floor(w * 0.82);
-  const scanH = Math.floor(h * 0.34);
-  const sx = Math.floor((w - scanW) / 2);
-  const sy = Math.floor((h - scanH) / 2);
-  SCANNER.frameCanvas.width = scanW;
-  SCANNER.frameCanvas.height = scanH;
-  const ctx = SCANNER.frameCanvas.getContext('2d');
-  if(!ctx) return Promise.resolve(null);
-  ctx.drawImage(video, sx, sy, scanW, scanH, 0, 0, scanW, scanH);
-  const src = SCANNER.frameCanvas.toDataURL('image/jpeg', 0.85);
+  const frame=scannerBuildEnhancedFrame(video,variant);
+  if(!frame) return Promise.resolve(null);
+  const src=frame.toDataURL(variant===0?'image/jpeg':'image/png',variant===0?0.94:undefined);
   return new Promise(resolve => {
     Quagga.decodeSingle({
       src,
       numOfWorkers: 0,
       locate: true,
-      inputStream: { size: 1024 },
-      decoder: { readers: SCANNER.readers }
-    }, result => resolve(result?.codeResult?.code || null));
+      inputStream: { size: SCANNER.difficultMode?1400:1100, singleChannel:false },
+      locator:{patchSize:SCANNER.difficultMode?'medium':'large',halfSample:!SCANNER.difficultMode},
+      decoder: { readers: SCANNER.readers, multiple:false }
+    }, result => resolve(result?.codeResult ?{code:result.codeResult.code||'',format:result.codeResult.format||''}:null));
   });
 }
 
-async function scannerLoop(){
+async function scannerLoop(session){
   const video = $('#video');
   if(!video) return;
-  while(SCANNER.running){
+  while(SCANNER.running && session===SCANNER.session){
     try{
       scannerDrawGuide();
       if(video.readyState >= 2){
-        let code = null;
-        if('BarcodeDetector' in window){
-          code = await scannerDetectWithNative(video);
-          if(code) scannerOnDetected(code, 'detector');
-        } else {
-          code = await scannerDetectWithQuagga(video);
-          if(code) scannerOnDetected(code, 'quagga');
+        SCANNER.frameNumber+=1;
+        let result = null;
+        const variant=SCANNER.difficultMode?(SCANNER.frameNumber%3):0;
+        if('BarcodeDetector' in window && !SCANNER.nativeUnavailable){
+          const nativeSource=SCANNER.difficultMode && SCANNER.frameNumber%2===0
+            ?(scannerBuildEnhancedFrame(video,variant)||video)
+            :video;
+          result = await scannerDetectWithNative(nativeSource);
+          if(result) scannerOnDetected(result.code,'detector',result.format);
+        }
+        if(!result){
+          SCANNER.noReadFrames+=1;
+          if(!SCANNER.difficultMode && SCANNER.noReadFrames>=11){
+            await setDifficultScanMode(true,true);
+          }
+          if(SCANNER.difficultMode || !('BarcodeDetector' in window) || SCANNER.nativeUnavailable){
+            result = await scannerDetectWithQuagga(video,variant);
+            if(result) scannerOnDetected(result.code,SCANNER.difficultMode?'quagga-curvo':'quagga',result.format);
+          }
+          if(!result && SCANNER.difficultMode && SCANNER.frameNumber%12===0){
+            setScannerStatus('Sigo buscando: inclina lentamente el envase y procura que el brillo no cubra las barras.');
+          }
+        }else{
+          SCANNER.noReadFrames=0;
         }
       }
     }catch(e){
       console.warn('scan loop error', e);
     }
-    await new Promise(r => setTimeout(r, ('BarcodeDetector' in window) ?170 : 420));
+    await new Promise(r => setTimeout(r,SCANNER.difficultMode?180:(('BarcodeDetector' in window) && !SCANNER.nativeUnavailable?170:360)));
   }
 }
 
@@ -4673,8 +5368,15 @@ window.restartScanner = async function restartScanner(){
       SCANNER.index = scannerPreferredIndex(SCANNER.devices);
     }
     scannerUpdateSwitchBtn();
+    SCANNER.candidateCode=''; SCANNER.candidateReads=0; SCANNER.lastCode=''; SCANNER.torchOn=false; SCANNER.nativeUnavailable=false;
+    SCANNER.noReadFrames=0; SCANNER.frameNumber=0; SCANNER.modeStartedAt=Date.now();
     SCANNER.running = true;
-    scannerLoop();
+    const session=++SCANNER.session;
+    scannerUpdateDifficultUI();
+    setScannerStatus(SCANNER.difficultMode
+      ?'Modo curvo/plástico activo. Inclina el envase y mantén visibles todas las barras.'
+      :'Apunta al código y mantenlo dentro del recuadro.');
+    scannerLoop(session);
   }catch(e){
     console.warn('camera access err', e);
     alert('No se pudo acceder a la camara. Verifica permisos del navegador y usa HTTPS si aplica.');
@@ -4694,12 +5396,22 @@ window.switchScannerCamera = async function switchScannerCamera(){
 
 window.startScanner = async function startScanner(context = 'auto'){
   SCANNER.context = ['sale','stock'].includes(context) ?context:'auto';
+  if(!getActiveShiftForCurrentUser()){
+    showToast('Abre un turno antes de escanear una venta',2200);
+    openShiftModal();
+    return;
+  }
+  SCANNER.difficultMode=false;
+  SCANNER.difficultAuto=false;
+  scannerUpdateDifficultUI();
   openModal('modal-scan');
+  if($('#scanned-code')) $('#scanned-code').value='';
   await window.restartScanner();
 };
 
 window.stopScanner = async function stopScanner(){
   SCANNER.running = false;
+  SCANNER.session += 1;
   SCANNER.detector = null;
   scannerStopTracks();
   const canvas = $('#scan-canvas');
@@ -4716,12 +5428,44 @@ window.registerScanned = function registerScanned(){
   scannerHandleScannedCode(code, 'manual');
 };
 
-// Ensure inline handlers and legacy references use the robust scanner implementation
-startScanner = window.startScanner;
-stopScanner = window.stopScanner;
-registerScanned = window.registerScanned;
+window.toggleScannerTorch = async function toggleScannerTorch(){
+  const track=SCANNER.stream?.getVideoTracks?.()[0];
+  if(!track) return;
+  try{
+    SCANNER.torchOn=!SCANNER.torchOn;
+    await track.applyConstraints({advanced:[{torch:SCANNER.torchOn}]});
+    $('#btn-scan-torch').textContent=SCANNER.torchOn?'Apagar linterna':'Linterna';
+  }catch(_){ SCANNER.torchOn=false; showToast('La linterna no está disponible en esta cámara'); }
+};
 
-const HW_SCANNER = { buffer: '', lastTs: 0, maxGapMs: 65, minLen: 4, bound: false, lastCode: '', lastAt: 0, dedupeMs: 900 };
+window.setScannerZoom = async function setScannerZoom(value){
+  const track=SCANNER.stream?.getVideoTracks?.()[0];
+  if(!track) return;
+  try{ await track.applyConstraints({advanced:[{zoom:Number(value)}]}); }catch(_){ }
+};
+
+window.rescanBarcode = async function rescanBarcode(){
+  if($('#scanned-code')) $('#scanned-code').value='';
+  await window.restartScanner();
+};
+
+window.openManualProductSearch = async function openManualProductSearch(){
+  await window.stopScanner();
+  closeModal('modal-scan');
+  openModal('modal-sale');
+  resetPosSearchForScanner();
+  setTimeout(()=>$('#pos-search')?.focus(),40);
+};
+
+window.cancelScanner = async function cancelScanner(){
+  await window.stopScanner();
+  closeModal('modal-scan');
+};
+
+document.addEventListener('visibilitychange',()=>{ if(document.hidden) window.stopScanner(); });
+window.addEventListener('pagehide',()=>window.stopScanner());
+
+const HW_SCANNER = { buffer: '', lastTs: 0, maxGapMs: 120, minLen: 4, bound: false, lastCode: '', lastAt: 0, dedupeMs: 900 };
 function setupHardwareScannerSupport(){
   if(HW_SCANNER.bound) return;
   HW_SCANNER.bound = true;
@@ -4732,7 +5476,7 @@ function setupHardwareScannerSupport(){
     const scannerInputs = activeId === 'pos-search' || activeId === 'scanned-code';
     if(isTypingContext && !scannerInputs) return;
 
-    if(ev.key === 'Enter'){
+    if(ev.key === 'Enter' || ev.key === 'Tab'){
       const candidate = HW_SCANNER.buffer;
       HW_SCANNER.buffer = '';
       if(candidate.length >= HW_SCANNER.minLen){
@@ -4902,7 +5646,7 @@ function openCustomerDebtDetail(customerId){
     </tr>`).join('');
 
   const receiptLines = [];
-  receiptLines.push('MINIMARKET LA ESQUINA DEL AHORRO');
+  receiptLines.push('MINIMARKET EL ERIZO');
   receiptLines.push('RECIBO DE DEUDA A CREDITO');
   receiptLines.push(`Cliente: ${customer.name || '-'}`);
   receiptLines.push(`Fecha de emision: ${fmtDate(new Date().toISOString())}`);
@@ -5052,6 +5796,7 @@ let ingresoSubDraftItems = [];
 let purchaseHistorySelectedId = '';
 let purchaseHistoryMode = 'view';
 let ingresoTargetPurchaseId = '';
+let purchaseSubmitInProgress = false;
 
 function getSupplierById(id){
   return (STATE.suppliers||[]).find(s => s.id === id && !s.deleted) || null;
@@ -5256,6 +6001,7 @@ function normalizePurchaseForView(raw){
   const itemsRaw = Array.isArray(raw.items) ?raw.items : [];
   const items = itemsRaw.map((it, idx)=>({
     line: Number(it.line || (idx + 1)),
+    movementId: String(it.movementId || '').trim(),
     productId: it.productId || '',
     name: it.name || 'Producto',
     qty: Number(it.qty || 0),
@@ -5354,6 +6100,7 @@ function buildPurchaseInvoiceHTML(purchase){
       <td>${idx + 1}</td>
       <td>
         <div style="font-weight:700">${escapeHtml(it.name || '')}</div>
+        ${it.movementId ?`<div class="small-muted">Movimiento: ${escapeHtml(it.movementId)}</div>`:''}
         ${Array.isArray(it.subProducts) && it.subProducts.length > 0 ?it.subProducts.map(sp => `<div class="small-muted">Sub: ${escapeHtml(sp.subName || '')} • Unidad: ${escapeHtml(sp.subUnit || 'und')} • Cant.: ${Number(sp.subQty || (Number(it.qty || 0) * Number(sp.subFactor || 0)) || 0)} • Venta: S/ ${money(sp.subSalePrice || 0)}</div>`).join('') : (it.subProductId || it.subName ?`<div class="small-muted">Sub: ${escapeHtml(it.subName || '')} • Unidad: ${escapeHtml(it.subUnit || 'und')} • Cant.: ${Number(it.subQty || (Number(it.qty || 0) * Number(it.subFactor || 0)) || 0)} • Venta: S/ ${money(it.subSalePrice || 0)}</div>` : '')}
       </td>
       <td style="text-align:right">${Number(it.qty || 0)}</td>
@@ -5369,7 +6116,7 @@ function buildPurchaseInvoiceHTML(purchase){
     <div class="invoice-paper" style="padding:10px">
       <div class="invoice-top" style="margin-bottom:8px">
         <div>
-          <div class="invoice-brand-title">MINIMARKET LA ESQUINA DEL AHORRO</div>
+        <div class="invoice-brand-title">MINIMARKET EL ERIZO</div>
           <div class="invoice-brand-sub">Comprobante de ingreso registrado</div>
         </div>
         <div class="invoice-docbox" style="min-width:230px">
@@ -5585,11 +6332,16 @@ document.getElementById('form-purchase-edit')?.addEventListener('submit',event=>
   purchase.updatedAt = now;
   purchase.updatedBy = getCurrentActor();
   const after = {docType,docNumber,date,supplierId:supplier.id,supplierName,supplierRuc,note};
-  STATE.auditLogs.unshift({
+  const editAudit = {
     id:uid(),ts:now,source:'PURCHASE',action:'EDIT_PURCHASE_HEADER',entity:'purchase',entityId:id,
     actor:getCurrentActor(),note:`Datos corregidos: ${docType} ${docNumber}`,details:{before,after,stockChanged:false}
-  });
+  };
+  STATE.auditLogs.unshift(editAudit);
   saveLocalBackup();
+  addPendingOp({id:`PURCHASE-EDIT-${id}-${now}`,type:'purchaseBundle',silent:true,payload:{
+    purchase:JSON.parse(JSON.stringify(purchase)),supplier:JSON.parse(JSON.stringify(supplier)),
+    auditLogs:[JSON.parse(JSON.stringify(editAudit))],products:[],stockMovements:[]
+  }});
   renderIngresoSupplierOptions(supplier.id);
   renderPurchaseHistoryList();
   closeModal('modal-purchase-edit');
@@ -5787,6 +6539,7 @@ function registerIngresoSupplier(){
   };
   STATE.suppliers.unshift(supplier);
   saveLocalBackup();
+  addPendingOp({id:`SUPPLIER-${supplier.id}`,type:'supplier',payload:{...supplier},silent:true});
   renderIngresoSupplierOptions(supplier.id);
   $('#ing-supplier-name').value = '';
   $('#ing-supplier-ruc').value = '';
@@ -6591,6 +7344,10 @@ function openIngresoModal(){
 
 document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
   e.preventDefault();
+  if(purchaseSubmitInProgress) return;
+  purchaseSubmitInProgress = true;
+  const submitButton=$('#btn-submit-ingreso');
+  if(submitButton){ submitButton.disabled=true; submitButton.textContent='Guardando de forma segura...'; }
   try{
     ensureStateShape();
     const supplierId = ($('#ing-supplier-id')?.value || '').trim();
@@ -6623,8 +7380,7 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
     }
 
     if(existingPurchase){
-      const ok = confirm('Esta factura/boleta ya fue registrada. Deseas agregar SOLO productos nuevos sin modificar lo ya registrado?');
-      if(!ok) return;
+      if(!ingresoTargetPurchaseId) return alert('Esta factura/boleta ya está registrada. Usa el botón ADD+ y selecciónala para agregar productos faltantes.');
       const existingIds = new Set((existingPurchase.items||[]).map(it => String(it.productId || '')));
       const repeated = items.filter(it => existingIds.has(String(it.productId || '')));
       if(repeated.length > 0){
@@ -6638,6 +7394,8 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
     const lineStart = Array.isArray(existingPurchase?.items) ?existingPurchase.items.length : 0;
     const reference = `${docType} ${docNumber} - ${supplier.name} (RUC ${supplier.ruc || 'SIN RUC'})${existingPurchase ?' [ADICION]' : ''}`;
     const anchoredItems = [];
+    const stockMovements = [];
+    const touchedProducts = new Map();
     items.forEach((it, idx) => {
       const p = getProductById(it.productId);
       if(!p) return;
@@ -6651,9 +7409,10 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
       p.price = Number(it.salePrice || 0);
       p.updatedAt = now;
       p.movements = Array.isArray(p.movements) ?p.movements : [];
-      p.movements.unshift({
-        id: uid(),
-        type: 'INGRESO',
+      const movement = {
+        id: `MOV-${purchaseId}-${lineNumber}-${p.id}`,
+        movementId: `MOV-${purchaseId}-${lineNumber}-${p.id}`,
+        type: 'PURCHASE_IN',
         purchaseId,
         line: lineNumber,
         qty: Number(it.qty || 0),
@@ -6665,9 +7424,13 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
         stockAfter,
         stockNumber: stockAfter,
         actor: getCurrentActor(),
-        productName: p.name
-      });
-      addPendingOp({ type: 'product', payload: p, silent: true });
+        productId:p.id,productName: p.name,
+        supplierId:supplier.id,supplierName:supplier.name,supplierRuc:supplier.ruc||'',
+        documentType:docType,documentNumber:docNumber
+      };
+      p.movements.unshift(movement);
+      stockMovements.push(movement);
+      touchedProducts.set(String(p.id),p);
 
       const subMetas = ensureSubProductsForIngreso(p, it, now);
       const relatedIds = getRelatedProductIdsForSync(p.id).filter(id => String(id) !== String(p.id));
@@ -6678,9 +7441,10 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
         const childQty = Number(it.qty || 0) * factor;
         const childStockAfter = Number(child.stock || 0);
         child.movements = Array.isArray(child.movements) ? child.movements : [];
-        child.movements.unshift({
-          id: uid(),
-          type: 'INGRESO_SUB',
+        const childMovement = {
+          id: `MOVSUB-${purchaseId}-${lineNumber}-${child.id}`,
+          movementId: `MOVSUB-${purchaseId}-${lineNumber}-${child.id}`,
+          type: 'PURCHASE_IN_SUB',
           purchaseId,
           line: lineNumber,
           qty: childQty,
@@ -6691,15 +7455,20 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
           actor: getCurrentActor(),
           productName: child.name,
           stockBefore: roundStock(childStockAfter-childQty),
-          stockAfter: childStockAfter
-        });
-        addPendingOp({ type: 'product', payload: child, silent: true });
+          stockAfter: childStockAfter,
+          productId:child.id,supplierId:supplier.id,supplierName:supplier.name,supplierRuc:supplier.ruc||'',
+          documentType:docType,documentNumber:docNumber
+        };
+        child.movements.unshift(childMovement);
+        stockMovements.push(childMovement);
+        touchedProducts.set(String(child.id),child);
       });
 
       anchoredItems.push({
         productId: it.productId,
         name: it.name,
         line: lineNumber,
+        movementId:movement.id,
         qty: Number(it.qty || 0),
         costPrice: Number(it.costPrice || 0),
         salePrice: Number(it.salePrice || 0),
@@ -6720,6 +7489,7 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
     if(anchoredItems.length === 0) return alert('No se pudo anclar el ingreso al stock');
     const anchoredTotal = anchoredItems.reduce((acc, it)=> acc + Number(it.subtotal || 0), 0);
 
+    let purchaseRecord = existingPurchase;
     if(existingPurchase){
       existingPurchase.items = (existingPurchase.items || []).concat(anchoredItems);
       existingPurchase.totalCost = Number(existingPurchase.totalCost || 0) + anchoredTotal;
@@ -6746,9 +7516,10 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
         createdBy: getCurrentActor()
       };
       STATE.purchases.unshift(ingreso);
+      purchaseRecord = ingreso;
     }
 
-    STATE.auditLogs.unshift({
+    const purchaseAudit = {
       id:uid(),ts:now,source:'PURCHASE',action:existingPurchase?'ADD_PURCHASE_ITEMS':'CREATE_PURCHASE',
       entity:'purchase',entityId:purchaseId,actor:getCurrentActor(),
       note:existingPurchase ?`Productos agregados a ${docType} ${docNumber}`:`Ingreso registrado: ${docType} ${docNumber}`,
@@ -6758,9 +7529,25 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
         products:anchoredItems.map(item=>({productId:item.productId,name:item.name,qty:item.qty,costPrice:item.costPrice,salePrice:item.salePrice})),
         stockChanged:true,mode:existingPurchase?'ADD_PLUS':'NEW_PURCHASE'
       }
+    };
+    STATE.auditLogs.unshift(purchaseAudit);
+    stockMovements.forEach(movement=>{
+      if(!(STATE.stockMovements||[]).some(current=>current.id===movement.id)) STATE.stockMovements.unshift(movement);
     });
 
     saveLocalBackup();
+    const operationId=uid();
+    addPendingOp({
+      id:`PURCHASE-BUNDLE-${purchaseId}-${operationId}`,
+      type:'purchaseBundle',silent:true,
+      payload:{
+        purchase:JSON.parse(JSON.stringify(purchaseRecord)),
+        supplier:JSON.parse(JSON.stringify(supplier)),
+        auditLogs:[JSON.parse(JSON.stringify(purchaseAudit))],
+        products:Array.from(touchedProducts.values()).map(product=>JSON.parse(JSON.stringify(product))),
+        stockMovements:stockMovements.map(movement=>JSON.parse(JSON.stringify(movement)))
+      }
+    });
     renderInventoryList();
     renderDashboard();
     if($('#modal-purchase-history')?.classList.contains('visible')) renderPurchaseHistoryList();
@@ -6772,6 +7559,9 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
   }catch(err){
     console.error(err);
     alert(err.message || 'No se pudo registrar el ingreso');
+  }finally{
+    purchaseSubmitInProgress=false;
+    if(submitButton){ submitButton.disabled=false; submitButton.textContent='Registrar ingreso'; }
   }
 });
 
@@ -6779,7 +7569,6 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
    PRODUCT CRUD
    ========= */
 function clearScannerProductRegistration(){
-  scannerPendingProductCode = '';
   const banner = $('#p-scanner-banner');
   if(banner){
     banner.innerHTML = '';
@@ -6792,9 +7581,8 @@ function cancelProductModal(){
   closeModal('modal-product');
 }
 
-function openNewProductModal(prefillName = '', prefillBarcode = '', fromScanner = false){
-  if(fromScanner) scannerPendingProductCode = scannerNormalize(prefillBarcode);
-  else clearScannerProductRegistration();
+function openNewProductModal(prefillName = '', prefillBarcode = ''){
+  clearScannerProductRegistration();
   const form = $('#form-p');
   if(form) form.reset();
   $('#p-id').value = '';
@@ -6811,11 +7599,6 @@ function openNewProductModal(prefillName = '', prefillBarcode = '', fromScanner 
   $('#p-stock-reason-wrap').classList.add('hidden');
   $('#p-stock-help').textContent = 'El motivo será obligatorio únicamente si cambias la cantidad.';
   $('#btn-delete-p').classList.add('hidden');
-  const banner = $('#p-scanner-banner');
-  if(banner && fromScanner){
-    banner.innerHTML = `<span><strong>Código nuevo detectado:</strong> ${escapeHtml(scannerPendingProductCode)}</span><span>Completa los datos para volver a Venta.</span>`;
-    banner.classList.remove('hidden');
-  }
   openModal('modal-product');
   setTimeout(()=>$('#p-name')?.focus(),40);
 }
@@ -6826,7 +7609,6 @@ document.getElementById('form-p')?.addEventListener('submit', async (e)=>{
     const id = $('#p-id').value || uid();
     const current = (STATE.products||[]).find(p => p.id === id) || null;
     const enteredBarcode = $('#p-barcode').value.trim();
-    const createdFromScanner = !current && !!scannerPendingProductCode && scannerNormalize(enteredBarcode) === scannerNormalize(scannerPendingProductCode);
     const now = new Date().toISOString();
     const previousStock = Number(current?.stock || 0);
     const nextStock = current?.parentProductId ?previousStock:(Number($('#p-stock').value) || 0);
@@ -6872,19 +7654,7 @@ document.getElementById('form-p')?.addEventListener('submit', async (e)=>{
     renderInventoryList(); renderDashboard();
     clearScannerProductRegistration();
     closeModal('modal-product');
-    if(createdFromScanner){
-      if(!$('#modal-sale')?.classList.contains('visible')) openModal('modal-sale');
-      if($('#modal-sale')?.classList.contains('visible') && getAvailableQtyForSale(prod)>0){
-        addToCart(prod);
-        showToast(`Producto registrado y agregado a la venta: ${prod.name}`,2600);
-      }else if(getAvailableQtyForSale(prod)<=0){
-        showToast(`Producto registrado sin stock: ${prod.name}`,2600);
-      }else{
-        showToast(`Producto registrado. Abre un turno para vender: ${prod.name}`,2600);
-      }
-    }else{
-      showToast('Producto guardado (cola si offline)');
-    }
+    showToast('Producto guardado (cola si offline)');
     if(current && Math.abs(stockDifference)>=1e-9 && $('#modal-stock-history')?.classList.contains('visible')) refreshStockHistoryData(false);
   }catch(e){ console.error(e); alert('Error guardando producto: '+ (e.message||e)); }
 });
@@ -6951,7 +7721,7 @@ function normalizeStaffUsername(value){
   return String(value || '').trim().toLowerCase().replace(/\s+/g,'');
 }
 
-async function hashStaffSecret(username, secret){
+async function hashStaffSecretLegacy(username, secret){
   const source = `TIENDA_SMART|${normalizeStaffUsername(username)}|${String(secret||'')}|TURNO_V1`;
   let hash = 2166136261;
   for(let round=0;round<1200;round+=1){
@@ -6961,6 +7731,40 @@ async function hashStaffSecret(username, secret){
     }
   }
   return 'pin-v1-' + (hash>>>0).toString(16).padStart(8,'0');
+}
+
+function bytesToBase64(bytes){
+  let binary=''; bytes.forEach(byte=>binary+=String.fromCharCode(byte));
+  return btoa(binary);
+}
+
+function base64ToBytes(value){
+  return Uint8Array.from(atob(value),char=>char.charCodeAt(0));
+}
+
+async function deriveStaffSecretV2(username,secret,salt,iterations=150000){
+  const material=await crypto.subtle.importKey('raw',new TextEncoder().encode(String(secret||'')),'PBKDF2',false,['deriveBits']);
+  const bits=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:new Uint8Array([...salt,...new TextEncoder().encode(normalizeStaffUsername(username))]),iterations},material,256);
+  return bytesToBase64(new Uint8Array(bits));
+}
+
+async function hashStaffSecret(username,secret){
+  if(!window.crypto?.subtle) return hashStaffSecretLegacy(username,secret);
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const iterations=150000;
+  const hash=await deriveStaffSecretV2(username,secret,salt,iterations);
+  return `pin-v2-${iterations}-${bytesToBase64(salt)}-${hash}`;
+}
+
+async function verifyStaffSecret(person,secret){
+  const stored=String(person?.passwordHash||'');
+  if(stored.startsWith('pin-v2-') && window.crypto?.subtle){
+    const match=stored.match(/^pin-v2-(\d+)-([A-Za-z0-9+/=]+)-([A-Za-z0-9+/=]+)$/);
+    if(!match) return false;
+    const derived=await deriveStaffSecretV2(person.username,secret,base64ToBytes(match[2]),Number(match[1]));
+    return derived===match[3];
+  }
+  return stored===await hashStaffSecretLegacy(person?.username||'',secret);
 }
 
 function isAdminSession(){
@@ -7042,8 +7846,35 @@ function updateShiftUI(){
   const shift = getActiveShiftForCurrentUser();
   btn.classList.toggle('open', !!shift);
   btn.classList.toggle('closed', !shift);
-  btn.textContent = shift ?`TURNO · ${shift.staffName||shift.username||'PERSONAL'}`:'ABRIR TURNO';
+  const shiftLabel = $('#btn-shift-label');
+  const shiftText = shift ?`TURNO · ${shift.staffName||shift.username||'PERSONAL'}`:'ABRIR TURNO';
+  if(shiftLabel) shiftLabel.textContent = shiftText;
+  else btn.textContent = shiftText;
 }
+
+function setAdministrationMenu(open){
+  const menu = $('#administration-menu');
+  const trigger = $('#admin-menu-trigger');
+  if(!menu || !trigger) return;
+  menu.classList.toggle('hidden',!open);
+  trigger.setAttribute('aria-expanded',open?'true':'false');
+}
+
+function toggleAdministrationMenu(){
+  const menu = $('#administration-menu');
+  setAdministrationMenu(!!menu?.classList.contains('hidden'));
+}
+
+function closeAdministrationMenu(){ setAdministrationMenu(false); }
+
+document.addEventListener('click', event=>{
+  const area = $('#header-administration');
+  const menu = $('#administration-menu');
+  if(area && menu && !menu.classList.contains('hidden') && !area.contains(event.target)) closeAdministrationMenu();
+});
+document.addEventListener('keydown', event=>{
+  if(event.key === 'Escape') closeAdministrationMenu();
+});
 
 function renderPersonnelList(){
   const box = $('#personnel-list');
@@ -7215,7 +8046,8 @@ function updateShiftOpeningHint(){
   openingCash.disabled = !!existing;
   if(existing){
     openingCash.value = Number(existing.openingCash||0).toFixed(2);
-    hint.textContent = `Esta persona ya tiene un turno abierto desde ${new Date(existing.openedAt).toLocaleString()}. Su PIN permitirá recuperarlo sin duplicarlo.`;
+    const anotherDevice=existing.deviceId && existing.deviceId!==getDeviceId();
+    hint.textContent = `Esta persona ya tiene un turno abierto desde ${new Date(existing.openedAt).toLocaleString()}${anotherDevice?' en otro equipo':''}. Su PIN permitirá recuperarlo sin duplicarlo.`;
     button.textContent = 'VALIDAR PIN Y CONTINUAR TURNO';
   }else{
     openingCash.value = '0.00';
@@ -7237,14 +8069,14 @@ async function openCurrentShift(){
   shiftOpeningInProgress = true;
   const openButton = $('#btn-confirm-open-shift');
   if(openButton) openButton.disabled = true;
-  let validHash = '';
+  let validPin = false;
   try{
-    validHash = await hashStaffSecret(person.username,pin);
+    validPin = await verifyStaffSecret(person,pin);
   }finally{
     shiftOpeningInProgress = false;
     if(openButton?.isConnected) openButton.disabled = false;
   }
-  if(!person.passwordHash || validHash !== person.passwordHash){
+  if(!person.passwordHash || !validPin){
     if(pinInput){ pinInput.value=''; pinInput.focus(); }
     return alert('PIN incorrecto para la persona seleccionada');
   }
@@ -7252,6 +8084,21 @@ async function openCurrentShift(){
     .filter(shift=>shift && shift.status==='OPEN' && String(shift.staffId||'')===String(person.id||''))
     .sort((a,b)=>new Date(b.openedAt||0)-new Date(a.openedAt||0))[0] || null;
   if(existing){
+    if(existing.deviceId && existing.deviceId!==getDeviceId()){
+      const continueRemote=confirm('Este turno figura abierto en otro equipo. ¿Deseas asumirlo en este equipo sin crear uno nuevo? Esta acción quedará auditada.');
+      if(!continueRemote) return;
+      const now=new Date().toISOString();
+      const conflict={id:`SHIFT-DEVICE-${existing.id}-${getDeviceId()}`,type:'SHIFT_OTHER_DEVICE',shiftId:existing.id,staffId:person.id,previousDeviceId:existing.deviceId,currentDeviceId:getDeviceId(),status:'OPEN',createdAt:now};
+      if(!(STATE.syncConflicts||[]).some(item=>item.id===conflict.id)) STATE.syncConflicts.unshift(conflict);
+      existing.previousDeviceId=existing.deviceId;
+      existing.deviceId=getDeviceId();
+      existing.deviceLabel=navigator.userAgent.slice(0,120);
+      existing.updatedAt=now;
+      existing.syncStatus='PENDING';
+      addPendingOp({id:`CONFLICT-${conflict.id}`,type:'syncConflict',payload:conflict,silent:true});
+      addPendingOp({id:`SHIFT-TAKEOVER-${existing.id}-${now}`,type:'shift',payload:{...existing},silent:true});
+      saveLocalBackup();
+    }
     localStorage.setItem(ACTIVE_SHIFT_KEY,String(existing.id));
     updateShiftUI();
     renderShiftModal();
@@ -7263,7 +8110,8 @@ async function openCurrentShift(){
   const now = new Date().toISOString();
   const shift = {
     id:`TURNO-${Date.now()}-${uid()}`, staffId:person.id, staffName:person.name, username:person.username,
-    openedAt:now, createdAt:now, updatedAt:now, openingCash:Number(openingCash.toFixed(2)), status:'OPEN', openedBy:getCurrentActor()
+    openedAt:now, createdAt:now, updatedAt:now, openingCash:Number(openingCash.toFixed(2)), status:'OPEN', openedBy:getCurrentActor(),
+    deviceId:getDeviceId(),deviceLabel:navigator.userAgent.slice(0,120),syncStatus:'PENDING'
   };
   STATE.shifts.unshift(shift);
   localStorage.setItem(ACTIVE_SHIFT_KEY,String(shift.id));
@@ -7335,14 +8183,14 @@ async function loadPersonnelForLoginFromCloud(showFeedback=false){
 /* =========
    LOGIN (local)
    ========= */
-const ALLOWED_PASS = 'magaly';
+const ADMIN_PASS_SHA256 = '019a3062c34e1a9907ef9470160a280ff0a60c64419eec5d5483c9eaa0186049';
 document.getElementById('form-stock-auth')?.addEventListener('submit', submitStockAuth);
 $('#btn-login')?.addEventListener('click', async ()=> {
   const user = normalizeStaffUsername($('#l-user').value);
   const pass = ($('#l-pass').value||'').trim();
   const err = $('#login-error'); err.classList.add('hidden'); err.textContent = '';
   if(!user || !pass){ err.textContent = 'Completa usuario y contraseña'; err.classList.remove('hidden'); return; }
-  if((user === 'liz' || user === 'lismagaly' || user === 'lis') && pass === ALLOWED_PASS){
+  if((user === 'liz' || user === 'lismagaly' || user === 'lis') && window.crypto?.subtle && await sha256Text(pass) === ADMIN_PASS_SHA256){
     localStorage.setItem('auth_token','ok');
     localStorage.setItem('auth_user', user);
     localStorage.setItem('auth_name','Administración');
@@ -7354,11 +8202,15 @@ $('#btn-login')?.addEventListener('click', async ()=> {
     updateShiftUI();
     return;
   }
-  await loadPersonnelForLoginFromCloud(false);
   ensureStateShape();
-  const person = (STATE.staff||[]).find(p=>!p.deleted && normalizeStaffUsername(p.username)===user);
-  const validHash = person ?await hashStaffSecret(user,pass):'';
-  if(person && person.active !== false && person.passwordHash === validHash){
+  let person = (STATE.staff||[]).find(p=>!p.deleted && normalizeStaffUsername(p.username)===user);
+  if(!person && navigator.onLine && isCloudAllowed()){
+    await loadPersonnelForLoginFromCloud(false);
+    ensureStateShape();
+    person = (STATE.staff||[]).find(p=>!p.deleted && normalizeStaffUsername(p.username)===user);
+  }
+  const validSecret = person ?await verifyStaffSecret(person,pass):false;
+  if(person && person.active !== false && validSecret){
     localStorage.setItem('auth_token','ok');
     localStorage.setItem('auth_user',person.username);
     localStorage.setItem('auth_name',person.name);
@@ -7481,15 +8333,20 @@ async function forceSync(){
   if(!confirm('Forzar sincronización desde subcolecciones?')) return;
   try{
     await migrateOldDataToSubcollections();
-    const [products, customers, sales, stockClosures, staff, shifts] = await Promise.all([
+    const [products, customers, sales, stockClosures, staff, shifts, purchases, suppliers, auditLogs, stockMovements, syncConflicts] = await Promise.all([
       fetchSubcollectionDocs(SUBCOLS.products),
       fetchSubcollectionDocs(SUBCOLS.customers),
       fetchSubcollectionDocs(SUBCOLS.sales),
       fetchSubcollectionDocs(SUBCOLS.stockClosures).catch(err => { console.warn('stockClosures read unavailable', err); return []; }),
       fetchSubcollectionDocs(SUBCOLS.staff).catch(err => { console.warn('staff read unavailable', err); return []; }),
       fetchSubcollectionDocs(SUBCOLS.shifts).catch(err => { console.warn('shifts read unavailable', err); return []; }),
+      fetchSubcollectionDocs(SUBCOLS.purchases).catch(()=>[]),
+      fetchSubcollectionDocs(SUBCOLS.suppliers).catch(()=>[]),
+      fetchSubcollectionDocs(SUBCOLS.auditLogs).catch(()=>[]),
+      fetchSubcollectionDocs(SUBCOLS.stockMovements).catch(()=>[]),
+      fetchSubcollectionDocs(SUBCOLS.syncConflicts).catch(()=>[]),
     ]);
-    mergeState({ products, customers, sales, stockClosures, staff, shifts });
+    mergeState({ products, customers, sales, stockClosures, staff, shifts, purchases, suppliers, auditLogs, stockMovements, syncConflicts });
     renderAll();
     processPendingOps();
     showToast('Sincronía forzada OK');
@@ -7499,15 +8356,25 @@ async function forceSync(){
 /* =========
    startApp
    ========= */
+async function registerPWA(){
+  if(!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return false;
+  try{
+    await navigator.serviceWorker.register('./service-worker.js',{scope:'./'});
+    return true;
+  }catch(error){ console.warn('No se pudo registrar el service worker',error); return false; }
+}
+
 async function startApp(){
+  registerPWA();
   await ensureLucideLoaded();
   safeCreateIcons();
   tryRecoverStateFromLocalStorage();
   renderAll();
+  queueLegacyCloudRecords();
   bindConnectivityEvents();
-  if(!navigator.onLine){
+  if(!navigator.onLine || !isCloudAllowed()){
     updateOnline(false);
-    showToast('Modo local activo (sin internet)');
+    showToast(!isCloudAllowed()?'Modo solo local activo':'Modo local activo (sin internet)');
   } else {
     await bootstrapCloudSync(false);
   }
@@ -7523,8 +8390,10 @@ async function startApp(){
 }
 
 /* DOM Ready */
-document.addEventListener('DOMContentLoaded', ()=>{
+document.addEventListener('DOMContentLoaded', async ()=>{
   safeCreateIcons();
+  registerPWA();
+  await initializeLocalPersistence();
   let validSession = false;
   if(localStorage.getItem('auth_token')){
     const user = normalizeStaffUsername(localStorage.getItem('auth_user'));
