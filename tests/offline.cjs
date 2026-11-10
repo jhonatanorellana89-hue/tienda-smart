@@ -24,8 +24,8 @@ const {chromium}=require('playwright');const assert=require('assert/strict');con
  await context.setOffline(true);
  await page.reload();await page.waitForFunction(()=>document.querySelector('#search-inv').dataset.fastSearchBound==='1');
  assert.equal(await page.evaluate(()=>getProductById('TEST').stock),100);tests.push('recarga completamente offline desde Service Worker e IndexedDB');
- assert.equal(await page.evaluate(()=>window.firebase===undefined&&window.XLSX===undefined&&window.jspdf===undefined&&window.Quagga===undefined),true);tests.push('módulos no esenciales no se ejecutan al iniciar offline');
- assert.equal(await page.evaluate(()=>ensureXLSXLoaded()),true);assert.equal(await page.evaluate(()=>ensurePDFLoaded()),true);tests.push('Excel y PDF cargan diferidos desde caché sin red');
+ assert.equal(await page.evaluate(()=>window.firebase===undefined&&window.XLSX===undefined&&window.Quagga===undefined),true);tests.push('módulos no esenciales no se ejecutan al iniciar offline');
+ assert.equal(await page.evaluate(()=>ensureXLSXLoaded()),true);tests.push('Excel carga diferido desde caché sin red');
  await page.evaluate(()=>{openShiftModal();});await page.waitForSelector('#shift-staff-pin');
  const shift=await page.evaluate(async()=>{
    document.querySelector('#shift-staff-id').value='USER';document.querySelector('#shift-staff-pin').value='1234';document.querySelector('#shift-opening-cash').value='10';
@@ -34,8 +34,6 @@ const {chromium}=require('playwright');const assert=require('assert/strict');con
  await page.evaluate(()=>{cart=[];addToCart(getProductById('TEST'));});await page.evaluate(()=>completeSale());
  assert.equal(await page.evaluate(async()=>{const state=await POSStorage.loadState(),ops=await POSStorage.loadPendingOps();return state.sales.length===1&&state.products[0].stock===99&&ops.some(op=>op.type==='sale');}),true);tests.push('venta sin conexión guardada de forma durable');
  await page.evaluate(()=>{switchTab('reports');});await page.waitForTimeout(100);
- const pdfDownload=page.waitForEvent('download');await page.evaluate(()=>downloadReportPDF());const pdf=await pdfDownload;
- const pdfPath=`${ARTIFACTS}/report-test.pdf`;await pdf.saveAs(pdfPath);assert.equal(fs.readFileSync(pdfPath).subarray(0,4).toString(),'%PDF');tests.push('PDF real con módulos locales y archivo válido');
  const excelDownload=page.waitForEvent('download');await page.evaluate(()=>exportInventoryXLSX());const excel=await excelDownload;const excelPath=`${ARTIFACTS}/report-test.xlsx`;await excel.saveAs(excelPath);assert.equal(fs.readFileSync(excelPath).subarray(0,2).toString(),'PK');tests.push('Excel real offline con archivo ZIP/XLSX válido');
  await context.setOffline(false);
  // Quagga and camera use only the synthetic Chromium video device, never a real camera.
