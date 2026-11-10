@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'tiendasmart-github-v4';
+const CACHE_NAME = 'tiendasmart-github-v6';
 const APP_SHELL = [
   './',
   './index.html',
@@ -9,11 +9,9 @@ const APP_SHELL = [
   './assets/icon-192.png',
   './assets/icon-512.png',
   './pos-offline.js',
-  './libs/tailwindcss-3.4.17.js',
+  './libs/app-tailwind.css',
   './libs/lucide-0.468.0.min.js',
   './libs/xlsx.full.min.js',
-  './libs/html2canvas-1.4.1.min.js',
-  './libs/jspdf-2.5.1.umd.min.js',
   './libs/quagga2-1.8.4.min.js',
   './libs/firebase-app-9.22.2-compat.js',
   './libs/firebase-auth-9.22.2-compat.js',
@@ -28,7 +26,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+      .then(keys => Promise.all(keys.filter(key => key.startsWith('tiendasmart-github-') && key !== CACHE_NAME).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
@@ -40,26 +38,27 @@ self.addEventListener('fetch', event => {
   if(url.origin !== self.location.origin) return;
 
   if(request.mode === 'navigate'){
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put('./index.html',copy));
-          return response;
-        })
-        .catch(() => caches.match('./index.html'))
-    );
+    // La caja instalada abre desde caché incluso si la conexión queda colgada.
+    const refresh = fetch(request).then(async response => {
+      if(response.ok && response.headers.get('content-type')?.includes('text/html')){
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put('./index.html', response.clone());
+      }
+      return response;
+    });
+    event.waitUntil(refresh.catch(()=>{}));
+    event.respondWith(caches.open(CACHE_NAME).then(async cache => (await cache.match('./index.html')) || refresh));
     return;
   }
 
   event.respondWith(
-    caches.match(request).then(cached => cached || fetch(request).then(response => {
+    caches.open(CACHE_NAME).then(cache => cache.match(request).then(cached => cached || fetch(request).then(response => {
       if(response && response.ok){
         const copy = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(request,copy));
       }
       return response;
-    }))
+    })))
   );
 });
 

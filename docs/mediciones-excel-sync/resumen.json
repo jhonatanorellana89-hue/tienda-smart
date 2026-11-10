@@ -1,0 +1,10 @@
+{
+  "passed": 53,
+  "javascriptErrors": 0,
+  "runtimePdfLibraries": 0,
+  "originalIdsPreserved": 183,
+  "actualIds": 193,
+  "staticHtmlHandlers": 98,
+  "firebaseProductionTested": false,
+  "androidPhysicalTested": false
+}

@@ -12,21 +12,20 @@
 <title>MINIMARKET EL ERIZO | TiendaSmart</title>
 
 <!-- Dependencias locales: la caja debe poder iniciar sin Internet. -->
-<script src="./libs/tailwindcss-3.4.17.js"></script>
 <script src="./libs/lucide-0.468.0.min.js"></script>
 
-<!-- Utilities: XLSX, html2canvas, jsPDF -->
-<script src="./libs/xlsx.full.min.js"></script>
-<script src="./libs/html2canvas-1.4.1.min.js"></script>
-<script src="./libs/jspdf-2.5.1.umd.min.js"></script>
+<!-- Excel se carga desde libs cuando se solicita una exportación. -->
+
+
+
 
 <!-- Quagga fallback -->
-<script src="./libs/quagga2-1.8.4.min.js"></script>
+
 
 <!-- Firebase compat -->
-<script src="./libs/firebase-app-9.22.2-compat.js"></script>
-<script src="./libs/firebase-auth-9.22.2-compat.js"></script>
-<script src="./libs/firebase-firestore-9.22.2-compat.js"></script>
+
+
+
 <script src="./pos-offline.js"></script>
 
 <style>
@@ -975,7 +974,9 @@
     .shift-resume-grid{grid-template-columns:1fr}
     .shift-resume-grid .btn-primary{width:100%}
   }
+  #modal-sync-center button:disabled{opacity:0.55;cursor:not-allowed}
 </style>
+<link rel="stylesheet" href="./libs/app-tailwind.css"/>
 </head>
 <body>
 
@@ -1096,8 +1097,7 @@
       </div>
       <div class="flex gap-2 mt-3">
         <button onclick="previewReportRange()" class="btn-primary">Vista previa</button>
-        <button onclick="exportReportRangeBothXLSX()" class="px-3 py-2 border rounded">Exportar XLSX</button>
-        <button onclick="downloadReportPDF()" class="px-3 py-2 border rounded">Exportar PDF (A4)</button>
+        <button onclick="exportReportRangeBothXLSX()" class="px-3 py-2 border rounded">Exportar Excel</button>
       </div>
     </div>
     <div id="report-summary" class="mt-4"></div>
@@ -1821,7 +1821,7 @@
     <div class="flex justify-between items-center mb-3">
       <div>
         <h3 class="font-bold text-lg">Centro de sincronización</h3>
-        <p class="small-muted">Control local, cola pendiente y respaldo</p>
+        <p class="small-muted">Envíos pendientes, confirmaciones y respaldo</p>
       </div>
       <button type="button" onclick="closeModal('modal-sync-center')"><i data-lucide="x"></i></button>
     </div>
@@ -1829,21 +1829,36 @@
       <button id="sync-mode-auto" type="button" onclick="setWorkMode('auto')" class="px-3 py-3 rounded-xl border text-sm font-semibold">Automático</button>
       <button id="sync-mode-local" type="button" onclick="setWorkMode('local')" class="px-3 py-3 rounded-xl border text-sm font-semibold">Solo sin conexión</button>
     </div>
+    <p id="sync-center-detail" class="small-muted mb-3" role="status" aria-live="polite"></p>
     <div class="rounded-2xl bg-slate-50 border p-3 space-y-2 text-sm">
       <div class="flex justify-between gap-3"><span class="small-muted">Estado</span><strong id="sync-center-status">Local</strong></div>
       <div class="flex justify-between gap-3"><span class="small-muted">Operaciones pendientes</span><strong id="sync-center-pending">0</strong></div>
       <div class="flex justify-between gap-3"><span class="small-muted">Última confirmación</span><strong id="sync-center-last" class="text-right">Nunca</strong></div>
-      <div id="sync-center-error-row" class="hidden border-t pt-2 text-red-700"><strong>Último error:</strong> <span id="sync-center-error"></span></div>
+      <div id="sync-center-error-row" class="hidden border-t pt-2 text-red-700"><strong>Último error registrado:</strong> <span id="sync-center-error"></span></div>
     </div>
-    <div id="sync-conflicts-box" class="hidden mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-      <div class="font-semibold text-amber-900">Conflictos por revisar: <span id="sync-conflicts-count">0</span></div>
-      <div id="sync-conflicts-list" class="small-muted mt-2 max-h-28 overflow-auto"></div>
+    <div class="grid grid-cols-3 gap-2 mt-3 text-center text-sm">
+      <div class="rounded-xl border p-2"><div class="small-muted">En espera</div><strong id="sync-center-waiting">0</strong></div>
+      <div class="rounded-xl border p-2"><div class="small-muted">Enviando</div><strong id="sync-center-sending">0</strong></div>
+      <div class="rounded-xl border p-2"><div class="small-muted">Con error</div><strong id="sync-center-errors">0</strong></div>
     </div>
     <div class="grid grid-cols-2 gap-2 mt-3">
-      <button type="button" onclick="syncNow()" class="btn-primary">Sincronizar ahora</button>
+      <button id="btn-sync-now" type="button" onclick="syncNow()" class="btn-primary">Enviar pendientes</button>
       <button type="button" onclick="downloadDataBackup()" class="px-3 py-2 rounded-xl border bg-white font-semibold">Exportar respaldo JSON</button>
     </div>
-    <p class="small-muted mt-3">En modo local las ventas continúan y quedan en cola. No cierres ni borres los datos del navegador antes de exportar un respaldo.</p>
+    <div class="mt-3">
+      <label class="small-muted" for="sync-queue-filter">Operaciones guardadas en este equipo</label>
+      <select id="sync-queue-filter" class="input-pro mt-1" onchange="syncQueuePage=0;renderSyncOperations()"><option value="all">Todas las pendientes</option><option value="errors">Sólo con error</option><option value="waiting">En espera o enviando</option></select>
+      <div id="sync-queue-list" class="mt-2 space-y-2 max-h-64 overflow-auto"></div>
+      <button id="btn-sync-retry-errors" type="button" onclick="syncNow(true)" class="hidden px-3 py-2 border rounded-xl mt-2 text-sm">Reintentar operaciones con error</button>
+    </div>
+    <details class="mt-3 rounded-xl border p-3"><summary class="font-semibold text-sm">Últimas confirmaciones en este equipo</summary><p class="small-muted mt-2">Se muestran las últimas 20 escrituras confirmadas. El historial de ventas y movimientos se conserva completo.</p><div id="sync-receipts-list" class="mt-2 space-y-2 max-h-64 overflow-auto"></div></details>
+    <div id="sync-conflicts-box" class="hidden mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+      <div class="font-semibold text-amber-900">Conflictos por revisar: <span id="sync-conflicts-count">0</span></div>
+      <p class="small-muted mt-2">Estos registros requieren revisión. Sincronizar no elige automáticamente cantidades ni corrige diferencias.</p>
+      <div id="sync-conflicts-list" class="small-muted mt-2 max-h-64 overflow-auto"></div>
+    </div>
+    <p class="small-muted mt-3">Las ventas pueden continuar mientras se sincroniza. Conserva los datos del navegador y exporta un respaldo antes de cambiar de equipo.</p>
+    <details class="mt-3"><summary class="small-muted">Opciones avanzadas</summary><p class="small-muted mt-2">Si faltan cambios de otro equipo, puedes volver a leer los datos de la nube. Se conserva la cola local.</p><button id="btn-sync-refresh" type="button" onclick="requireStockAccess(forceSync)" class="px-3 py-2 border rounded-xl mt-2 text-sm">Actualizar datos desde la nube</button></details>
   </div>
 </div>
 
@@ -1894,6 +1909,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => Array.from(document.querySelectorAll(s));
 const uid = ()=> (window.crypto?.randomUUID ?window.crypto.randomUUID():('id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,11)));
 const money = v => Number(v||0).toFixed(2);
+const spanishCollator = new Intl.Collator('es',{sensitivity:'base'});
 const todayYMD = ()=> { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const isSameLocalDay = (dateStr, ref = new Date()) => {
   if(!dateStr) return false;
@@ -1923,7 +1939,7 @@ function requireStockAccess(onSuccess = null){
     err.textContent = '';
   }
   if($('#stock-auth-pass')) $('#stock-auth-pass').value = '';
-  setTimeout(()=> $('#stock-auth-pass')?.focus(), 40);
+  afterModalPaint('modal-stock-auth',()=>$('#stock-auth-pass')?.focus());
   return false;
 }
 
@@ -1995,47 +2011,42 @@ function renderIconFallbacks(){
 }
 
 let iconRenderScheduled = false;
-function safeCreateIcons(){
-  const hasLucide = !!(window.lucide && typeof window.lucide.createIcons === 'function');
+const iconRenderRoots = new Set();
+function safeCreateIcons(root = document){
+  iconRenderRoots.add(root);
+  const hasLucide = !!window.lucide?.createIcons;
   if(iconRenderScheduled) return hasLucide;
   iconRenderScheduled = true;
-  const renderIcons = ()=>{
+  requestAnimationFrame(()=>{
     iconRenderScheduled = false;
+    const roots = [...iconRenderRoots]; iconRenderRoots.clear();
     try{
-      if(window.lucide && typeof window.lucide.createIcons === 'function'){
-        window.lucide.createIcons();
+      if(window.lucide?.createIcons){
+        roots.forEach(scope=>scope.querySelectorAll('i[data-lucide]').forEach(el=>el.setAttribute('data-lucide-pending',el.getAttribute('data-lucide'))));
+        if(document.querySelector('[data-lucide-pending]')){
+          lucide.createIcons({nameAttr:'data-lucide-pending'});
+          document.querySelectorAll('[data-lucide-pending]').forEach(el=>el.removeAttribute('data-lucide-pending'));
+        }
         return;
       }
-    }catch(_){}
+    }catch(error){ console.warn('Iconos',error); }
     renderIconFallbacks();
-  };
-  if(typeof window.requestIdleCallback === 'function') window.requestIdleCallback(renderIcons,{timeout:180});
-  else setTimeout(renderIcons,0);
+  });
   return hasLucide;
 }
 
 const _extScriptPromises = {};
 function loadExternalScript(src, testFn){
-  const key = String(src || '');
-  if(!key) return Promise.resolve(false);
-  if(typeof testFn === 'function' && testFn()) return Promise.resolve(true);
-  if(_extScriptPromises[key]) return _extScriptPromises[key];
-  const isRemote = /^https?:\/\//i.test(key);
-  if(isRemote && !navigator.onLine) return Promise.resolve(false);
-  const timeoutMs = isRemote ? 9000 : 1200;
-  _extScriptPromises[key] = new Promise((resolve)=>{
-    const s = document.createElement('script');
-    s.src = src;
-    s.async = true;
-    s.onload = ()=> resolve(typeof testFn === 'function' ? !!testFn() : true);
-    s.onerror = ()=> resolve(false);
-    document.head.appendChild(s);
-    setTimeout(()=> resolve(typeof testFn === 'function' ? !!testFn() : false), timeoutMs);
-  }).then(ok => {
-    if(!ok) delete _extScriptPromises[key];
-    return ok;
+  if(testFn?.()) return Promise.resolve(true);
+  if(_extScriptPromises[src]) return _extScriptPromises[src];
+  _extScriptPromises[src] = new Promise(resolve=>{
+    const script = document.createElement('script');
+    script.src=src; script.async=true;
+    script.onload=()=>resolve(testFn ? !!testFn() : true);
+    script.onerror=()=>{script.remove();delete _extScriptPromises[src];resolve(false);};
+    document.head.appendChild(script);
   });
-  return _extScriptPromises[key];
+  return _extScriptPromises[src];
 }
 
 async function ensureLucideLoaded(){
@@ -2065,9 +2076,13 @@ async function ensureXLSXLoaded(showError = true){
   return false;
 }
 
+
+
 async function ensureFirebaseLoaded(){
-  if(window.firebase && typeof window.firebase.initializeApp === 'function' && window.firebase.firestore) return true;
-  return false;
+  if(window.firebase?.firestore) return true;
+  if(!await loadExternalScript('./libs/firebase-app-9.22.2-compat.js',()=>!!window.firebase?.initializeApp)) return false;
+  if(!await loadExternalScript('./libs/firebase-auth-9.22.2-compat.js',()=>!!window.firebase?.auth)) return false;
+  return loadExternalScript('./libs/firebase-firestore-9.22.2-compat.js',()=>!!window.firebase?.firestore);
 }
 
 /* Simple escape for safety in HTML rendering */
@@ -2084,6 +2099,38 @@ let saleSubmitInProgress = false;
 /* pendingOps: offline queue persistent in localStorage.
    Each op has shape { id, type: 'sale'|'product'|'customer', payload, ts, retries } */
 let pendingOps = [];
+let syncReceipts = [];
+let localPersistenceReady = false, stateRevision = 0, savedRevision = -1, criticalWriteDepth = 0;
+let productIndex = null, salesIndex = null;
+const normalizedRecords = new WeakSet();
+function invalidateProductIndexes(){ productIndex=null; salesIndex=null; }
+function getProductIndexes(){
+  const rows=STATE.products||[];
+  if(productIndex?.rows===rows && productIndex.length===rows.length) return productIndex;
+  const byId=new Map(), children=new Map(), barcode=new Map(), search=[];
+  rows.forEach(p=>{
+    if(!p) return;
+    byId.set(p.id,p);
+    if(p.deleted) return;
+    if(p.parentProductId){
+      const key=String(p.parentProductId);if(!children.has(key)) children.set(key,[]);children.get(key).push(p);
+    }
+    const code=String(p.barcode||'').replace(/\D/g,'');
+    if(code && !barcode.has(code)) barcode.set(code,p);
+    search.push({p,name:normalizeForSearch(p.name),category:normalizeForSearch(p.category),code,inventoryName:String(p.name||'').toLowerCase(),inventoryCode:String(p.barcode||'')});
+  });
+  children.forEach(list=>list.sort((a,b)=>Number(b.subFactor||0)-Number(a.subFactor||0)));
+  return productIndex={rows,length:rows.length,byId,children,barcode,search};
+}
+function getSalesIndex(){
+  const rows=STATE.sales||[];
+  if(salesIndex?.rows===rows && salesIndex.length===rows.length) return salesIndex;
+  const byShift=new Map();rows.forEach(s=>{
+    if(!s || s.deleted) return;
+    const key=String(s.shiftId||'');if(!byShift.has(key)) byShift.set(key,[]);byShift.get(key).push(s);
+  });
+  return salesIndex={rows,length:rows.length,byShift,summaries:new Map()};
+}
 const PENDING_KEY = 'tienda_pending_ops_v1';
 const LOCAL_BACKUP_KEY = 'tienda_local_backup_v1';
 const LOCAL_BACKUP_PREV_KEY = 'tienda_local_backup_v1_prev';
@@ -2101,10 +2148,12 @@ function getDeviceId(){
 }
 
 /* Load persisted state and pending ops */
-try { const b = localStorage.getItem(LOCAL_BACKUP_KEY); if(b) STATE = JSON.parse(b); } catch(e){ console.warn('local parse err', e); }
+try { const b = (!localStorage.getItem('tienda_idb_authoritative_v1')||localStorage.getItem('tienda_critical_fallback_v1'))?localStorage.getItem(LOCAL_BACKUP_KEY):null; if(b) STATE = JSON.parse(b); } catch(e){ console.warn('local parse err', e); }
 try { const p = localStorage.getItem(PENDING_KEY); if(p) pendingOps = JSON.parse(p) || []; } catch(e){ pendingOps = []; }
+try{const fallback=JSON.parse(localStorage.getItem('tienda_critical_fallback_v1')||'null');if(fallback?.state){STATE=fallback.state;pendingOps=fallback.ops||[];syncReceipts=Array.isArray(fallback.syncReceipts)?fallback.syncReceipts:[];}}catch(error){console.warn('Respaldo alternativo inválido',error);}
 
 function ensureStateShape(){
+  let normalizeStocks=false;
   if(!STATE || typeof STATE !== 'object') STATE = {};
   if(!Array.isArray(STATE.products)) STATE.products = [];
   if(!Array.isArray(STATE.sales)) STATE.sales = [];
@@ -2118,6 +2167,8 @@ function ensureStateShape(){
   if(!Array.isArray(STATE.stockMovements)) STATE.stockMovements = [];
   if(!Array.isArray(STATE.syncConflicts)) STATE.syncConflicts = [];
   (STATE.products||[]).forEach(p => {
+    if(!p || typeof p!=='object' || normalizedRecords.has(p)) return;
+    normalizedRecords.add(p);normalizeStocks=true;
     if(!p || typeof p !== 'object') return;
     p.id = String(p.id || uid());
     p.name = String(p.name || '').trim();
@@ -2131,20 +2182,28 @@ function ensureStateShape(){
     if(Number.isFinite(sf) && sf > 0) p.subFactor = Math.max(1, Math.floor(sf));
   });
   (STATE.purchases||[]).forEach(p => {
+    if(!p || typeof p!=='object' || normalizedRecords.has(p)) return;
+    normalizedRecords.add(p);
     if(!p.id) p.id = uid();
     if(!Array.isArray(p.items)) p.items = [];
   });
   (STATE.auditLogs||[]).forEach(l => {
+    if(!l || typeof l!=='object' || normalizedRecords.has(l)) return;
+    normalizedRecords.add(l);
     if(!l.id) l.id = uid();
     if(!l.ts) l.ts = new Date().toISOString();
   });
   (STATE.stockClosures||[]).forEach(c => {
+    if(!c || typeof c!=='object' || normalizedRecords.has(c)) return;
+    normalizedRecords.add(c);
     if(!c.id) c.id = 'CIERRE-' + uid();
     if(!c.createdAt) c.createdAt = new Date().toISOString();
     if(!Array.isArray(c.items)) c.items = [];
     if(!Array.isArray(c.salesSummary)) c.salesSummary = [];
   });
   (STATE.staff||[]).forEach(person => {
+    if(!person || typeof person!=='object' || normalizedRecords.has(person)) return;
+    normalizedRecords.add(person);
     if(!person || typeof person!=='object') return;
     if(!person.id) person.id = 'PERSONAL-' + uid();
     person.name = String(person.name || '').trim();
@@ -2152,6 +2211,8 @@ function ensureStateShape(){
     person.active = person.active !== false;
   });
   (STATE.shifts||[]).forEach(shift => {
+    if(!shift || typeof shift!=='object' || normalizedRecords.has(shift)) return;
+    normalizedRecords.add(shift);
     if(!shift || typeof shift!=='object') return;
     if(!shift.id) shift.id = 'TURNO-' + uid();
     if(!shift.status) shift.status = shift.closedAt ?'CLOSED':'OPEN';
@@ -2159,52 +2220,76 @@ function ensureStateShape(){
     shift.openingCash = Number(shift.openingCash || 0);
   });
   (STATE.customers||[]).forEach(c => {
+    if(!c || typeof c!=='object' || normalizedRecords.has(c)) return;
+    normalizedRecords.add(c);
     if(!c || typeof c !== 'object') return;
     if(!c.id) c.id = 'C-' + uid();
     else c.id = String(c.id);
     c.balance = Number(c.balance || 0);
   });
-  rebuildLinkedStocks();
+  if(normalizeStocks) rebuildLinkedStocks();
 }
 ensureStateShape();
 
 /* Persist helpers */
 let mergedStateBackupTimer = 0;
 function scheduleMergedStateBackup(){
-  if(mergedStateBackupTimer) clearTimeout(mergedStateBackupTimer);
-  mergedStateBackupTimer = setTimeout(()=>{
-    mergedStateBackupTimer = 0;
-    try{ localStorage.setItem(LOCAL_BACKUP_KEY,JSON.stringify(STATE)); }catch(_){}
-    if(window.POSStorage) POSStorage.scheduleStateSave(STATE);
-  },120);
+  stateRevision += 1; invalidateProductIndexes();
+  clearTimeout(mergedStateBackupTimer);
+  mergedStateBackupTimer=setTimeout(()=>{mergedStateBackupTimer=0;persistLocalState().catch(reportLocalSaveError);},180);
 }
 
 function queueUnsentAuditLogs(){
   let queued=false;
+  const ids=new Set(pendingOps.map(op=>op.id));
   (STATE.auditLogs||[]).forEach(log=>{
     if(!log?.id || log.syncQueuedAt) return;
-    log.syncQueuedAt=new Date().toISOString();
-    const opId=`AUDIT-${log.id}`;
-    if(!pendingOps.some(op=>op.id===opId)) pendingOps.push({id:opId,type:'audit',payload:{...log},ts:log.ts||log.syncQueuedAt,retries:0,status:'pending',silent:true});
+    log.syncQueuedAt=new Date().toISOString();const id=`AUDIT-${log.id}`;
+    if(!ids.has(id)){pendingOps.push({id,type:'audit',payload:{...log},ts:log.ts||log.syncQueuedAt,retries:0,status:'pending',silent:true});ids.add(id);}
     queued=true;
-  });
-  return queued;
+  });return queued;
 }
 
 function saveLocalBackup(){
-  const queuedAudit=queueUnsentAuditLogs();
+  stateRevision+=1;invalidateProductIndexes();
+  const queued=queueUnsentAuditLogs();
+  if(!localPersistenceReady && !criticalWriteDepth){
+    // Respaldo síncrono de compatibilidad si IndexedDB no está disponible.
+    writeLegacyBackup();
+  }else{
+    clearTimeout(mergedStateBackupTimer);
+    mergedStateBackupTimer=setTimeout(()=>{mergedStateBackupTimer=0;persistLocalState().catch(reportLocalSaveError);},120);
+  }
+  if(queued) savePending();
+}
+function writeLegacyBackup(receipts=syncReceipts){
+  // Un solo setItem es atómico: nunca queda una venta sin su cola por falta de cuota.
+  localStorage.setItem('tienda_critical_fallback_v1',JSON.stringify({state:STATE,ops:pendingOps,syncReceipts:receipts}));
+}
+function reportLocalSaveError(error){
+  console.error('No se confirmó el guardado local',error);
+  showToast('No se pudo confirmar el guardado local. Exporta un respaldo y revisa el espacio disponible.',6000);
+}
+async function persistLocalState(force=false){
+  if(criticalWriteDepth&&!force) return false;
+  clearTimeout(mergedStateBackupTimer);mergedStateBackupTimer=0;
+  if(!force && savedRevision===stateRevision) return true;
+  const revision=stateRevision;
   try{
-    const prev = localStorage.getItem(LOCAL_BACKUP_KEY);
-    if(prev) localStorage.setItem(LOCAL_BACKUP_PREV_KEY, prev);
-    localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(STATE));
-  }catch(e){}
-  if(window.POSStorage) POSStorage.scheduleStateSave(STATE);
-  if(queuedAudit) savePending();
+    if(!localPersistenceReady) throw new Error('IndexedDB no disponible');
+    await POSStorage.commit(STATE,pendingOps);
+    localStorage.removeItem('tienda_critical_fallback_v1');
+  }catch(error){
+    // No se informa éxito si tampoco es posible completar el respaldo alternativo.
+    writeLegacyBackup();
+  }
+  savedRevision=revision;return true;
 }
 function savePending(){
-  try { localStorage.setItem(PENDING_KEY, JSON.stringify(pendingOps)); } catch(e){}
-  if(window.POSStorage) POSStorage.schedulePendingSave(pendingOps);
-  renderSyncCenter();
+  if(criticalWriteDepth) return;
+  if(localPersistenceReady) POSStorage.schedulePendingSave(pendingOps);
+  else writeLegacyBackup();
+  scheduleSyncIndicators();
 }
 
 async function initializeLocalPersistence(){
@@ -2215,21 +2300,25 @@ async function initializeLocalPersistence(){
     if(loaded?.state){
       const currentScore = stateDataScore(STATE);
       const indexedScore = stateDataScore(loaded.state);
-      if(indexedScore >= currentScore) STATE = loaded.state;
+      if(!localStorage.getItem('tienda_critical_fallback_v1') && (loaded.authoritative || indexedScore >= currentScore)) STATE = loaded.state;
       else await POSStorage.saveState(STATE);
     }
     const opMap = new Map();
-    [...(loaded?.ops||[]),...(pendingOps||[])].forEach(op=>{
+    [...(loaded?.ops||[]),...(loaded?.queueAuthoritative&&!localStorage.getItem('tienda_critical_fallback_v1')?[]:pendingOps||[])].forEach(op=>{
       if(op?.id) opMap.set(op.id,op);
     });
     pendingOps = Array.from(opMap.values()).sort((a,b)=>String(a.ts||'').localeCompare(String(b.ts||'')));
+    if(!localStorage.getItem('tienda_critical_fallback_v1')) syncReceipts=Array.isArray(loaded.receipts)?loaded.receipts:[];
+    localPersistenceReady=true;
+    if(localStorage.getItem('tienda_critical_fallback_v1')){await POSStorage.commit(STATE,pendingOps,syncReceipts);localStorage.removeItem('tienda_critical_fallback_v1');}
+    localStorage.setItem('tienda_idb_authoritative_v1','1');
     ensureStateShape();
-    saveLocalBackup();
-    savePending();
+    scheduleMergedStateBackup();
     window.STATE = STATE;
     window.pendingOps = pendingOps;
   }catch(error){
     console.warn('IndexedDB no disponible; se conserva el respaldo local',error);
+    tryRecoverStateFromLocalStorage();
   }
 }
 
@@ -2285,6 +2374,8 @@ function parseStateCandidate(raw){
 }
 
 function tryRecoverStateFromLocalStorage(){
+  // Un almacén ya migrado es la fuente actual; un respaldo antiguo no debe resucitar registros.
+  if(localPersistenceReady) return;
   try{
     const currentScore = stateDataScore(STATE);
     let best = null;
@@ -2431,143 +2522,7 @@ function normalizeRemoteData(remote){
    - merges remote normalized state with local STATE avoiding destructive overwrite
 */
 function mergeState(remoteState){
-  ensureStateShape();
-  const mergeRecordsById = (localRows,remoteRows)=>{
-    const rows = new Map();
-    (localRows||[]).forEach(row=>{ if(row?.id) rows.set(String(row.id),row); });
-    (remoteRows||[]).forEach(row=>{
-      if(!row?.id) return;
-      const key = String(row.id);
-      const current = rows.get(key);
-      const localAt = new Date(current?.updatedAt||current?.createdAt||current?.date||0).getTime();
-      const remoteAt = new Date(row.updatedAt||row.createdAt||row.date||0).getTime();
-      if(!current || remoteAt >= localAt) rows.set(key,row);
-    });
-    return Array.from(rows.values());
-  };
-  const purchasesMerged = mergeRecordsById(STATE.purchases,remoteState.purchases);
-  const suppliersMerged = mergeRecordsById(STATE.suppliers,remoteState.suppliers);
-  const auditMerged = mergeRecordsById(STATE.auditLogs,remoteState.auditLogs);
-  const stockMovementsMerged = mergeRecordsById(STATE.stockMovements,remoteState.stockMovements);
-  const conflictsMerged = mergeRecordsById(STATE.syncConflicts,remoteState.syncConflicts);
-  const closuresMap = new Map();
-  (STATE.stockClosures||[]).forEach(c => { if(c?.id) closuresMap.set(String(c.id), c); });
-  (remoteState.stockClosures||[]).forEach(c => {
-    if(!c?.id) return;
-    const key = String(c.id);
-    if(!closuresMap.has(key)) closuresMap.set(key, c);
-  });
-  const staffMap = new Map();
-  (STATE.staff||[]).forEach(person => { if(person?.id) staffMap.set(String(person.id), person); });
-  (remoteState.staff||[]).forEach(person => {
-    if(!person?.id) return;
-    const key = String(person.id);
-    const current = staffMap.get(key);
-    if(!current || new Date(person.updatedAt||person.createdAt||0) >= new Date(current.updatedAt||current.createdAt||0)) staffMap.set(key, person);
-  });
-  const shiftMap = new Map();
-  (STATE.shifts||[]).forEach(shift => { if(shift?.id) shiftMap.set(String(shift.id), shift); });
-  (remoteState.shifts||[]).forEach(shift => {
-    if(!shift?.id) return;
-    const key = String(shift.id);
-    const current = shiftMap.get(key);
-    if(!current || new Date(shift.updatedAt||shift.closedAt||shift.openedAt||0) >= new Date(current.updatedAt||current.closedAt||current.openedAt||0)) shiftMap.set(key, shift);
-  });
-  // Merge products: prefer more recent createdAt, merge movements by id
-  const map = new Map(); (STATE.products||[]).forEach(p => map.set(p.id, JSON.parse(JSON.stringify(p))));
-  for(const rp of (remoteState.products||[])){
-    if(rp && rp.id && rp.deleted){
-      const existingDeleted = map.get(rp.id) || {};
-      const deletedProduct = { ...existingDeleted, ...rp, deleted:true };
-      const deletedMovements = new Map();
-      (existingDeleted.movements||[]).forEach(m=>deletedMovements.set(m.id||JSON.stringify(m),m));
-      (rp.movements||[]).forEach(m=>deletedMovements.set(m.id||JSON.stringify(m),m));
-      deletedProduct.movements = Array.from(deletedMovements.values());
-      map.set(rp.id,deletedProduct);
-      continue;
-    }
-    const existing = map.get(rp.id);
-    if(!existing) map.set(rp.id, rp);
-    else {
-      const ldt = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
-      const rdt = new Date(rp.updatedAt || rp.createdAt || 0).getTime();
-      let base = rdt >= ldt ?{...rp}:{...existing};
-      // unify movements
-      const mm = new Map();
-      const remoteMovementIds = new Set();
-      (rp.movements||[]).forEach(m=>remoteMovementIds.add(String(m.id||m.movementId||JSON.stringify(m))));
-      (existing.movements||[]).forEach(m=> mm.set(m.id||m.movementId||JSON.stringify(m), m));
-      (rp.movements||[]).forEach(m=> mm.set(m.id||m.movementId||JSON.stringify(m), m));
-      base.movements = Array.from(mm.values());
-      const localOnly = (existing.movements||[]).filter(m=>!remoteMovementIds.has(String(m.id||m.movementId||JSON.stringify(m))));
-      const hasPendingLocal = pendingOps.some(op=>
-        (op.type==='product' && String(op.payload?.id||'')===String(rp.id)) ||
-        (op.type==='purchaseBundle' && (op.payload?.products||[]).some(p=>String(p.id||'')===String(rp.id)))
-      );
-      if(hasPendingLocal && localOnly.length){
-        base = {...base,stock:roundStock(Number(rp.stock||0)+localOnly.reduce((sum,m)=>sum+getMovementStockDelta(m),0)),movements:Array.from(mm.values())};
-      }
-      if(hasPendingLocal && Number(existing.stock||0)!==Number(rp.stock||0)){
-        const conflictId = `STOCK-${rp.id}-${String(existing.updatedAt||'local')}-${String(rp.updatedAt||'remote')}`.replaceAll('/','_');
-        if(!conflictsMerged.some(item=>item.id===conflictId)) conflictsMerged.push({
-          id:conflictId,type:'STOCK_CONCURRENT',productId:rp.id,productName:existing.name||rp.name||'',
-          localStock:Number(existing.stock||0),remoteStock:Number(rp.stock||0),status:'OPEN',createdAt:new Date().toISOString()
-        });
-      }
-      map.set(base.id, base);
-    }
-  }
-  const mergedProds = Array.from(map.values());
-
-  // Merge sales: keep set union, prefer latest date on conflict
-  const sMap = new Map(); (STATE.sales||[]).forEach(s=> sMap.set(s.id, s));
-  for(const rs of (remoteState.sales||[])){
-    if(rs && rs.id && rs.deleted){
-      sMap.delete(rs.id);
-      continue;
-    }
-    if(!sMap.has(rs.id)) sMap.set(rs.id, rs);
-    else {
-      const cur = sMap.get(rs.id);
-      const cd = new Date(cur.updatedAt || cur.date || 0).getTime();
-      const rd = new Date(rs.updatedAt || rs.date || 0).getTime();
-      if(rd >= cd) sMap.set(rs.id, rs);
-    }
-  }
-  const mergedSales = Array.from(sMap.values()).sort((a,b)=> new Date(b.date)-new Date(a.date));
-
-  // Merge customers by normalized name or id, prefer latest updatedAt
-  const cMap = new Map(); (STATE.customers||[]).forEach(c=> cMap.set((c.id||c.name||'').toString().toLowerCase(), c));
-  for(const rc of (remoteState.customers||[])){
-    if(rc && (rc.id || rc.name) && rc.deleted){
-      const delKey = (rc.id || rc.name || '').toString().toLowerCase();
-      cMap.delete(delKey);
-      continue;
-    }
-    const key = (rc.id || rc.name || '').toString().toLowerCase();
-    if(!cMap.has(key)) cMap.set(key, rc);
-    else {
-      const ex = cMap.get(key);
-      const edt = new Date(ex.updatedAt || ex.createdAt || 0).getTime();
-      const rdt = new Date(rc.updatedAt || rc.createdAt || 0).getTime();
-      if(rdt >= edt) cMap.set(key, rc);
-    }
-  }
-  const mergedCustomers = Array.from(cMap.values());
-
-  const mergedProductsById = new Map(mergedProds.map(product=>[String(product?.id||''),product]));
-  stockMovementsMerged.forEach(movement=>{
-    const product = mergedProductsById.get(String(movement.productId||''));
-    if(!product) return;
-    product.movements = Array.isArray(product.movements)?product.movements:[];
-    if(!product.movements.some(m=>String(m.id||m.movementId||'')===String(movement.id||movement.movementId||''))) product.movements.push(movement);
-  });
-  STATE.products = mergedProds; STATE.sales = mergedSales; STATE.customers = mergedCustomers;
-  STATE.purchases = purchasesMerged; STATE.suppliers = suppliersMerged; STATE.auditLogs = auditMerged;
-  STATE.stockMovements = stockMovementsMerged; STATE.syncConflicts = conflictsMerged;
-  STATE.stockClosures = Array.from(closuresMap.values()); STATE.staff = Array.from(staffMap.values()); STATE.shifts = Array.from(shiftMap.values());
-  ensureStateShape();
-  scheduleMergedStateBackup();
+  Object.keys(SUBCOLS).forEach(name=>{if(Array.isArray(remoteState[name])) mergeFromSubcollection(name,remoteState[name]);});
 }
 
 /* ==========
@@ -2577,6 +2532,7 @@ function mergeState(remoteState){
    - Incluye migración segura desde doc legacy
    ========== */
 function initFirebase(){
+  if(db) return;
   try{
     if(!window.firebase) { console.warn('Firebase SDK not loaded'); return; }
     if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
@@ -2590,7 +2546,39 @@ const SUBCOLS = {
   syncConflicts:'syncConflicts'
 };
 const MIGRATION_KEY = 'tienda_migration_v1';
-let syncInProgress = false;
+let syncInProgress = false, cloudBootstrapPromise=null, firestoreStartPromise=null, syncGeneration=0;
+let syncIndicatorTimer=0, syncActionInProgress=false, syncRefreshInProgress=false, syncQueuePage=0, syncConflictPage=0, pendingFlushPromise=null, activeSyncOperationId=null;
+const syncCollectionStates={};
+function scheduleSyncIndicators(){
+  if(syncIndicatorTimer) return;
+  syncIndicatorTimer=setTimeout(()=>{syncIndicatorTimer=0;updateOnline(cloudOn);},50);
+}
+function stopCloudListeners(){
+  syncGeneration++;
+  Object.keys(syncCollectionStates).forEach(key=>delete syncCollectionStates[key]);
+  Object.entries(unsubscribers).forEach(([key,stop])=>{try{stop?.();}catch(_){}unsubscribers[key]=null;});
+}
+const remoteEntityIndexes=new Map();
+let movementProductIndex=null;
+function movementsForProduct(id){
+  const rows=STATE.stockMovements||[];
+  if(movementProductIndex?.rows!==rows||movementProductIndex.length!==rows.length){
+    const byProduct=new Map();rows.forEach(m=>{const key=String(m.productId||'');if(!byProduct.has(key)) byProduct.set(key,[]);byProduct.get(key).push(m);});
+    movementProductIndex={rows,length:rows.length,byProduct};
+  }
+  return movementProductIndex.byProduct.get(id)||[];
+}
+function pendingEntityKeys(){
+  const keys=new Set();
+  const entities={product:'products',sale:'sales',customer:'customers',staff:'staff',shift:'shifts',purchase:'purchases',supplier:'suppliers',audit:'auditLogs',stockMovement:'stockMovements',stockClosure:'stockClosures',syncConflict:'syncConflicts'};
+  pendingOps.forEach(op=>{
+    if(entities[op.type]&&op.payload?.id) keys.add(entities[op.type]+':'+op.payload.id);
+    if(op.type==='purchaseBundle'){
+      (op.payload?.products||[]).forEach(p=>keys.add('products:'+p.id));
+      if(op.payload?.purchase?.id) keys.add('purchases:'+op.payload.purchase.id);
+    }
+  });return keys;
+}
 let unsubscribers = Object.fromEntries(Object.keys(SUBCOLS).map(key=>[key,null]));
 let activeDbCol = DB.col;
 
@@ -2601,7 +2589,12 @@ function subcolRef(name){
   return parentDocRef().collection(name);
 }
 
-async function resolveDbCollectionName(){
+let collectionResolutionPromise=null;
+function resolveDbCollectionName(){
+  if(!collectionResolutionPromise) collectionResolutionPromise=resolveDbCollectionNameOnce().catch(error=>{collectionResolutionPromise=null;throw error;});
+  return collectionResolutionPromise;
+}
+async function resolveDbCollectionNameOnce(){
   if(!db) return;
   const candidates = Array.from(new Set([DB.col, DB.colFallback].filter(Boolean)));
   for(const col of candidates){
@@ -2775,152 +2768,126 @@ async function migrateOldDataToSubcollections(){
   }
 }
 
-function mergeFromSubcollection(name, docs){
-  const partial = { products: [], sales: [], customers: [], purchases: [], suppliers: [], auditLogs: [], stockMovements: [], stockClosures: [], staff: [], shifts: [], syncConflicts: [] };
-  if(name === SUBCOLS.products) partial.products = docs;
-  if(name === SUBCOLS.sales) partial.sales = docs;
-  if(name === SUBCOLS.customers) partial.customers = docs;
-  if(name === SUBCOLS.stockClosures) partial.stockClosures = docs;
-  if(name === SUBCOLS.staff) partial.staff = docs;
-  if(name === SUBCOLS.shifts) partial.shifts = docs;
-  if(name === SUBCOLS.purchases) partial.purchases = docs;
-  if(name === SUBCOLS.suppliers) partial.suppliers = docs;
-  if(name === SUBCOLS.auditLogs) partial.auditLogs = docs;
-  if(name === SUBCOLS.stockMovements) partial.stockMovements = docs;
-  if(name === SUBCOLS.syncConflicts) partial.syncConflicts = docs;
-  mergeState(partial);
+function mergeFromSubcollection(name,docs){
+  if(!Object.prototype.hasOwnProperty.call(SUBCOLS,name) || !docs.length) return false;
+  const rows=STATE[name]||(STATE[name]=[]);
+  let index=remoteEntityIndexes.get(name);
+  if(index?.rows!==rows || index.length!==rows.length){index={rows,length:rows.length,byId:new Map(rows.map((row,i)=>[String(row.id),i]))};remoteEntityIndexes.set(name,index);}
+  const protectedKeys=pendingEntityKeys();let changed=false,salesOrderChanged=false;
+  for(const remote of docs){
+    if(!remote?.id) continue;
+    const id=String(remote.id),position=index.byId.get(id),current=position===undefined?null:rows[position];
+    const localAt=new Date(current?.updatedAt||current?.closedAt||current?.createdAt||current?.date||current?.openedAt||0).getTime();
+    const remoteAt=new Date(remote.updatedAt||remote.closedAt||remote.createdAt||remote.date||remote.openedAt||0).getTime();
+    // Un eco del listener nunca confirma la cola ni pisa una edición pendiente.
+    if(current && protectedKeys.has(name+':'+id)) continue;
+    if(current && remoteAt<localAt) continue;
+    let merged={...remote,id};
+    if(name==='products'){
+      const movements=new Map();
+      [...(current?.movements||[]),...(remote.movements||[])].forEach(m=>movements.set(String(m.id||m.movementId||JSON.stringify(m)),m));
+      movementsForProduct(id).forEach(m=>movements.set(String(m.id||m.movementId||JSON.stringify(m)),m));
+      merged={...current,...merged,movements:[...movements.values()]};
+      merged.name=String(merged.name||'').trim();merged.stock=Number(merged.stock||0);merged.price=Number(merged.price||0);merged.costPrice=Number(merged.costPrice||0);
+      if(merged.parentProductId) merged.parentProductId=String(merged.parentProductId);
+      if(Number(merged.subFactor)>0) merged.subFactor=Math.max(1,Math.floor(Number(merged.subFactor)));
+    }
+    if(name==='shifts'){merged.status=merged.status||(merged.closedAt?'CLOSED':'OPEN');merged.openedAt=merged.openedAt||merged.createdAt||current?.openedAt||new Date().toISOString();merged.openingCash=Number(merged.openingCash||0);}
+    if(name==='customers') merged.balance=Number(merged.balance||0);
+    if(name==='staff'){merged.name=String(merged.name||'').trim();merged.username=normalizeStaffUsername(merged.username);merged.active=merged.active!==false;}
+    if(current && JSON.stringify(current)===JSON.stringify(merged)) continue;
+    if(name==='sales'&&(!current||current.date!==merged.date)) salesOrderChanged=true;
+    if(position===undefined){index.byId.set(id,rows.length);rows.push(merged);}else rows[position]=merged;
+    changed=true;
+    if(name==='stockMovements'){
+      const product=getProductById(merged.productId);
+      if(product){product.movements=product.movements||[];if(!product.movements.some(m=>String(m.id||m.movementId||'')===id)) product.movements.push(merged);}
+    }
+  }
+  if(!changed) return false;
+  if(salesOrderChanged){rows.sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));remoteEntityIndexes.delete(name);}
+  else index.length=rows.length;
+  if(name==='stockMovements') movementProductIndex=null;
+  if(name==='products') rebuildLinkedStocks(false);
+  scheduleMergedStateBackup();window.STATE=STATE;
+  return true;
 }
 
 async function startFirestoreSync(){
-  if(!db){ updateOnline(false); return; }
-
-  await migrateOldDataToSubcollections();
-
-  // initial fetch from subcollections
-  try{
-    const [products, customers, sales, stockClosures, staff, shifts, purchases, suppliers, auditLogs, stockMovements, syncConflicts] = await Promise.all([
-      fetchSubcollectionDocs(SUBCOLS.products),
-      fetchSubcollectionDocs(SUBCOLS.customers),
-      fetchSubcollectionDocs(SUBCOLS.sales),
-      fetchSubcollectionDocs(SUBCOLS.stockClosures).catch(err => { console.warn('stockClosures read unavailable', err); return []; }),
-      fetchSubcollectionDocs(SUBCOLS.staff).catch(err => { console.warn('staff read unavailable', err); return []; }),
-      fetchSubcollectionDocs(SUBCOLS.shifts).catch(err => { console.warn('shifts read unavailable', err); return []; }),
-      fetchSubcollectionDocs(SUBCOLS.purchases).catch(err => { console.warn('purchases read unavailable', err); return []; }),
-      fetchSubcollectionDocs(SUBCOLS.suppliers).catch(err => { console.warn('suppliers read unavailable', err); return []; }),
-      fetchSubcollectionDocs(SUBCOLS.auditLogs).catch(err => { console.warn('auditLogs read unavailable', err); return []; }),
-      fetchSubcollectionDocs(SUBCOLS.stockMovements).catch(err => { console.warn('stockMovements read unavailable', err); return []; }),
-      fetchSubcollectionDocs(SUBCOLS.syncConflicts).catch(err => { console.warn('syncConflicts read unavailable', err); return []; }),
-    ]);
-    mergeState({ products, customers, sales, stockClosures, staff, shifts, purchases, suppliers, auditLogs, stockMovements, syncConflicts });
-    renderAll();
-    updateOnline(true);
-  }catch(e){
-    console.error('initial subcollection read error', e);
-    updateOnline(false);
-  }
-
-  // realtime listeners
-  try{
-    Object.values(unsubscribers).forEach(unsubscribe=>{ if(unsubscribe) try{ unsubscribe(); }catch(_){} });
-
-    unsubscribers.products = subcolRef(SUBCOLS.products).onSnapshot(snap => {
-      const docs = snap.docs.map(d => d.data());
-      mergeFromSubcollection(SUBCOLS.products, docs);
-      scheduleRenderAll();
-      updateOnline(true);
-      processPendingOps();
-    }, err => { console.error('products onSnapshot err', err); updateOnline(false); });
-
-    unsubscribers.customers = subcolRef(SUBCOLS.customers).onSnapshot(snap => {
-      const docs = snap.docs.map(d => d.data());
-      mergeFromSubcollection(SUBCOLS.customers, docs);
-      scheduleRenderAll();
-      updateOnline(true);
-      processPendingOps();
-    }, err => { console.error('customers onSnapshot err', err); updateOnline(false); });
-
-    unsubscribers.sales = subcolRef(SUBCOLS.sales).onSnapshot(snap => {
-      const docs = snap.docs.map(d => d.data());
-      mergeFromSubcollection(SUBCOLS.sales, docs);
-      scheduleRenderAll();
-      updateOnline(true);
-      processPendingOps();
-    }, err => { console.error('sales onSnapshot err', err); updateOnline(false); });
-
-    unsubscribers.stockClosures = subcolRef(SUBCOLS.stockClosures).onSnapshot(snap => {
-      const docs = snap.docs.map(d => d.data());
-      mergeFromSubcollection(SUBCOLS.stockClosures, docs);
-      if($('#modal-daily-stock')?.classList.contains('visible')) renderDailyClosureHistory();
-      updateOnline(true);
-      processPendingOps();
-    }, err => { console.warn('stockClosures onSnapshot unavailable; cierres quedan locales', err); });
-
-    unsubscribers.staff = subcolRef(SUBCOLS.staff).onSnapshot(snap => {
-      mergeFromSubcollection(SUBCOLS.staff, snap.docs.map(d=>d.data()));
-      renderPersonnelList();
-      enforceCurrentStaffAccess();
-    }, err => { console.warn('staff onSnapshot unavailable; personal queda local', err); });
-
-    unsubscribers.shifts = subcolRef(SUBCOLS.shifts).onSnapshot(snap => {
-      mergeFromSubcollection(SUBCOLS.shifts, snap.docs.map(d=>d.data()));
-      updateShiftUI();
-      if($('#modal-shift')?.classList.contains('visible')) renderShiftModal();
-    }, err => { console.warn('shifts onSnapshot unavailable; turnos quedan locales', err); });
-
-    [SUBCOLS.purchases,SUBCOLS.suppliers,SUBCOLS.auditLogs,SUBCOLS.stockMovements,SUBCOLS.syncConflicts].forEach(name=>{
-      const key = Object.keys(SUBCOLS).find(k=>SUBCOLS[k]===name);
-      unsubscribers[key] = subcolRef(name).onSnapshot(snap=>{
-        mergeFromSubcollection(name,snap.docs.map(d=>d.data()));
-        saveLocalBackup();
-        if(name===SUBCOLS.purchases && $('#modal-purchase-history')?.classList.contains('visible')) renderPurchaseHistoryList();
-        renderSyncCenter();
-        updateOnline(true);
-      },err=>console.warn(`${name} onSnapshot unavailable; datos quedan locales`,err));
-    });
-  }catch(e){ console.error('startFirestoreSync err', e); updateOnline(false); }
+  if(!db || !isCloudAllowed()) return false;
+  if(firestoreStartPromise) return firestoreStartPromise;
+  const generation=syncGeneration;
+  firestoreStartPromise=(async()=>{
+    await migrateOldDataToSubcollections();
+    if(generation!==syncGeneration||!isCloudAllowed()) return false;
+    Object.entries(SUBCOLS).forEach(([key,name])=>{
+      if(unsubscribers[key]) return;
+      syncCollectionStates[key]={state:'connecting',error:''};
+      let pending=new Map(),timer=0,stopped=false,fromCache=true;
+      const flush=()=>{
+        timer=0;if(stopped||generation!==syncGeneration||!isCloudAllowed()) return;
+        const batch=[...pending.values()].slice(0,200);batch.forEach(row=>pending.delete(String(row.id)));
+        const changed=mergeFromSubcollection(name,batch);
+        if(changed){
+          if(['products','sales','customers'].includes(key)) scheduleRenderAll();
+          if(key==='staff'){if(isModalVisible('modal-personnel')) renderPersonnelList();enforceCurrentStaffAccess();}
+          if(key==='shifts') updateShiftUI();
+          if(['staff','shifts'].includes(key)&&isModalVisible('modal-shift')) renderShiftModal();
+          if(key==='stockClosures'&&isModalVisible('modal-daily-stock')) renderDailyClosureHistory();
+          if(key==='purchases'&&isModalVisible('modal-purchase-history')) renderPurchaseHistoryList();
+        }
+        scheduleSyncIndicators();
+        syncCollectionStates[key]={state:pending.size?'loading':fromCache?'cache':'ready',error:''};
+        if(pending.size) timer=setTimeout(flush,0);
+      };
+      const stop=subcolRef(name).onSnapshot({includeMetadataChanges:true},snapshot=>{
+        if(stopped||generation!==syncGeneration||!isCloudAllowed()) return;
+        // La primera instantánea ya contiene la colección: no se hace un get() completo previo.
+        fromCache=snapshot.metadata?.fromCache===true;
+        const changes=snapshot.docChanges();
+        changes.forEach(change=>{
+          // No borrar historia por una salida de la consulta; sólo se aplican tombstones explícitos.
+          if(change.type==='removed') return;
+          const row=change.doc.data();if(row) pending.set(String(row.id||change.doc.id),{...row,id:row.id||change.doc.id});
+        });
+        syncCollectionStates[key]={state:pending.size?'loading':fromCache?'cache':'ready',error:''};
+        if(pending.size&&!timer) timer=setTimeout(flush,0);
+        cloudOn=true;scheduleSyncIndicators();processPendingOps();
+      },error=>{
+        console.warn(name+' onSnapshot: datos locales conservados',error);
+        syncCollectionStates[key]={state:'error',error:String(error.message||error)};
+        localStorage.setItem(LAST_SYNC_ERROR_KEY,String(error.message||error));
+        stopped=true;clearTimeout(timer);pending.clear();unsubscribers[key]=null;updateOnline(false);
+      });
+      unsubscribers[key]=()=>{stopped=true;clearTimeout(timer);pending.clear();stop();};
+    });return true;
+  })();
+  try{return await firestoreStartPromise;}finally{firestoreStartPromise=null;}
 }
 
-async function bootstrapCloudSync(showFeedback = false){
-  try{
-    if(!isCloudAllowed()){
-      updateOnline(false);
-      if(showFeedback) showToast('Modo solo local activo');
-      return false;
-    }
-    if(!navigator.onLine){
-      updateOnline(false);
-      if(showFeedback) showToast('Sin internet: trabajando en modo local');
-      return false;
-    }
-    const okFirebase = await ensureFirebaseLoaded();
-    if(!okFirebase){
-      updateOnline(false);
-      if(showFeedback) showToast('No se pudo cargar la nube. Seguimos en modo local');
-      return false;
-    }
-    initFirebase();
-    if(!db){
-      updateOnline(false);
-      if(showFeedback) showToast('Firebase no disponible');
-      return false;
-    }
-    await resolveDbCollectionName();
-    await startFirestoreSync();
-    if(showFeedback) showToast('Sincronización activa');
-    return true;
-  }catch(err){
-    console.error('bootstrapCloudSync err', err);
-    updateOnline(false);
-    if(showFeedback) showToast('No se pudo iniciar sincronización');
-    return false;
-  }
+async function bootstrapCloudSync(showFeedback=false,startQueue=true){
+  if(!isCloudAllowed()||!navigator.onLine){updateOnline(false);if(showFeedback) showToast('Trabajando en modo local');return false;}
+  if(cloudBootstrapPromise) return cloudBootstrapPromise;
+  cloudBootstrapPromise=(async()=>{
+    try{
+      if(!await ensureFirebaseLoaded()) throw new Error('No se pudo cargar el servicio de sincronización. Los cambios siguen guardados en este equipo.');
+      initFirebase();if(!db) return false;
+      await resolveDbCollectionName();if(!isCloudAllowed()) return false;
+      const started=await startFirestoreSync();
+      if(started){if(startQueue) processPendingOps();if(showFeedback) showToast('Sincronización iniciada');}
+      return started;
+    }catch(error){console.error('bootstrapCloudSync',error);localStorage.setItem(LAST_SYNC_ERROR_KEY,String(error.message||error));updateOnline(false);return false;}
+  })();
+  try{return await cloudBootstrapPromise;}finally{cloudBootstrapPromise=null;}
 }
 
 let connectivityEventsBound = false;
 function bindConnectivityEvents(){
   if(connectivityEventsBound) return;
   connectivityEventsBound = true;
+  const markUnverified=()=>Object.values(syncCollectionStates).forEach(item=>{if(item.state!=='error') item.state='cache';});
   window.addEventListener('online', async ()=>{
+    markUnverified();updateOnline(false);
     if(isCloudAllowed()){
       showToast('Internet detectado, sincronizando...');
       await bootstrapCloudSync(false);
@@ -2929,7 +2896,7 @@ function bindConnectivityEvents(){
     safeCreateIcons();
   });
   window.addEventListener('offline', ()=>{
-    updateOnline(false);
+    markUnverified();updateOnline(false);
     showToast('Sin internet: guardando en local');
   });
 }
@@ -2941,16 +2908,17 @@ function bindConnectivityEvents(){
 */
 function addPendingOp(op){
   // op: { type, payload, id, ts, retries, silent }
+  op={...op,payload:typeof structuredClone==='function'?structuredClone(op.payload):JSON.parse(JSON.stringify(op.payload))};
   op.id = op.id || uid();
   op.ts = op.ts || new Date().toISOString();
   op.retries = op.retries || 0;
   op.status = 'pending';
   op.lastError = '';
   const existingIndex = pendingOps.findIndex(item=>item.id===op.id);
-  if(existingIndex >= 0) pendingOps[existingIndex] = {...pendingOps[existingIndex],...op};
+  if(existingIndex >= 0) pendingOps[existingIndex] = {...pendingOps[existingIndex],...op,cloudConfirmedAt:null};
   else pendingOps.push(op);
   savePending();
-  if(!op.silent) showToast(isCloudAllowed() && navigator.onLine ?'Operación guardada; esperando confirmación':'Operación guardada en cola local');
+  if(!op.silent && !criticalWriteDepth) showToast(isCloudAllowed() && navigator.onLine ?'Operación guardada; esperando confirmación':'Operación guardada en cola local');
   if(db && isCloudAllowed() && navigator.onLine) processPendingOps();
 }
 
@@ -2971,51 +2939,59 @@ async function executePendingOperation(op){
 }
 
 /* Solo se retira una operación después de que Firestore confirma la escritura. */
-async function processPendingOps(){
-  if(!db || !navigator.onLine || !isCloudAllowed()) return;
-  if(pendingOps.length === 0) return;
-  if(syncInProgress) return;
-  syncInProgress = true;
+function processPendingOps(){
+  if(pendingFlushPromise) return pendingFlushPromise;
+  pendingFlushPromise=flushPendingOperations().finally(()=>{pendingFlushPromise=null;});
+  return pendingFlushPromise;
+}
+async function flushPendingOperations(){
+  if(!db||!navigator.onLine||!isCloudAllowed()||!pendingOps.length||syncInProgress||criticalWriteDepth) return;
+  syncInProgress=true;scheduleSyncIndicators();
   try{
-    for(let i = 0; i < pendingOps.length; ){
-      const op = pendingOps[i];
-      if(op.nextAttemptAt && new Date(op.nextAttemptAt).getTime() > Date.now()){ i += 1; continue; }
+    await persistLocalState(true);
+    const blockedEntities=new Set();
+    const entityKeys=op=>op.type==='purchaseBundle'
+      ?['purchase:'+op.payload?.purchase?.id,...(op.payload?.products||[]).map(p=>'product:'+p.id)]
+      :[op.type+':'+(op.payload?.id||op.id)];
+    for(const op of [...pendingOps]){
+      if(criticalWriteDepth||!navigator.onLine||!isCloudAllowed()) break;
+      if(!pendingOps.includes(op)) continue;
+      const keys=entityKeys(op);
+      if(keys.some(key=>blockedEntities.has(key))) continue;
+      if(op.nextAttemptAt&&new Date(op.nextAttemptAt).getTime()>Date.now()){keys.forEach(key=>blockedEntities.add(key));continue;}
       try{
-        op.status = 'processing';
-        op.lastAttemptAt = new Date().toISOString();
-        savePending();
-        await executePendingOperation(op);
-        op.status = 'confirmed';
-        op.confirmedAt = new Date().toISOString();
-        localStorage.setItem(LAST_SYNC_KEY,op.confirmedAt);
-        localStorage.removeItem(LAST_SYNC_ERROR_KEY);
-        savePending();
-        pendingOps.splice(i,1);
-        savePending();
+        op.status='processing';activeSyncOperationId=op.id;op.lastAttemptAt=new Date().toISOString();scheduleSyncIndicators();
+        // Una recepción de documentos nunca confirma la escritura de esta operación.
+        if(!op.cloudConfirmedAt){
+          const confirmed=await executePendingOperation(op);
+          if(!confirmed) throw new Error('La nube no confirmó la escritura');
+          op.cloudConfirmedAt=new Date().toISOString();
+        }
+        const receipt={id:op.id,type:op.type,reference:syncOperationReference(op),confirmedAt:op.cloudConfirmedAt};
+        const receipts=[receipt,...syncReceipts.filter(item=>item.id!==receipt.id)].sort((a,b)=>new Date(b.confirmedAt)-new Date(a.confirmedAt)).slice(0,20);
+        const index=pendingOps.indexOf(op);if(index>=0) pendingOps.splice(index,1);
+        try{
+          // La retirada y su recibo local forman una sola transacción.
+          if(localPersistenceReady) await POSStorage.savePendingOps(pendingOps,receipts);
+          else writeLegacyBackup(receipts);
+        }catch(error){
+          if(!pendingOps.includes(op)) pendingOps.splice(Math.min(Math.max(0,index),pendingOps.length),0,op);
+          throw error;
+        }
+        syncReceipts=receipts;
+        try{localStorage.setItem(LAST_SYNC_KEY,receipts[0].confirmedAt);localStorage.removeItem(LAST_SYNC_ERROR_KEY);}catch(error){console.warn('No se pudo actualizar el indicador secundario',error);}
         if(!op.silent) showToast('Operación confirmada en la nube');
-        continue;
-      }catch(err){
-        console.warn('Op failed, retained for retry',op,err);
-        op.retries = (op.retries || 0) + 1;
-        op.status = 'error';
-        op.lastError = String(err?.message||err||'Error desconocido');
-        op.lastErrorCode = String(err?.code||'');
-        const waitMs = Math.min(300000,Math.max(5000,Math.pow(2,Math.min(op.retries,8))*1000));
-        op.nextAttemptAt = new Date(Date.now()+waitMs).toISOString();
-        localStorage.setItem(LAST_SYNC_ERROR_KEY,op.lastError);
-        savePending();
-        i += 1;
-        if(/network|unavailable|offline/i.test(`${op.lastErrorCode} ${op.lastError}`)) break;
+      }catch(error){
+        keys.forEach(key=>blockedEntities.add(key));
+        op.retries=(op.retries||0)+1;op.status='error';op.lastError=String(error.message||error);op.lastErrorCode=String(error.code||'');
+        op.nextAttemptAt=new Date(Date.now()+Math.min(300000,Math.max(5000,2**Math.min(op.retries,8)*1000))).toISOString();
+        localStorage.setItem(LAST_SYNC_ERROR_KEY,op.lastError);savePending();
+        if(/network|unavailable|offline/i.test(op.lastErrorCode+' '+op.lastError)) break;
       }
+      scheduleSyncIndicators();
     }
-  }catch(e){
-    console.error('processPendingOps err', e);
-  } finally {
-    syncInProgress = false;
-    saveLocalBackup();
-    renderSyncCenter();
-    updateOnline(cloudOn);
-  }
+  }catch(error){console.error('processPendingOps',error);localStorage.setItem(LAST_SYNC_ERROR_KEY,String(error.message||error));}
+  finally{syncInProgress=false;activeSyncOperationId=null;scheduleSyncIndicators();}
 }
 
 /* Try periodic flush when online */
@@ -3030,8 +3006,7 @@ function isCloudAllowed(){ return getWorkMode()==='auto'; }
 async function setWorkMode(mode){
   localStorage.setItem(WORK_MODE_KEY,mode==='local'?'local':'auto');
   if(mode==='local'){
-    Object.values(unsubscribers).forEach(unsubscribe=>{ if(unsubscribe) try{ unsubscribe(); }catch(_){} });
-    Object.keys(unsubscribers).forEach(key=>unsubscribers[key]=null);
+    stopCloudListeners();
     cloudOn = false;
     updateOnline(false);
     showToast('Modo solo local activado');
@@ -3044,45 +3019,128 @@ async function setWorkMode(mode){
 }
 
 function renderSyncCenter(){
-  const mode = getWorkMode();
-  const pending = pendingOps.filter(op=>op.status!=='confirmed').length;
-  const errors = pendingOps.filter(op=>op.status==='error').length;
-  const badge = $('#pending-count');
-  if(badge){ badge.textContent=String(pending); badge.classList.toggle('hidden',pending===0); }
-  $('#sync-center-pending') && ($('#sync-center-pending').textContent=errors?`${pending} (${errors} con error)`:String(pending));
-  $('#sync-center-status') && ($('#sync-center-status').textContent=mode==='local'?'Solo local':cloudOn?'Conectado y confirmado':navigator.onLine?'Conectando':'Sin Internet');
-  const last = localStorage.getItem(LAST_SYNC_KEY);
-  $('#sync-center-last') && ($('#sync-center-last').textContent=last?new Date(last).toLocaleString():'Nunca');
-  const error = localStorage.getItem(LAST_SYNC_ERROR_KEY)||'';
-  $('#sync-center-error-row')?.classList.toggle('hidden',!error);
-  $('#sync-center-error') && ($('#sync-center-error').textContent=error);
-  $('#sync-mode-auto')?.classList.toggle('bg-emerald-50',mode==='auto');
-  $('#sync-mode-auto')?.classList.toggle('border-emerald-500',mode==='auto');
-  $('#sync-mode-local')?.classList.toggle('bg-amber-50',mode==='local');
-  $('#sync-mode-local')?.classList.toggle('border-amber-500',mode==='local');
-  const conflicts = (STATE.syncConflicts||[]).filter(item=>item.status!=='RESOLVED');
-  $('#sync-conflicts-box')?.classList.toggle('hidden',conflicts.length===0);
-  $('#sync-conflicts-count') && ($('#sync-conflicts-count').textContent=String(conflicts.length));
-  if($('#sync-conflicts-list')) $('#sync-conflicts-list').innerHTML=conflicts.slice(0,20).map(item=>`<div>${escapeHtml(item.productName||item.type||'Conflicto')}: local ${escapeHtml(item.localStock??'')} / nube ${escapeHtml(item.remoteStock??'')}</div>`).join('');
-}
-
-function openSyncCenter(){ renderSyncCenter(); openModal('modal-sync-center'); safeCreateIcons(); }
-
-async function syncNow(){
-  if(!isCloudAllowed()) return alert('Activa el modo Automático para sincronizar con la nube.');
-  if(!navigator.onLine) return alert('No hay conexión a Internet. Los cambios permanecen seguros en este equipo.');
-  const ready = db ?true:await bootstrapCloudSync(true);
-  if(ready || db){
-    pendingOps.forEach(op=>{ if(op.status==='error') op.nextAttemptAt=null; });
-    savePending();
-    await processPendingOps();
-    renderSyncCenter();
+  const summary=getSyncSummary(),mode=getWorkMode();
+  const setText=(id,text)=>{const el=document.getElementById(id);if(el&&el.textContent!==String(text)) el.textContent=String(text);};
+  const badge=$('#pending-count');if(badge){badge.textContent=String(summary.total);badge.classList.toggle('hidden',summary.total===0);}
+  setText('sync-center-status',summary.label);setText('sync-center-detail',summary.detail);
+  setText('sync-center-pending',summary.total);setText('sync-center-waiting',summary.waiting);
+  setText('sync-center-sending',summary.sending);setText('sync-center-errors',summary.errors);
+  const last=syncReceipts[0]?.confirmedAt;
+  setText('sync-center-last',last?formatSyncTime(last):'Todavía no hay confirmaciones');
+  const error=Object.values(syncCollectionStates).find(item=>item.error)?.error||localStorage.getItem(LAST_SYNC_ERROR_KEY)||'';
+  $('#sync-center-error-row')?.classList.toggle('hidden',!error);setText('sync-center-error',error);
+  $('#sync-mode-auto')?.classList.toggle('bg-emerald-50',mode==='auto');$('#sync-mode-auto')?.classList.toggle('border-emerald-500',mode==='auto');
+  $('#sync-mode-local')?.classList.toggle('bg-amber-50',mode==='local');$('#sync-mode-local')?.classList.toggle('border-amber-500',mode==='local');
+  for(const id of ['btn-sync-now','btn-sync-retry-errors','btn-sync-refresh']){
+    const button=document.getElementById(id);if(button) button.disabled=mode==='local'||!navigator.onLine||syncActionInProgress||syncRefreshInProgress||syncInProgress;
   }
+  $('#btn-sync-retry-errors')?.classList.toggle('hidden',summary.errors===0);
+  if(isModalVisible('modal-sync-center')){renderSyncOperations();renderSyncReceipts();renderSyncConflicts();}
 }
+const SYNC_TYPE_LABELS={sale:'Venta',product:'Producto',customer:'Cliente',purchaseBundle:'Compra',purchase:'Compra',supplier:'Proveedor',audit:'Auditoría',stockMovement:'Movimiento de stock',stockClosure:'Cierre de stock',staff:'Personal',shift:'Turno',syncConflict:'Conflicto'};
+function syncOperationReference(op){
+  const p=op.payload||{};
+  return String(p.purchase?.docNumber||p.docNumber||p.name||p.staffName||p.id||op.id||'');
+}
+function formatSyncTime(value){
+  const date=new Date(value);return Number.isNaN(date.getTime())?'Fecha no disponible':date.toLocaleString('es-PE');
+}
+function getSyncSummary(){
+  const total=pendingOps.length,sending=syncInProgress?pendingOps.filter(op=>op.status==='processing'&&op.id===activeSyncOperationId).length:0,errors=pendingOps.filter(op=>op.status==='error').length;
+  const waiting=total-sending-errors,states=Object.values(syncCollectionStates);
+  const ready=cloudOn&&Object.keys(SUBCOLS).every(key=>syncCollectionStates[key]?.state==='ready');
+  let label,detail,tone='pending';
+  if(!isCloudAllowed()){label='Solo en este equipo';detail=total?`${total} operación(es) guardada(s) aquí. Activa Automático para enviarlas.`:'Los registros se guardan en este equipo. El envío a la nube está pausado.';}
+  else if(!navigator.onLine){label='Sin Internet';detail=total?`${total} operación(es) guardada(s) aquí. Se reintentará al recuperar la conexión.`:'Puedes seguir trabajando con los datos locales.';}
+  else if(syncRefreshInProgress){label='Actualizando desde la nube';detail='Revisando cambios de otros equipos. Las operaciones locales siguen guardadas.';}
+  else if(errors){label='Hay operaciones por revisar';tone='error';detail=`${errors} operación(es) con error. Permanecen guardadas en la cola; revisa el detalle antes de reintentar.`;}
+  else if(states.some(item=>item.state==='error')){label='Actualización incompleta';tone='error';detail='No se pudieron actualizar todos los datos de la nube. Puedes seguir trabajando con los datos locales.';}
+  else if(syncInProgress&&!activeSyncOperationId){label='Preparando envío';detail='Comprobando el guardado local antes de enviar las operaciones.';}
+  else if(sending||syncInProgress){label='Enviando operaciones';detail=`${sending} en envío · ${waiting} en espera. Se retiran de la cola sólo al recibir confirmación.`;}
+  else if(total){label='Cambios pendientes de envío';detail=`${total} operación(es) guardada(s) en este equipo y todavía pendientes de confirmación.`;}
+  else if(states.some(item=>item.state==='loading')){label='Actualizando datos';detail='Se están incorporando cambios recibidos de la nube. Los controles locales siguen disponibles.';}
+  else if(!ready){label='Esperando respuesta de la nube';detail=states.some(item=>item.state==='cache')?'Se muestran datos guardados. Falta verificar la conexión con la nube.':'Comprobando la conexión. Puedes seguir trabajando con tus datos locales.';}
+  else if((STATE.syncConflicts||[]).some(item=>item.status!=='RESOLVED')){label='Revisión pendiente';detail='Los envíos están confirmados, pero hay conflictos de stock o turno por revisar. No se corrigen automáticamente.';}
+  else{label='Al día';tone='ready';detail='No hay operaciones pendientes y los datos de la nube se han actualizado.';}
+  return {total,sending,waiting,errors,label,detail,tone,ready};
+}
+function createSyncText(tag,text,className=''){
+  const el=document.createElement(tag);el.textContent=text;el.className=className;return el;
+}
+function renderSyncOperations(){
+  const container=$('#sync-queue-list');if(!container) return;
+  const filter=$('#sync-queue-filter')?.value||'all';
+  const rows=pendingOps.filter(op=>filter==='all'||(filter==='errors'?op.status==='error':op.status!=='error'));
+  const size=20;syncQueuePage=Math.min(syncQueuePage,Math.max(0,Math.ceil(rows.length/size)-1));
+  const fragment=document.createDocumentFragment();
+  if(!rows.length) fragment.appendChild(createSyncText('p',filter==='errors'?'No hay operaciones con error.':'No hay operaciones en esta lista.','small-muted'));
+  rows.slice(syncQueuePage*size,(syncQueuePage+1)*size).forEach(op=>{
+    const row=createSyncText('div','','rounded-xl border bg-white p-3 space-y-1');row.dataset.syncOpId=op.id;
+    row.appendChild(createSyncText('div',`${SYNC_TYPE_LABELS[op.type]||'Operación'} · ${syncOperationReference(op)}`,'font-semibold break-all'));
+    const status=op.cloudConfirmedAt?'Confirmada en nube; recibo local pendiente':op.status==='processing'&&syncInProgress&&op.id===activeSyncOperationId?'Enviando; esperando confirmación':op.status==='error'?'Error; guardada para reintento':'En espera de envío';
+    row.appendChild(createSyncText('div',status,op.status==='error'?'text-red-700 text-sm':'small-muted'));
+    row.appendChild(createSyncText('div',`Registrada: ${formatSyncTime(op.ts)} · Intentos fallidos: ${Number(op.retries||0)}`,'small-muted'));
+    if(op.lastAttemptAt) row.appendChild(createSyncText('div',`Último intento: ${formatSyncTime(op.lastAttemptAt)}`,'small-muted'));
+    if(op.nextAttemptAt) row.appendChild(createSyncText('div',`Reintento disponible: ${formatSyncTime(op.nextAttemptAt)}`,'small-muted'));
+    if(op.lastError) row.appendChild(createSyncText('div',op.lastError,'small-muted break-all'));
+    row.appendChild(createSyncText('div',`ID: ${op.id}`,'small-muted break-all'));
+    if(op.status==='error'){
+      const button=createSyncText('button','Reintentar esta operación','px-3 py-2 border rounded-xl text-sm');button.type='button';
+      button.disabled=!isCloudAllowed()||!navigator.onLine||syncActionInProgress||syncRefreshInProgress||syncInProgress;
+      button.onclick=()=>retrySyncOperation(op.id);row.appendChild(button);
+    }
+    fragment.appendChild(row);
+  });
+  appendListPagination(fragment,syncQueuePage,rows.length,size,page=>{syncQueuePage=page;renderSyncOperations();});
+  const top=container.scrollTop;container.replaceChildren(fragment);container.scrollTop=top;
+}
+function renderSyncReceipts(){
+  const container=$('#sync-receipts-list');if(!container) return;const fragment=document.createDocumentFragment();
+  if(!syncReceipts.length) fragment.appendChild(createSyncText('p','Todavía no hay confirmaciones registradas en este equipo.','small-muted'));
+  syncReceipts.forEach(receipt=>{
+    const row=createSyncText('div','','border-t pt-2');
+    row.appendChild(createSyncText('div',`${SYNC_TYPE_LABELS[receipt.type]||'Operación'} · ${receipt.reference}`,'font-semibold text-sm break-all'));
+    row.appendChild(createSyncText('div',`Confirmada: ${formatSyncTime(receipt.confirmedAt)}`,'small-muted'));fragment.appendChild(row);
+  });container.replaceChildren(fragment);
+}
+function renderSyncConflicts(){
+  const rows=(STATE.syncConflicts||[]).filter(item=>item.status!=='RESOLVED');
+  $('#sync-conflicts-box')?.classList.toggle('hidden',rows.length===0);
+  if($('#sync-conflicts-count')) $('#sync-conflicts-count').textContent=String(rows.length);
+  const container=$('#sync-conflicts-list');if(!container) return;const fragment=document.createDocumentFragment();
+  syncConflictPage=Math.min(syncConflictPage,Math.max(0,Math.ceil(rows.length/20)-1));
+  rows.slice(syncConflictPage*20,(syncConflictPage+1)*20).forEach(item=>{
+    const label=item.type==='SHIFT_OTHER_DEVICE'?'Turno abierto en otro equipo':item.productName||item.type||'Conflicto';
+    const detail=item.localStock!==undefined||item.remoteStock!==undefined?`Stock en este equipo: ${item.localStock??'sin dato'} · Stock recibido: ${item.remoteStock??'sin dato'}`:item.note||item.description||'Revisa el registro antes de hacer una corrección.';
+    const row=createSyncText('div','','border-t pt-2');row.appendChild(createSyncText('strong',label));row.appendChild(createSyncText('p',detail,'small-muted break-all'));fragment.appendChild(row);
+  });
+  appendListPagination(fragment,syncConflictPage,rows.length,20,page=>{syncConflictPage=page;renderSyncConflicts();});container.replaceChildren(fragment);
+}
+
+function openSyncCenter(){
+  openModal('modal-sync-center');renderSyncCenter();safeCreateIcons($('#modal-sync-center'));
+}
+
+async function syncNow(onlyErrors=false,operationId=null){
+  if(syncActionInProgress||syncRefreshInProgress||syncInProgress) return;
+  if(!isCloudAllowed()) return alert('Activa Automático para enviar las operaciones guardadas.');
+  if(!navigator.onLine) return alert('No hay Internet. Las operaciones permanecen guardadas en este equipo.');
+  syncActionInProgress=true;renderSyncCenter();
+  try{
+    pendingOps.forEach(op=>{if((!operationId||op.id===operationId)&&(!onlyErrors||op.status==='error')) op.nextAttemptAt=null;});
+    savePending();
+    const ready=await bootstrapCloudSync(true,false);
+    if(ready||db){
+      await processPendingOps();
+    }
+  }catch(error){showToast('No se pudo completar el envío. Las operaciones siguen en la cola.',4000);console.warn('Sincronización manual',error);}
+  finally{syncActionInProgress=false;updateOnline(cloudOn);}
+}
+function retrySyncOperation(id){return syncNow(true,id);}
 
 async function downloadDataBackup(){
   try{
-    const backup = window.POSStorage ?await POSStorage.createBackup(STATE,pendingOps,{deviceId:getDeviceId(),workMode:getWorkMode()}):{createdAt:new Date().toISOString(),state:STATE,pendingOps};
+    const backup = window.POSStorage ?await POSStorage.createBackup(STATE,pendingOps,{deviceId:getDeviceId(),workMode:getWorkMode(),syncReceipts}):{createdAt:new Date().toISOString(),state:STATE,pendingOps};
     const blob = new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -3094,16 +3152,9 @@ async function downloadDataBackup(){
 }
 
 function updateOnline(on){
-  cloudOn = !!on;
-  const localOnly = !isCloudAllowed();
-  const pending = pendingOps.filter(op=>op.status!=='confirmed').length;
-  if($('#dot')) $('#dot').style.background = localOnly?'#64748b':on?(pending?'#f59e0b':'#10b981'):'#ef4444';
-  if($('#cloud-text')) $('#cloud-text').textContent = localOnly?'Solo local':on?(pending?`Pendientes ${pending}`:'Sincronizado'):(navigator.onLine?'Sin confirmar':'Sin Internet');
-  if(on){
-    localStorage.setItem(LAST_SYNC_KEY,new Date().toISOString());
-    localStorage.removeItem(LAST_SYNC_ERROR_KEY);
-    processPendingOps();
-  }
+  cloudOn=!!on;const summary=getSyncSummary();
+  if($('#dot')) $('#dot').style.background=summary.tone==='ready'?'#10b981':summary.tone==='error'?'#ef4444':!isCloudAllowed()?'#64748b':'#f59e0b';
+  if($('#cloud-text')) $('#cloud-text').textContent=summary.total?`${summary.label} (${summary.total})`:summary.label;
   renderSyncCenter();
 }
 
@@ -3130,8 +3181,7 @@ function scheduleRenderAll(delay = 40){
 
 function renderAll(){
   if(renderAllTimer){ clearTimeout(renderAllTimer); renderAllTimer = 0; }
-  rebuildLinkedStocks();
-  renderDashboard(true);
+  if(isElementVisible('tab-home')) renderDashboard(true);
   if(isElementVisible('tab-inventory')) renderInventoryList(true);
   if(isModalVisible('modal-sale')) renderCart();
   if(isModalVisible('modal-clients')) renderClients();
@@ -3142,7 +3192,7 @@ function renderAll(){
 }
 
 function renderDashboard(stockPrepared = false){
-  if(!stockPrepared) rebuildLinkedStocks();
+
   const now = new Date();
   const ventasHoy = (STATE.sales||[]).filter(s => !s.deleted && isSameLocalDay(s.date, now));
   const total = ventasHoy.reduce((a,b)=> a + Number(b.total||0), 0);
@@ -3212,7 +3262,8 @@ function renderDashboard(stockPrepared = false){
   buildSection('Stock bajo', lowStock, 'low');
 }
 
-let inventoryRenderTimer = 0;
+let inventoryRenderTimer = 0, inventoryPage=0, inventoryQuery='';
+let inventoryRows=new Map();
 function scheduleInventoryRender(delay = 80){
   if(inventoryRenderTimer) clearTimeout(inventoryRenderTimer);
   inventoryRenderTimer = setTimeout(()=>{
@@ -3221,22 +3272,31 @@ function scheduleInventoryRender(delay = 80){
   },delay);
 }
 
-function renderInventoryList(stockPrepared = false){
-  if(!stockPrepared) rebuildLinkedStocks();
-  const container = $('#inventory-list'); if(!container) return; container.innerHTML='';
-  const q = ($('#search-inv')?.value||'').toLowerCase();
-  const list = (STATE.products||[]).filter(p => p && !p.deleted && (!q || (p.name||'').toLowerCase().includes(q) || (p.barcode||'').includes(q)));
-  if(list.length === 0) container.innerHTML = '<div class="small-muted">No hay productos</div>';
-  const fragment = document.createDocumentFragment();
-  list.forEach(p=>{
-    const stockView = getAvailableQtyForSale(p);
-    const d = document.createElement('div'); d.className='card flex justify-between items-center'; d.style.padding='8px';
-    d.onclick = ()=> editProduct(p.id);
-    d.innerHTML = `<div><div style="font-weight:800">${escapeHtml(p.name)}</div><div class="small-muted">STOCK: ${stockView} • S/ ${money(p.price)}</div></div><div class="text-indigo-600"><i data-lucide="edit-3"></i></div>`;
-    fragment.appendChild(d);
-  });
-  container.appendChild(fragment);
-  safeCreateIcons();
+function renderInventoryList(){
+  const container=$('#inventory-list');if(!container) return;
+  const q=($('#search-inv')?.value||'').toLowerCase();
+  if(q!==inventoryQuery){inventoryQuery=q;inventoryPage=0;}
+  const list=getProductIndexes().search.filter(row=>!row.p.deleted&&(!q||row.inventoryName.includes(q)||row.inventoryCode.includes(q)));
+  const size=80,pages=Math.max(1,Math.ceil(list.length/size));inventoryPage=Math.min(inventoryPage,pages-1);
+  const fragment=document.createDocumentFragment(),next=new Map();
+  for(const {p} of list.slice(inventoryPage*size,(inventoryPage+1)*size)){
+    const stock=getAvailableQtyForSale(p),signature=JSON.stringify([p.name,p.price,stock]);
+    const cached=inventoryRows.get(p.id);const row=cached?.element||document.createElement('div');
+    if(!cached){row.className='card flex justify-between items-center';row.style.padding='8px';row.onclick=()=>editProduct(p.id);}
+    if(cached?.signature!==signature) row.innerHTML=`<div><div style="font-weight:800">${escapeHtml(p.name)}</div><div class="small-muted">STOCK: ${stock} • S/ ${money(p.price)}</div></div><div class="text-indigo-600"><i data-lucide="edit-3"></i></div>`;
+    next.set(p.id,{element:row,signature});fragment.appendChild(row);
+  }
+  if(!list.length){const empty=document.createElement('div');empty.className='small-muted';empty.textContent='No hay productos';fragment.appendChild(empty);}
+  if(pages>1){
+    const nav=document.createElement('div');nav.className='flex items-center justify-between gap-2';
+    const previous=document.createElement('button'),label=document.createElement('span'),nextButton=document.createElement('button');
+    previous.textContent='Anterior';nextButton.textContent='Siguiente';previous.disabled=inventoryPage===0;nextButton.disabled=inventoryPage===pages-1;
+    previous.className=nextButton.className='px-3 py-2 border rounded-xl bg-white';
+    label.className='small-muted';label.textContent=`${inventoryPage+1} / ${pages} · ${list.length} productos`;
+    previous.onclick=()=>{inventoryPage--;renderInventoryList();};nextButton.onclick=()=>{inventoryPage++;renderInventoryList();};
+    nav.append(previous,label,nextButton);fragment.appendChild(nav);
+  }
+  inventoryRows=next;container.replaceChildren(fragment);safeCreateIcons(container);
 }
 
 /* POS search (coincide por letras) */
@@ -3274,31 +3334,25 @@ function matchLettersOrdered(needle, hay){
 }
 
 function getPosMatches(query){
-  const q = normalizeForSearch(query);
-  const qDigits = String(query||'').replace(/\D/g,'');
-  if(!q && !qDigits) return [];
-  const items = (STATE.products||[]).filter(p=>p && !p.deleted);
-  const scored = [];
-  for(const p of items){
-    const nameNorm = normalizeForSearch(p.name);
-    const catNorm = normalizeForSearch(p.category);
-    const codeNorm = String(p.barcode||'').replace(/\D/g,'');
-    const nameMatch = q && (nameNorm.includes(q) || matchLettersOrdered(q, nameNorm));
-    const catMatch = q && (catNorm.includes(q) || matchLettersOrdered(q, catNorm));
-    const codeMatch = qDigits && codeNorm.includes(qDigits);
-    if(!(nameMatch || catMatch || codeMatch)) continue;
-
-    let score = 0;
-    if(q && nameNorm.startsWith(q)) score += 4;
-    else if(q && nameNorm.includes(q)) score += 3;
-    else if(q && matchLettersOrdered(q, nameNorm)) score += 1;
-    if(qDigits && codeNorm === qDigits) score += 3;
-    else if(qDigits && codeNorm.includes(qDigits)) score += 2;
-    if(getAvailableQtyForSale(p) <= 0) score -= 1;
-    scored.push({ p, score });
+  const q=normalizeForSearch(query),digits=String(query||'').replace(/\D/g,'');
+  if(!q && !digits) return [];
+  const scored=[];
+  for(const {p,name,category,code} of getProductIndexes().search){
+    if(p.deleted) continue;
+    const nameMatch=q&&(name.includes(q)||matchLettersOrdered(q,name));
+    const catMatch=q&&(category.includes(q)||matchLettersOrdered(q,category));
+    const codeMatch=digits&&code.includes(digits);
+    if(!(nameMatch||catMatch||codeMatch)) continue;
+    let score=0;
+    if(q&&name.startsWith(q)) score+=4;else if(q&&name.includes(q)) score+=3;else if(q&&matchLettersOrdered(q,name)) score+=1;
+    if(digits&&code===digits) score+=3;else if(digits&&code.includes(digits)) score+=2;
+    if(getAvailableQtyForSale(p)<=0) score-=1;
+    // Sólo ocho candidatos, orden estable en empates igual al orden original.
+    const index=scored.findIndex(row=>row.score<score);
+    if(index<0){if(scored.length<8) scored.push({p,score});}
+    else{scored.splice(index,0,{p,score});if(scored.length>8) scored.pop();}
   }
-  scored.sort((a,b)=> b.score - a.score);
-  return scored.slice(0, 8).map(s => s.p);
+  return scored.map(row=>row.p);
 }
 
 function renderPosSuggestions(matches){
@@ -3379,16 +3433,18 @@ function setupPosSearch(){
     renderPosSuggestions(lastMatches);
   };
 
-  input.addEventListener('input', refresh);
+  let searchTimer=0;
+  input.addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(refresh,60);});
   input.addEventListener('focus', refresh);
   input.addEventListener('keydown', (ev) => {
     if(ev.key === 'Enter'){
+      clearTimeout(searchTimer);
       ev.preventDefault();
       const q = input.value.trim();
       if(!q) return;
       const qDigits = q.replace(/\D/g,'');
       if(qDigits){
-        const exact = (STATE.products||[]).find(p => !p.deleted && String(p.barcode||'').replace(/\D/g,'') === qDigits);
+        const exact = getProductIndexes().barcode.get(qDigits);
         if(exact){
           addToCart(exact);
           input.value = '';
@@ -3396,7 +3452,7 @@ function setupPosSearch(){
           return;
         }
       }
-      const pick = lastMatches && lastMatches[0];
+      const pick = getPosMatches(q)[0];
       if(pick){
         addToCart(pick);
         input.value = '';
@@ -3414,30 +3470,26 @@ function setupPosSearch(){
 
 /* CART render & operations */
 function renderCart(){
-  const container = $('#pos-cart'); if(!container) return; container.innerHTML='';
-  let total = 0;
-  cart.forEach((item, idx) => {
-    total += item.price * item.qty;
-    const subtotal = item.price * item.qty;
-    const div = document.createElement('div'); div.className='card flex justify-between items-center'; div.style.padding='8px';
-    div.innerHTML = `<div style="flex:1">
-        <div style="font-weight:800">${escapeHtml(item.name)}</div>
-        <div class="small-muted">Precio: S/ ${money(item.price)} • Subtotal: S/ ${money(subtotal)}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button onclick="updateQty(${idx},-1)" class="px-2 py-1 border rounded">-</button>
-        <input type="number" min="1" value="${item.qty}" oninput="setQty(${idx}, this.value)" class="input-pro qty-input">
-        <button onclick="updateQty(${idx},1)" class="px-2 py-1 border rounded">+</button>
-      </div>`;
-    container.appendChild(div);
-  });
-  $('#pos-total').textContent = money(total);
-  $('#pos-items-count').textContent = `${cart.reduce((s,i)=> s + (i.qty||0),0)} items`;
+  const container=$('#pos-cart');if(!container) return;
+  let total=0,count=0;const existing=new Map([...container.children].map(row=>[row.dataset.productId,row]));
+  cart.forEach((item,index)=>{
+    total+=item.price*item.qty;count+=Number(item.qty||0);
+    let row=existing.get(String(item.id));
+    if(!row){row=document.createElement('div');row.dataset.productId=item.id;row.className='card flex justify-between items-center';row.style.padding='8px';row.innerHTML='<div style="flex:1"><div class="cart-name" style="font-weight:800"></div><div class="small-muted cart-subtotal"></div></div><div style="display:flex;align-items:center;gap:8px"><button class="px-2 py-1 border rounded">-</button><input type="number" min="1" class="input-pro qty-input"><button class="px-2 py-1 border rounded">+</button></div>';}
+    row.querySelector('.cart-name').textContent=item.name;
+    row.querySelector('.cart-subtotal').textContent=`Precio: S/ ${money(item.price)} • Subtotal: S/ ${money(item.price*item.qty)}`;
+    const input=row.querySelector('input');if(input.value!==String(item.qty)) input.value=item.qty;
+    input.oninput=()=>setQty(index,input.value);
+    const buttons=row.querySelectorAll('button');buttons[0].onclick=()=>updateQty(index,-1);buttons[1].onclick=()=>updateQty(index,1);
+    if(container.children[index]!==row) container.insertBefore(row,container.children[index]||null);
+    existing.delete(String(item.id));
+  });existing.forEach(row=>row.remove());
+  $('#pos-total').textContent=money(total);$('#pos-items-count').textContent=`${count} items`;
 }
 
 function setQty(idx, value){
   if(!cart[idx]) return;
-  const prod = (STATE.products||[]).find(p => p.id === cart[idx].id);
+  const prod = getProductById(cart[idx].id);
   const maxStock = prod ?getAvailableQtyForSale(prod) : null;
   let qty = Math.floor(Number(value) || 1);
   if(qty <= 0) { cart.splice(idx,1); renderCart(); return; }
@@ -3489,10 +3541,30 @@ function setPayMethod(m, ev){
    - when offline: pushes op to pendingOps
    - when online: tries to push to Firestore and process pendingOps
    ========== */
+function cloneLocalRecord(value){
+  if(value===undefined) return undefined;
+  return typeof structuredClone==='function'?structuredClone(value):JSON.parse(JSON.stringify(value));
+}
+function captureCriticalRollback(productIds,keys){
+  const related=new Set(productIds.flatMap(id=>getRelatedProductIdsForSync(id)));
+  const products=new Map([...related].map(id=>[id,cloneLocalRecord(getProductById(id))]));
+  const initialProductIds=new Set((STATE.products||[]).map(p=>p.id));
+  const arrays=new Map(keys.map(key=>[key,['customers','shifts','staff','syncConflicts'].includes(key)?STATE[key].map(row=>cloneLocalRecord(row)):STATE[key].slice()]));
+  const queue=pendingOps.slice();
+  return ()=>{
+    STATE.products=STATE.products.filter(p=>initialProductIds.has(p.id)).map(p=>products.get(p.id)||p);
+    arrays.forEach((rows,key)=>STATE[key]=rows);pendingOps=queue;invalidateProductIndexes();
+    stateRevision++;savedRevision=-1;window.STATE=STATE;window.pendingOps=pendingOps;
+    scheduleRenderAll(0);
+  };
+}
 async function completeSale(){
-  if(saleSubmitInProgress) return;
-  saleSubmitInProgress=true;
+  if(saleSubmitInProgress||criticalWriteDepth) return;
+  saleSubmitInProgress=true;criticalWriteDepth++;
+  let rollback=null,committed=false;
   try{
+    window.POSStorage?.cancelScheduled();
+    await window.POSStorage?.settleWrites();
     if(cart.length === 0) return alert('El carrito está vacío');
     const activeShift = getActiveShiftForCurrentUser();
     if(!activeShift){
@@ -3538,6 +3610,7 @@ async function completeSale(){
       }
     }
 
+    rollback=captureCriticalRollback(cart.map(item=>item.id),['sales','customers','stockMovements','auditLogs']);
     // assemble sale object with customerId handling
     const sale = {
       id: 'V-' + uid(),
@@ -3578,7 +3651,7 @@ async function completeSale(){
     const touchedProductIds = new Set();
     for(const it of sale.items){
       const res = adjustStockForSaleItem(it.productId, Number(it.qty || 0), 'OUT', sale.id, 'Venta POS');
-      if(!res.ok) return alert(res.error || 'No se pudo descontar stock');
+      if(!res.ok) throw new Error(res.error || 'No se pudo descontar stock');
       (res.touched || []).forEach(id => touchedProductIds.add(id));
     }
 
@@ -3594,16 +3667,6 @@ async function completeSale(){
     });
     saveLocalBackup();
 
-    // Close first so the sale feels immediate; refresh only the visible views afterwards.
-    cart = [];
-    closeModal('modal-sale');
-    renderCart();
-    rebuildLinkedStocks();
-    renderDashboard(true);
-    if(isElementVisible('tab-inventory')) scheduleInventoryRender(0);
-    updateShiftUI();
-    if($('#pos-customer')) $('#pos-customer').value = '';
-
     // Build op and either process immediately or queue
     const op = { id:`SALE-${sale.id}`,type: 'sale', payload: sale };
     addPendingOp(op);
@@ -3615,6 +3678,17 @@ async function completeSale(){
     } else {
       queueProductSyncFromItems(sale.items);
     }
+    await persistLocalState(true);committed=true;
+    // Close first so the sale feels immediate; refresh only the visible views afterwards.
+    cart = [];
+    closeModal('modal-sale');
+    renderCart();
+    rebuildLinkedStocks();
+    renderDashboard(true);
+    if(isElementVisible('tab-inventory')) scheduleInventoryRender(0);
+    updateShiftUI();
+    if($('#pos-customer')) $('#pos-customer').value = '';
+
     if(!cloudOn || !db){
       showToast('Venta guardada offline. Se sincronizará cuando haya conexión.');
     } else {
@@ -3622,10 +3696,12 @@ async function completeSale(){
       showToast('Venta registrada; esperando confirmación de nube');
     }
   }catch(e){
+    if(rollback&&!committed) rollback();
     console.error('completeSale err', e);
     alert('Error registrando venta: ' + (e && e.message || ''));
   }finally{
-    saleSubmitInProgress=false;
+    saleSubmitInProgress=false;criticalWriteDepth--;scheduleSyncIndicators();
+    if(committed) processPendingOps();
   }
 }
 
@@ -3653,7 +3729,7 @@ function addGestionAudit(action, saleId, note, details = {}){
     details: details || {}
   };
   STATE.auditLogs.unshift(log);
-  if(STATE.auditLogs.length > 5000) STATE.auditLogs = STATE.auditLogs.slice(0, 5000);
+  // El historial de auditoría se conserva completo.
   saveLocalBackup();
 }
 
@@ -3881,19 +3957,31 @@ function appendShiftControlSheets(wb, from = '', to = ''){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(auditRows.length?auditRows:[{nota:'Sin eventos de personal o turnos'}]),'Auditoria_Personal');
 }
 
+let gestionPage=0,clientsPage=0;
+function appendListPagination(container,page,total,size,onChange){
+  const pages=Math.ceil(total/size);if(pages<=1) return;
+  const nav=document.createElement('div'),previous=document.createElement('button'),label=document.createElement('span'),next=document.createElement('button');
+  nav.className='flex items-center justify-between gap-2 mt-3';previous.className=next.className='px-3 py-2 border rounded-xl bg-white';label.className='small-muted';
+  previous.textContent='Anterior';next.textContent='Siguiente';label.textContent=`${page+1} / ${pages} · ${total} registros`;
+  previous.disabled=page===0;next.disabled=page===pages-1;
+  previous.onclick=()=>onChange(page-1);next.onclick=()=>onChange(page+1);nav.append(previous,label,next);container.appendChild(nav);
+}
 function renderGestionList(){
-  const container = $('#gestion-list'); if(!container) return; container.innerHTML = '';
-  const rows = (STATE.sales||[]).filter(s => !s.deleted).slice(0,500);
-  if(rows.length === 0) { container.innerHTML = '<div class="small-muted">No hay ventas registradas</div>'; return; }
-  const table = document.createElement('table');
-  table.innerHTML = `<thead><tr><th>Fecha</th><th>ID</th><th>Responsable</th><th>Cliente</th><th>Pago</th><th style="text-align:right">Total</th><th>Acciones</th></tr></thead><tbody></tbody>`;
-  const tbody = table.querySelector('tbody');
+  const container=$('#gestion-list');if(!container) return;
+  const all=(STATE.sales||[]).filter(s=>!s.deleted),size=80;
+  gestionPage=Math.min(gestionPage,Math.max(0,Math.ceil(all.length/size)-1));
+  const rows=all.slice(gestionPage*size,(gestionPage+1)*size),fragment=document.createDocumentFragment();
+  if(!rows.length){container.innerHTML='<div class="small-muted">No hay ventas registradas</div>';return;}
+  const table=document.createElement('table');
+  table.innerHTML='<thead><tr><th>Fecha</th><th>ID</th><th>Responsable</th><th>Cliente</th><th>Pago</th><th style="text-align:right">Total</th><th>Acciones</th></tr></thead><tbody></tbody>';
+  const body=table.querySelector('tbody');
   rows.forEach(s=>{
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${new Date(s.date).toLocaleString()}</td><td>${s.id}</td><td>${escapeHtml(s.responsible||s.meta?.responsible||s.createdBy||'SIN RESPONSABLE')}</td><td>${escapeHtml(s.customerName||s.customer||'-')}</td><td>${escapeHtml(s.paymentType||s.method||'EFECTIVO')}</td><td style="text-align:right">S/ ${money(s.total)}</td><td style="white-space:nowrap"><button onclick="openEditSale('${s.id}')" class="px-2 py-1 border rounded mr-2">Editar</button><button onclick="deleteSaleConfirm('${s.id}')" class="px-2 py-1 border rounded">Eliminar</button></td>`;
-    tbody.appendChild(tr);
-  });
-  container.appendChild(table);
+    const row=document.createElement('tr');
+    row.innerHTML=`<td>${new Date(s.date).toLocaleString()}</td><td>${escapeHtml(s.id)}</td><td>${escapeHtml(s.responsible||s.meta?.responsible||s.createdBy||'SIN RESPONSABLE')}</td><td>${escapeHtml(s.customerName||s.customer||'-')}</td><td>${escapeHtml(s.paymentType||s.method||'EFECTIVO')}</td><td style="text-align:right">S/ ${money(s.total)}</td><td style="white-space:nowrap"><button class="px-2 py-1 border rounded mr-2">Editar</button><button class="px-2 py-1 border rounded">Eliminar</button></td>`;
+    const buttons=row.querySelectorAll('button');buttons[0].onclick=()=>openEditSale(s.id);buttons[1].onclick=()=>deleteSaleConfirm(s.id);body.appendChild(row);
+  });fragment.appendChild(table);
+  appendListPagination(fragment,gestionPage,all.length,size,page=>{gestionPage=page;renderGestionList();});
+  container.replaceChildren(fragment);
 }
 
 /* Open edit sale modal (allows editing qty per item and payment) */
@@ -3910,7 +3998,7 @@ function openEditSale(saleId){
   modal.appendChild(sheet); document.body.appendChild(modal);
   const itemsContainer = sheet.querySelector('#edit-items');
   s.items.forEach((it, idx)=>{
-    const prod = (STATE.products||[]).find(p=> p.id === it.productId) || { name: it.rawName || 'Producto' };
+    const prod = getProductIndexes().byId.get(it.productId) || { name: it.rawName || 'Producto' };
     const row = document.createElement('div'); row.style.display='flex'; row.style.gap='8px'; row.style.marginBottom='8px';
     row.innerHTML = `<div style="flex:1"><div style="font-weight:700">${escapeHtml(prod.name)}</div><div class="small-muted">Unit S/ ${money(it.unitPrice||0)}</div></div><div><input type="number" value="${it.qty}" min="1" data-idx="${idx}" class="input-pro edit-qty" style="width:90px"></div>`;
     itemsContainer.appendChild(row);
@@ -4202,7 +4290,7 @@ async function exportSalesXLSX(){
       ventaId:s.id, fecha:s.date, turnoId:s.shiftId||'', personalId:s.staffId||'',
       responsable:s.responsible||s.meta?.responsible||s.createdBy||'SIN RESPONSABLE',
       clienteId:s.customerId||'', cliente:s.customerName||'', medioPago:s.paymentType||s.method||'',
-      total:Number(s.total||0), productos:(s.items||[]).map(it=>((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name+' x'+it.qty)).join(' | ')
+      total:Number(s.total||0), productos:(s.items||[]).map(it=>((getProductIndexes().byId.get(it.productId)||{name:it.rawName||it.productId}).name+' x'+it.qty)).join(' | ')
     }));
     const wb=XLSX.utils.book_new();
     appendJsonSheet(wb,'Productos_Vendidos',buildSoldProductsForRange(from,to),'No hay productos vendidos');
@@ -4250,7 +4338,7 @@ async function exportCombinedXLSX(from=todayYMD(),to=todayYMD()){
       ventaId:s.id, fecha:s.date, turnoId:s.shiftId||'', personalId:s.staffId||'',
       responsable:s.responsible||s.meta?.responsible||s.createdBy||'SIN RESPONSABLE',
       clienteId:s.customerId||'', cliente:s.customerName||'', medioPago:s.paymentType||s.method||'',
-      total:Number(s.total||0), productos:(s.items||[]).map(it=>((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name+' x'+it.qty)).join(' | ')
+      total:Number(s.total||0), productos:(s.items||[]).map(it=>((getProductIndexes().byId.get(it.productId)||{name:it.rawName||it.productId}).name+' x'+it.qty)).join(' | ')
     }));
     const inventoryRows=(STATE.products||[]).filter(p=>!p.deleted).map(p=>({
       productoId:p.id, producto:p.name, categoria:p.category||'', codigo:p.barcode||'',
@@ -4320,7 +4408,9 @@ function generateReportData(from,to){
   return { groups, grand, totalOps: sales.length, sales };
 }
 
+let reportSalesPage=0,reportInventoryPage=0,reportRangeKey='';
 function renderReportSummary(from,to){
+  if(reportRangeKey!==from+'|'+to){reportRangeKey=from+'|'+to;reportSalesPage=0;reportInventoryPage=0;}
   const { groups, grand, totalOps, sales } = generateReportData(from,to);
   const parts = [];
   parts.push(`<div style="display:flex;justify-content:space-between;align-items:center"><div><h2 style="margin:0">MINIMARKET EL ERIZO</h2><div class="small-muted">${from} → ${to}</div></div><div style="text-align:right"><div style="font-weight:800">Total S/ ${money(grand)}</div><div class="small-muted">${totalOps} ventas</div></div></div><hr/>`);
@@ -4331,42 +4421,29 @@ function renderReportSummary(from,to){
   });
   parts.push(`</div><hr style="margin:12px 0"/>`);
   // sales table
-  const rows = sales.map(s=>{
-    const items = (s.items||[]).map(it => ((STATE.products.find(p=>p.id===it.productId)||{name:it.rawName||it.productId}).name) + ' x' + it.qty).join('; ');
+  reportSalesPage=Math.min(reportSalesPage,Math.max(0,Math.ceil(sales.length/80)-1));
+  const rows = sales.slice(reportSalesPage*80,(reportSalesPage+1)*80).map(s=>{
+    const items = (s.items||[]).map(it => ((getProductIndexes().byId.get(it.productId)||{name:it.rawName||it.productId}).name) + ' x' + it.qty).join('; ');
     return `<tr><td>${new Date(s.date).toLocaleString()}</td><td>${s.id}</td><td>${escapeHtml(s.responsible||s.meta?.responsible||s.createdBy||'SIN RESPONSABLE')}</td><td>${escapeHtml(s.customerName||'-')}</td><td>${escapeHtml(s.paymentType||s.method||'EFECTIVO')}</td><td style="text-align:right">S/ ${money(s.total)}</td><td>${escapeHtml(items)}</td></tr>`;
   }).join('');
   const table = `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th>Fecha</th><th>ID</th><th>Responsable</th><th>Cliente</th><th>Pago</th><th style="text-align:right">Total</th><th>Productos</th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="small-muted">No hay ventas</td></tr>'}</tbody></table>`;
-  $('#report-summary').innerHTML = parts.join('') + table + '<hr/>' + buildInventoryMiniHTML();
+  const container=$('#report-summary');container.innerHTML=parts.join('')+table;
+  appendListPagination(container,reportSalesPage,sales.length,80,page=>{reportSalesPage=page;renderReportSummary(from,to);});
+  const inventory=document.createElement('div');inventory.innerHTML='<hr/>'+buildInventoryMiniHTML();container.appendChild(inventory);
+  appendListPagination(inventory,reportInventoryPage,getProductIndexes().search.length,80,page=>{reportInventoryPage=page;renderReportSummary(from,to);});
 }
 
 function buildInventoryMiniHTML(){
-  const invRows = (STATE.products||[]).filter(p=>!p.deleted).map(p=>`<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.barcode||'')}</td><td style="text-align:right">${p.stock}</td><td style="text-align:right">S/ ${money(p.price||0)}</td></tr>`).join('');
+  const products=(STATE.products||[]).filter(p=>!p.deleted);
+  reportInventoryPage=Math.min(reportInventoryPage,Math.max(0,Math.ceil(products.length/80)-1));
+  const invRows = products.slice(reportInventoryPage*80,(reportInventoryPage+1)*80).map(p=>`<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.barcode||'')}</td><td style="text-align:right">${p.stock}</td><td style="text-align:right">S/ ${money(p.price||0)}</td></tr>`).join('');
   return `<h3 style="margin-top:10px">Inventario</h3><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th>Producto</th><th>Cod</th><th style="text-align:right">Stock</th><th style="text-align:right">Precio</th></tr></thead><tbody>${invRows}</tbody></table>`;
 }
 
 function previewReportRange(){ const from = $('#rep-from').value || todayYMD(); const to = $('#rep-to').value || todayYMD(); renderReportSummary(from,to); }
 function updateReportsIfOpen(){ if(!document.getElementById('tab-reports').classList.contains('hidden')) previewReportRange(); }
 
-async function downloadReportPDF(){
-  const from = $('#rep-from').value || todayYMD(); const to = $('#rep-to').value || todayYMD();
-  renderReportSummary(from,to); // ensure content
-  const el = document.getElementById('report-summary');
-  if(!el) return alert('Generando PDF: no se encontró contenido del reporte');
-  showToast('Generando PDF, espere...');
-  try{
-    const canvas = await html2canvas(el, { scale:2, useCORS:true, logging:false });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jspdf.jsPDF('p','mm','a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfHeight = (imgProps.height * pageWidth) / imgProps.width;
-    pdf.addImage(imgData, 'PNG', 10, 10, pageWidth-20, pdfHeight > (pageHeight-20) ?pageHeight-20 : pdfHeight);
-    const filename = `Reporte del dia ${todayYMD()}.pdf`;
-    pdf.save(filename);
-    showToast('PDF descargado: ' + filename);
-  }catch(e){ console.error(e); alert('Error generando PDF: ' + (e.message||e)); }
-}
+
 
 /* =========
    CONTROL DIARIO DE STOCK Y CAJA
@@ -4610,7 +4687,7 @@ function openStockHistoryModal(){
   if(stockHistoryCacheDirty){
     const body = $('#stock-history-body');
     if(body) body.innerHTML = '<tr><td colspan="9" class="small-muted" style="text-align:center;padding:20px">Analizando ajustes manuales...</td></tr>';
-    setTimeout(()=>refreshStockHistoryData(false),30);
+    afterModalPaint('modal-stock-history',()=>refreshStockHistoryData(false));
   }else{
     resetStockHistoryView();
   }
@@ -4619,7 +4696,7 @@ function openStockHistoryModal(){
 function refreshStockHistoryData(showFeedback = true){
   if(stockHistoryAnalyzing) return;
   stockHistoryAnalyzing = true;
-  setTimeout(()=>{
+  afterModalPaint('modal-stock-history',()=>{
     try{
       buildStockMovementHistory(true);
       resetStockHistoryView();
@@ -4631,7 +4708,7 @@ function refreshStockHistoryData(showFeedback = true){
     }finally{
       stockHistoryAnalyzing = false;
     }
-  },20);
+  });
 }
 
 async function exportStockHistoryXLSX(){
@@ -4669,7 +4746,7 @@ function buildDailyStockRows(dateYmd){
   return (STATE.products||[])
     .filter(p => p && !p.deleted && !p.parentProductId)
     .slice()
-    .sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''), 'es', { sensitivity:'base' }))
+    .sort((a,b)=> spanishCollator.compare(String(a.name||''),String(b.name||'')))
     .map(p => {
       let entries = 0;
       let registeredOut = 0;
@@ -4706,7 +4783,8 @@ function buildDailyStockRows(dateYmd){
 
 function buildDailySalesSummary(dateYmd){
   const sales = salesInRange(dateYmd, dateYmd);
-  const productsMap = new Map();
+  const productsMap = new Map(), cutoffStocks=new Map();
+  const cutoff=getLocalDayBounds(dateYmd).end;
   const payments = { EFECTIVO:0, YAPE:0, A_CREDITO:0, OTROS:0 };
   const workers = {};
 
@@ -4733,7 +4811,8 @@ function buildDailySalesSummary(dateYmd){
       row.responsibles.add(responsible);
       const root = getRootStockProduct(product);
       if(root){
-        const rootExpected = getStockAtCutoff(root, getLocalDayBounds(dateYmd).end);
+        if(!cutoffStocks.has(root.id)) cutoffStocks.set(root.id,getStockAtCutoff(root,cutoff));
+        const rootExpected = cutoffStocks.get(root.id);
         row.expectedStock = product.parentProductId
           ?Math.max(0, Math.floor((rootExpected * getLinkedFactor(root, product)) + 1e-9))
           :rootExpected;
@@ -4790,11 +4869,14 @@ function renderDailyStockKpis(){
   }).join('');
 }
 
+let dailySalesPage=0,dailyStockPage=0;
 function renderDailySalesProducts(){
   const box = $('#daily-sales-products');
   if(!box) return;
-  const rows = dailySalesSummary.map(row=>`<tr><td>${escapeHtml(row.name)}</td><td style="text-align:right">${formatStockQty(row.qty)}</td><td style="text-align:right">S/ ${money(row.amount)}</td><td style="text-align:right">${row.expectedStock === null ?'-' : formatStockQty(row.expectedStock)}</td><td>${escapeHtml(row.responsibles || 'SIN RESPONSABLE')}</td></tr>`).join('');
+  dailySalesPage=Math.min(dailySalesPage,Math.max(0,Math.ceil(dailySalesSummary.length/80)-1));
+  const rows = dailySalesSummary.slice(dailySalesPage*80,(dailySalesPage+1)*80).map(row=>`<tr><td>${escapeHtml(row.name)}</td><td style="text-align:right">${formatStockQty(row.qty)}</td><td style="text-align:right">S/ ${money(row.amount)}</td><td style="text-align:right">${row.expectedStock === null ?'-' : formatStockQty(row.expectedStock)}</td><td>${escapeHtml(row.responsibles || 'SIN RESPONSABLE')}</td></tr>`).join('');
   box.innerHTML = `<table class="daily-table"><thead><tr><th>Producto vendido</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Importe</th><th style="text-align:right">Stock esperado</th><th>Responsable(s)</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="small-muted">No hay ventas registradas en esta fecha.</td></tr>'}</tbody></table>`;
+  appendListPagination(box,dailySalesPage,dailySalesSummary.length,80,page=>{dailySalesPage=page;renderDailySalesProducts();});
   const workerBox = $('#daily-worker-summary');
   if(workerBox){
     const workerRows = Object.entries(dailyWorkerSummary).map(([name,data])=>`<tr><td><strong>${escapeHtml(name)}</strong></td><td style="text-align:right">${Number(data.sales||0)}</td><td style="text-align:right">S/ ${money(data.EFECTIVO||0)}</td><td style="text-align:right">S/ ${money(data.YAPE||0)}</td><td style="text-align:right">S/ ${money(data.A_CREDITO||0)}</td><td style="text-align:right"><strong>S/ ${money(data.total||0)}</strong></td></tr>`).join('');
@@ -4805,13 +4887,15 @@ function renderDailySalesProducts(){
 function renderDailyStockTable(){
   const box = $('#daily-stock-table');
   if(!box) return;
-  const rows = dailyStockRows.map(row=>{
+  dailyStockPage=Math.min(dailyStockPage,Math.max(0,Math.ceil(dailyStockRows.length/80)-1));
+  const rows = dailyStockRows.slice(dailyStockPage*80,(dailyStockPage+1)*80).map(row=>{
     const diff = row.difference;
     const diffClass = diff === null || Math.abs(diff) < 1e-6 ?'daily-diff-ok' : (diff < 0 ?'daily-diff-bad':'daily-diff-extra');
     const loss = diff !== null && diff < 0 ?Math.abs(diff) * Number(row.price || 0) : 0;
     return `<tr data-daily-product="${escapeAttr(row.productId)}"><td><strong>${escapeHtml(row.name)}</strong><div class="small-muted">${escapeHtml(row.barcode||'Sin código')}</div></td><td style="text-align:right">${formatStockQty(row.opening)}</td><td style="text-align:right">${formatStockQty(row.entries)}</td><td style="text-align:right">${formatStockQty(row.registeredOut)}</td><td style="text-align:right">${formatStockQty(row.manualAdjustments)}</td><td style="text-align:right"><strong>${formatStockQty(row.expected)}</strong></td><td style="text-align:right"><input class="daily-count-input" type="number" min="0" step="0.001" value="${row.physical === null ?'':escapeAttr(formatStockQty(row.physical))}" data-daily-count="${escapeAttr(row.productId)}"></td><td class="${diffClass}" data-daily-diff="${escapeAttr(row.productId)}" style="text-align:right">${diff === null ?'-':formatStockQty(diff)}</td><td data-daily-loss="${escapeAttr(row.productId)}" style="text-align:right">S/ ${money(loss)}</td></tr>`;
   }).join('');
   box.innerHTML = `<table class="daily-table"><thead><tr><th>Producto principal</th><th style="text-align:right">Stock inicial</th><th style="text-align:right">Ingresos</th><th style="text-align:right">Salidas registradas</th><th style="text-align:right">Ajustes manuales</th><th style="text-align:right">Debe quedar</th><th style="text-align:right">Conteo físico</th><th style="text-align:right">Diferencia</th><th style="text-align:right">Faltante S/</th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="small-muted">No hay productos para controlar.</td></tr>'}</tbody></table>`;
+  appendListPagination(box,dailyStockPage,dailyStockRows.length,80,page=>{dailyStockPage=page;renderDailyStockTable();});
   box.querySelectorAll('[data-daily-count]').forEach(input => {
     input.addEventListener('input', ()=> updateDailyPhysicalCount(input.getAttribute('data-daily-count'), input.value));
   });
@@ -4894,8 +4978,8 @@ function openDailyStockControl(){
   }
   if($('#daily-stock-responsible')) $('#daily-stock-responsible').value = getCurrentActor();
   dailyDraftDate = '';
-  renderDailyStockControl();
   openModal('modal-daily-stock');
+  afterModalPaint('modal-daily-stock',renderDailyStockControl);
   safeCreateIcons();
 }
 
@@ -5089,14 +5173,19 @@ function barcodeAliases(rawCode){
 }
 
 function scannerFindProductByCode(rawCode){
-  const code = scannerNormalize(rawCode);
-  if(!code) return null;
-  const aliases = barcodeAliases(code);
-  return (STATE.products||[]).find(p => {
-    if(p.deleted) return false;
-    const bc = scannerNormalize(p.barcode);
-    return barcodeAliases(bc).has(code) || aliases.has(bc);
-  }) || null;
+  const code=scannerNormalize(rawCode);if(!code) return null;
+  const indexes=getProductIndexes();
+  if(!indexes.scanner){
+    const byAlias=new Map(),byRaw=new Map();let position=0;
+    indexes.search.forEach(({p})=>{
+      const raw=scannerNormalize(p.barcode),entry={p,position:position++};
+      if(!byRaw.has(raw)) byRaw.set(raw,entry);
+      barcodeAliases(raw).forEach(alias=>{if(!byAlias.has(alias)) byAlias.set(alias,entry);});
+    });indexes.scanner={byAlias,byRaw};
+  }
+  let selected=indexes.scanner.byAlias.get(code);
+  barcodeAliases(code).forEach(alias=>{const candidate=indexes.scanner.byRaw.get(alias);if(candidate&&(!selected||candidate.position<selected.position)) selected=candidate;});
+  return selected?.p||null;
 }
 
 function resetPosSearchForScanner(){
@@ -5227,7 +5316,7 @@ function scannerStopTracks(){
   if(video) video.srcObject = null;
 }
 
-async function scannerStartVideo(deviceId){
+async function scannerStartVideo(deviceId,request){
   const video = $('#video');
   if(!video) throw new Error('No se encontro el elemento de video');
   const base = { width: { ideal: 1920, min: 1280 }, height: { ideal: 1080, min: 720 }, frameRate:{ideal:30,min:20} };
@@ -5238,6 +5327,7 @@ async function scannerStartVideo(deviceId){
   }catch(_){
     stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
   }
+  if(request!==scannerOpenRequest||!isModalVisible('modal-scan')){stream.getTracks().forEach(track=>track.stop());return null;}
   SCANNER.stream = stream;
   video.srcObject = stream;
   await video.play();
@@ -5260,6 +5350,7 @@ async function scannerStartVideo(deviceId){
     zoomInput.step=capabilities.zoom.step||0.1; zoomInput.value=track.getSettings?.().zoom||capabilities.zoom.min;
   }
   await applyDifficultCameraSettings(SCANNER.difficultMode);
+  return stream;
 }
 
 function scannerUpdateDifficultUI(){
@@ -5396,7 +5487,7 @@ function scannerBuildEnhancedFrame(video,variant=0){
 }
 
 function scannerDetectWithQuagga(video,variant=0){
-  if(typeof Quagga === 'undefined') return Promise.resolve(null);
+  if(typeof Quagga === 'undefined'){ loadExternalScript('./libs/quagga2-1.8.4.min.js',()=>!!window.Quagga); return Promise.resolve(null); }
   const frame=scannerBuildEnhancedFrame(video,variant);
   if(!frame) return Promise.resolve(null);
   const src=frame.toDataURL(variant===0?'image/jpeg':'image/png',variant===0?0.94:undefined);
@@ -5452,9 +5543,17 @@ async function scannerLoop(session){
   }
 }
 
+let scannerOpenRequest = 0;
 window.restartScanner = async function restartScanner(){
+  const request = ++scannerOpenRequest;
+  if(!window.BarcodeDetector && !window.Quagga){
+    setScannerStatus('Cargando lector local...');
+    if(!await loadExternalScript('./libs/quagga2-1.8.4.min.js',()=>!!window.Quagga)) return setScannerStatus('No se pudo cargar el lector local');
+  }
+  if(request !== scannerOpenRequest || !isModalVisible('modal-scan')) return;
   try{
-    await window.stopScanner();
+    await window.stopScanner(true);
+    if(request!==scannerOpenRequest||!isModalVisible('modal-scan')) return;
     if(!navigator.mediaDevices?.getUserMedia){
       alert('Este navegador no soporta acceso a camara.');
       return;
@@ -5464,11 +5563,14 @@ window.restartScanner = async function restartScanner(){
       SCANNER.index = scannerPreferredIndex(SCANNER.devices);
     }
     const selectedId = SCANNER.devices[SCANNER.index]?.deviceId || null;
-    await scannerStartVideo(selectedId);
+    const stream=await scannerStartVideo(selectedId,request);
+    if(!stream) return;
+    if(request !== scannerOpenRequest || !isModalVisible('modal-scan')){stream.getTracks().forEach(track=>track.stop());return;}
     SCANNER.devices = await scannerListDevices();
     if(!selectedId && SCANNER.devices.length > 0){
       SCANNER.index = scannerPreferredIndex(SCANNER.devices);
     }
+    if(request!==scannerOpenRequest||!isModalVisible('modal-scan')) return;
     scannerUpdateSwitchBtn();
     SCANNER.candidateCode=''; SCANNER.candidateReads=0; SCANNER.lastCode=''; SCANNER.torchOn=false; SCANNER.nativeUnavailable=false;
     SCANNER.noReadFrames=0; SCANNER.frameNumber=0; SCANNER.modeStartedAt=Date.now();
@@ -5480,6 +5582,7 @@ window.restartScanner = async function restartScanner(){
       :'Apunta al código y mantenlo dentro del recuadro.');
     scannerLoop(session);
   }catch(e){
+    if(request!==scannerOpenRequest||!isModalVisible('modal-scan')) return;
     console.warn('camera access err', e);
     alert('No se pudo acceder a la camara. Verifica permisos del navegador y usa HTTPS si aplica.');
   }
@@ -5511,7 +5614,8 @@ window.startScanner = async function startScanner(context = 'auto'){
   await window.restartScanner();
 };
 
-window.stopScanner = async function stopScanner(){
+window.stopScanner = async function stopScanner(preserveRequest=false){
+  if(!preserveRequest) scannerOpenRequest += 1;
   SCANNER.running = false;
   SCANNER.session += 1;
   SCANNER.detector = null;
@@ -5619,7 +5723,7 @@ $('#btn-open-clients')?.addEventListener('click', ()=> openModal('modal-clients'
 function getActiveCustomers(){
   return (STATE.customers||[])
     .filter(c => !c.deleted && String(c.name||'').trim())
-    .sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''), 'es', { sensitivity: 'base' }));
+    .sort((a,b)=> spanishCollator.compare(String(a.name||''),String(b.name||'')));
 }
 
 function findCustomerById(customerId){
@@ -5647,8 +5751,16 @@ function renderCreditCustomerOptions(selectedId = ''){
   }
 }
 
+let clientSubmitInProgress=false;
 document.getElementById('form-client')?.addEventListener('submit', async (ev)=>{
   ev.preventDefault();
+  if(clientSubmitInProgress||criticalWriteDepth) return;
+  clientSubmitInProgress=true;criticalWriteDepth++;
+  let rollback=null,committed=false;
+  try{
+    window.POSStorage?.cancelScheduled();await window.POSStorage?.settleWrites();
+    rollback=captureCriticalRollback([],['customers']);
+
   const name = ($('#client-name').value||'').trim();
   const init = Number($('#client-initial').value) || 0;
   if(!name) return alert('Nombre requerido');
@@ -5664,30 +5776,30 @@ document.getElementById('form-client')?.addEventListener('submit', async (ev)=>{
     STATE.customers.unshift(customer);
     addPendingOp({ type: 'customer', payload: customer });
   }
+  await persistLocalState(true);committed=true;
   $('#client-name').value=''; $('#client-initial').value='';
   saveLocalBackup();
   showToast('Cliente agregado/actualizado (cola si offline)');
   renderClients();
   renderCreditCustomerOptions();
   if(cloudOn && db) processPendingOps();
+  }catch(error){if(rollback&&!committed) rollback();reportLocalSaveError(error);}
+  finally{clientSubmitInProgress=false;criticalWriteDepth--;scheduleSyncIndicators();if(committed) processPendingOps();}
 });
 
 function renderClients(){
-  const el = $('#clients-list'); if(!el) return; el.innerHTML='';
-  const list = getActiveCustomers().sort((a,b)=> Number(b.balance||0) - Number(a.balance||0));
-  if(list.length === 0) el.innerHTML = '<div class="small-muted">No hay clientes registrados</div>';
-  list.forEach(c => {
-    const row = document.createElement('div'); row.className='card flex justify-between items-center'; row.style.padding='8px';
-    row.innerHTML = `<div><div style="font-weight:800">${escapeHtml(c.name)}</div><div class="small-muted">Saldo: S/ ${money(c.balance||0)}</div></div>
-      <div style="display:flex;gap:6px">
-        <button onclick="openCustomerDebtDetail('${escapeAttr(c.id)}')" class="px-3 py-1 border rounded">Detalle</button>
-        <button onclick="promptAddPayment('${escapeAttr(c.id)}')" class="px-3 py-1 border rounded">Abonar</button>
-        <button onclick="clearDebt('${escapeAttr(c.id)}')" class="px-3 py-1 border rounded">Saldar</button>
-        <button onclick="deleteCustomer('${escapeAttr(c.id)}')" class="px-3 py-1 border rounded bg-red-50 text-red-700">Eliminar</button>
-      </div>`;
-    el.appendChild(row);
+  const container=$('#clients-list');if(!container) return;
+  const all=getActiveCustomers().sort((a,b)=>Number(b.balance||0)-Number(a.balance||0)),size=80;
+  clientsPage=Math.min(clientsPage,Math.max(0,Math.ceil(all.length/size)-1));
+  const fragment=document.createDocumentFragment();
+  all.slice(clientsPage*size,(clientsPage+1)*size).forEach(c=>{
+    const row=document.createElement('div');row.className='card flex justify-between items-center';row.style.padding='8px';
+    row.innerHTML=`<div><div style="font-weight:800">${escapeHtml(c.name)}</div><div class="small-muted">Saldo: S/ ${money(c.balance||0)}</div></div><div style="display:flex;gap:6px"><button class="px-3 py-1 border rounded">Detalle</button><button class="px-3 py-1 border rounded">Abonar</button><button class="px-3 py-1 border rounded">Saldar</button><button class="px-3 py-1 border rounded bg-red-50 text-red-700">Eliminar</button></div>`;
+    const buttons=row.querySelectorAll('button');buttons[0].onclick=()=>openCustomerDebtDetail(c.id);buttons[1].onclick=()=>promptAddPayment(c.id);buttons[2].onclick=()=>clearDebt(c.id);buttons[3].onclick=()=>deleteCustomer(c.id);fragment.appendChild(row);
   });
-  renderCreditCustomerOptions();
+  if(!all.length){const empty=document.createElement('div');empty.className='small-muted';empty.textContent='No hay clientes registrados';fragment.appendChild(empty);}
+  appendListPagination(fragment,clientsPage,all.length,size,page=>{clientsPage=page;renderClients();});
+  container.replaceChildren(fragment);renderCreditCustomerOptions();
 }
 
 function openCustomerDebtDetail(customerId){
@@ -5709,7 +5821,7 @@ function openCustomerDebtDetail(customerId){
     return Number.isNaN(d.getTime()) ?'-' : d.toLocaleString();
   };
   const itemName = (it) => {
-    const prod = STATE.products.find(p => p.id === it.productId);
+    const prod = getProductIndexes().byId.get(it.productId);
     return (prod && prod.name) ?prod.name : (it.rawName || it.productId || 'Producto');
   };
 
@@ -5905,7 +6017,8 @@ function getSupplierById(id){
 }
 
 function getProductById(id){
-  return (STATE.products||[]).find(p => p.id === id && !p.deleted) || null;
+  const p=getProductIndexes().byId.get(id);
+  return p && !p.deleted ? p : null;
 }
 
 function roundStock(value){
@@ -5913,10 +6026,7 @@ function roundStock(value){
 }
 
 function getLinkedChildrenByParentId(parentId){
-  if(!parentId) return [];
-  return (STATE.products||[])
-    .filter(p => !p.deleted && String(p.parentProductId || '') === String(parentId))
-    .sort((a,b) => Number(b.subFactor || 0) - Number(a.subFactor || 0));
+  return parentId ? (getProductIndexes().children.get(String(parentId))||[]).filter(p=>!p.deleted) : [];
 }
 
 function getLinkedChildByParentId(parentId){
@@ -5938,6 +6048,7 @@ function syncChildrenFromParent(parentProduct){
   children.forEach(child => {
     const factor = getLinkedFactor(parentProduct, child);
     child.parentProductId = parentProduct.id;
+    invalidateProductIndexes();
     child.subFactor = factor;
     child.isSubProduct = true;
     child.stock = Math.max(0, Math.floor((parentStock * factor) + 1e-9));
@@ -5964,7 +6075,8 @@ function syncParentFromChild(parentProduct){
   syncChildrenFromParent(parentProduct);
 }
 
-function rebuildLinkedStocks(){
+function rebuildLinkedStocks(inferLegacyStock=true){
+  invalidateProductIndexes();
   const childrenByParent = new Map();
   const roots = [];
   (STATE.products||[]).forEach(product=>{
@@ -5978,7 +6090,7 @@ function rebuildLinkedStocks(){
     const children = childrenByParent.get(String(parent.id)) || [];
     if(children.length === 0) return;
     let parentStock = Number(parent.stock || 0);
-    if(!(parentStock > 0)){
+    if(inferLegacyStock && !(parentStock > 0)){
       children.forEach(child=>{
         const factor = getLinkedFactor(parent,child);
         if(factor > 0) parentStock = Math.max(parentStock,Number(child.stock || 0) / factor);
@@ -6301,6 +6413,7 @@ function renderPurchaseHistoryPreview(purchase){
   container.innerHTML = buildPurchaseInvoiceHTML(purchase);
 }
 
+let purchaseListPage=0,purchaseListQuery='';
 function renderPurchaseHistoryList(){
   const listEl = $('#purchase-history-list');
   if(!listEl) return;
@@ -6323,7 +6436,9 @@ function renderPurchaseHistoryList(){
 
   if(!filtered.some(p => p.id === purchaseHistorySelectedId)) purchaseHistorySelectedId = filtered[0].id;
 
-  listEl.innerHTML = filtered.map(p => {
+  if(q!==purchaseListQuery){purchaseListQuery=q;purchaseListPage=0;}
+  purchaseListPage=Math.min(purchaseListPage,Math.max(0,Math.ceil(filtered.length/80)-1));
+  listEl.innerHTML = filtered.slice(purchaseListPage*80,(purchaseListPage+1)*80).map(p => {
     const active = p.id === purchaseHistorySelectedId ?'active' : '';
     return `
       <button type="button" class="purchase-row ${active}" data-purchase-id="${escapeAttr(p.id)}">
@@ -6339,6 +6454,7 @@ function renderPurchaseHistoryList(){
     `;
   }).join('');
 
+  appendListPagination(listEl,purchaseListPage,filtered.length,80,page=>{purchaseListPage=page;renderPurchaseHistoryList();});
   listEl.querySelectorAll('[data-purchase-id]').forEach(btn => {
     btn.addEventListener('click', ()=>{
       purchaseHistorySelectedId = btn.getAttribute('data-purchase-id') || '';
@@ -6359,8 +6475,8 @@ function openPurchaseHistoryModal(mode = 'view'){
     input.dataset.bound = '1';
     input.addEventListener('input', renderPurchaseHistoryList);
   }
-  renderPurchaseHistoryList();
   openModal('modal-purchase-history');
+  afterModalPaint('modal-purchase-history',renderPurchaseHistoryList);
   safeCreateIcons();
 }
 
@@ -6612,7 +6728,7 @@ function renderIngresoSupplierOptions(selectedId = ''){
   const suppliers = (STATE.suppliers||[])
     .filter(s => !s.deleted)
     .slice()
-    .sort((a,b)=> String(a.name||'').localeCompare(String(b.name||''), 'es', { sensitivity:'base' }));
+    .sort((a,b)=> spanishCollator.compare(String(a.name||''),String(b.name||'')));
 
   const opts = ['<option value="">Seleccionar proveedor...</option>'];
   for(const s of suppliers){
@@ -7418,6 +7534,7 @@ function ensureSubProductsForIngreso(parentProduct, row, now){
     }
 
     child.parentProductId = parentProduct.id;
+    invalidateProductIndexes();
     child.name = String(cfg.subName || child.name || 'Subproducto').trim() || 'Subproducto';
     child.subFactor = factor;
     child.unitName = String(cfg.subUnit || child.unitName || 'Unidad').trim() || 'Unidad';
@@ -7468,11 +7585,14 @@ function openIngresoModal(){
 
 document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
   e.preventDefault();
-  if(purchaseSubmitInProgress) return;
-  purchaseSubmitInProgress = true;
+  if(purchaseSubmitInProgress||criticalWriteDepth) return;
+  purchaseSubmitInProgress = true;criticalWriteDepth++;
+  let rollback=null,committed=false;
   const submitButton=$('#btn-submit-ingreso');
   if(submitButton){ submitButton.disabled=true; submitButton.textContent='Guardando de forma segura...'; }
   try{
+    window.POSStorage?.cancelScheduled();
+    await window.POSStorage?.settleWrites();
     ensureStateShape();
     const supplierId = ($('#ing-supplier-id')?.value || '').trim();
     const supplier = getSupplierById(supplierId);
@@ -7485,6 +7605,9 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
     if(!docNumber) return alert('Numero de comprobante es obligatorio');
 
     const items = readIngresoRows(true);
+    rollback=captureCriticalRollback(items.flatMap(item=>[item.productId,...(item.subProducts||[]).map(sub=>sub.subProductId).filter(Boolean)]),['purchases','auditLogs','stockMovements']);
+    const purchaseSnapshots=new Map();
+    const revert=rollback;rollback=()=>{revert();STATE.purchases=STATE.purchases.map(record=>purchaseSnapshots.get(record.id)||record);};
     if(items.length === 0) return alert('Agrega al menos un producto');
 
     const normDocType = String(docType || '').trim().toUpperCase();
@@ -7513,6 +7636,7 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
       }
     }
 
+    if(existingPurchase) purchaseSnapshots.set(existingPurchase.id,cloneLocalRecord(existingPurchase));
     const purchaseId = existingPurchase?.id || uid();
     const now = new Date().toISOString();
     const lineStart = Array.isArray(existingPurchase?.items) ?existingPurchase.items.length : 0;
@@ -7672,7 +7796,8 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
         stockMovements:stockMovements.map(movement=>JSON.parse(JSON.stringify(movement)))
       }
     });
-    renderInventoryList();
+    await persistLocalState(true);committed=true;
+    if(isElementVisible('tab-inventory')) renderInventoryList();
     renderDashboard();
     if($('#modal-purchase-history')?.classList.contains('visible')) renderPurchaseHistoryList();
     clearIngresoAddMode();
@@ -7681,10 +7806,12 @@ document.getElementById('form-ingreso')?.addEventListener('submit', async (e)=>{
     else showToast(`Ingreso registrado: ${items.length} producto(s)`);
     if(cloudOn && db) processPendingOps();
   }catch(err){
+    if(rollback&&!committed) rollback();
     console.error(err);
     alert(err.message || 'No se pudo registrar el ingreso');
   }finally{
-    purchaseSubmitInProgress=false;
+    purchaseSubmitInProgress=false;criticalWriteDepth--;scheduleSyncIndicators();
+    if(committed) processPendingOps();
     if(submitButton){ submitButton.disabled=false; submitButton.textContent='Registrar ingreso'; }
   }
 });
@@ -7724,12 +7851,20 @@ function openNewProductModal(prefillName = '', prefillBarcode = ''){
   $('#p-stock-help').textContent = 'El motivo será obligatorio únicamente si cambias la cantidad.';
   $('#btn-delete-p').classList.add('hidden');
   openModal('modal-product');
-  setTimeout(()=>$('#p-name')?.focus(),40);
+  afterModalPaint('modal-product',()=>$('#p-name')?.focus());
 }
 
+let productSubmitInProgress=false;
 document.getElementById('form-p')?.addEventListener('submit', async (e)=>{
   e.preventDefault();
+  if(productSubmitInProgress||criticalWriteDepth) return;
+  productSubmitInProgress=true;criticalWriteDepth++;
+  let rollback=null,committed=false;
+
   try{
+    window.POSStorage?.cancelScheduled();await window.POSStorage?.settleWrites();
+    rollback=captureCriticalRollback([$('#p-id').value].filter(Boolean),['auditLogs']);
+
     const id = $('#p-id').value || uid();
     const current = (STATE.products||[]).find(p => p.id === id) || null;
     const enteredBarcode = $('#p-barcode').value.trim();
@@ -7775,12 +7910,14 @@ document.getElementById('form-p')?.addEventListener('submit', async (e)=>{
     if(current && Math.abs(stockDifference)>=1e-9) invalidateStockHistoryCache();
     saveLocalBackup();
     addPendingOp({ type: 'product', payload: prod });
+  await persistLocalState(true);committed=true;
     renderInventoryList(); renderDashboard();
     clearScannerProductRegistration();
     closeModal('modal-product');
     showToast('Producto guardado (cola si offline)');
     if(current && Math.abs(stockDifference)>=1e-9 && $('#modal-stock-history')?.classList.contains('visible')) refreshStockHistoryData(false);
-  }catch(e){ console.error(e); alert('Error guardando producto: '+ (e.message||e)); }
+  }catch(e){ if(rollback&&!committed) rollback();console.error(e); alert('Error guardando producto: '+ (e.message||e)); }
+  finally{productSubmitInProgress=false;criticalWriteDepth--;scheduleSyncIndicators();if(committed) processPendingOps();}
 });
 
 function editProduct(id){
@@ -7940,11 +8077,13 @@ function getActiveShiftForCurrentUser(){
 }
 
 function getShiftSales(shift){
-  if(!shift) return [];
-  return (Array.isArray(STATE.sales)?STATE.sales:[]).filter(s => s && typeof s==='object' && !s.deleted && String(s.shiftId||'') === String(shift.id||''));
+  return shift ? getSalesIndex().byShift.get(String(shift.id||''))||[] : [];
 }
 
 function calculateShiftSummary(shift){
+  const cache=getSalesIndex().summaries;
+  const key=String(shift.id)+'|'+Number(shift.openingCash||0);
+  if(cache.has(key)) return cache.get(key);
   const sales = getShiftSales(shift);
   const payments = { EFECTIVO:0, YAPE:0, A_CREDITO:0, OTROS:0 };
   const products = new Map();
@@ -7962,13 +8101,14 @@ function calculateShiftSummary(shift){
       row.amount += Number(it.qty||0)*Number(it.unitPrice||0);
     });
   });
-  return {
+  const summary = {
     sales,
     payments,
     products:Array.from(products.values()).sort((a,b)=>b.amount-a.amount),
     total:sales.reduce((sum,s)=>sum+Number(s.total||0),0),
     expectedCash:Number(shift.openingCash||0)+payments.EFECTIVO
   };
+  cache.set(key,summary); return summary;
 }
 
 function updateShiftUI(){
@@ -8015,7 +8155,7 @@ function renderPersonnelList(){
   if(!box) return;
   ensureStateShape();
   const allStaff = (STATE.staff||[]);
-  const rows = allStaff.filter(person=>person && !person.deleted).slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'es',{sensitivity:'base'}));
+  const rows = allStaff.filter(person=>person && !person.deleted).slice().sort((a,b)=>spanishCollator.compare(String(a.name||''),String(b.name||'')));
   const deletedCount = allStaff.filter(person=>person?.deleted).length;
   const staffHtml = rows.map(person=>{
     const hasOpenShift = (STATE.shifts||[]).some(s=>s.status==='OPEN' && String(s.staffId||'')===String(person.id||''));
@@ -8030,8 +8170,16 @@ function openPersonnelModal(){
   safeCreateIcons();
 }
 
+let staffSubmitInProgress=false;
 document.getElementById('form-staff')?.addEventListener('submit', async ev=>{
   ev.preventDefault();
+  if(staffSubmitInProgress||criticalWriteDepth) return;
+  staffSubmitInProgress=true;criticalWriteDepth++;
+  let rollback=null,committed=false;
+  try{
+    window.POSStorage?.cancelScheduled();await window.POSStorage?.settleWrites();
+    rollback=captureCriticalRollback([],['staff','auditLogs']);
+
   const name = ($('#staff-name')?.value||'').trim();
   const username = normalizeStaffUsername($('#staff-username')?.value);
   const pin = ($('#staff-pin')?.value||'').trim();
@@ -8050,9 +8198,12 @@ document.getElementById('form-staff')?.addEventListener('submit', async ev=>{
   saveLocalBackup();
   addPendingOp({type:'staff',payload:person,silent:true});
   processPendingOps();
+  await persistLocalState(true);committed=true;
   ev.target.reset();
   renderPersonnelList();
   showToast(`Usuario ${username} creado`);
+  }catch(error){if(rollback&&!committed) rollback();reportLocalSaveError(error);}
+  finally{staffSubmitInProgress=false;criticalWriteDepth--;scheduleSyncIndicators();if(committed) processPendingOps();}
 });
 
 async function resetStaffPin(personId){
@@ -8135,7 +8286,21 @@ function renderShiftHistory(){
   }).join('') || '<div class="small-muted mt-2">No hay turnos registrados.</div>';
 }
 
+let renderedShiftKey=null;
 function renderShiftModal(){
+  const content=$('#shift-modal-content'),key=getActiveShiftForCurrentUser()?.id||'opening';
+  const preserve=renderedShiftKey===key;
+  const fields=preserve&&content?[...content.querySelectorAll('input,textarea,select')].map(el=>({id:el.id,value:el.value,selection:el.selectionStart})):[];
+  const focused=content?.contains(document.activeElement)?document.activeElement.id:null;
+  const expanded=content?.querySelector('details')?.open;
+  buildShiftModal();renderedShiftKey=key;
+  if(preserve){
+    fields.forEach(field=>{const el=document.getElementById(field.id);if(el){el.value=field.value;if(el.type==='password'&&field.selection!==null) try{el.setSelectionRange(field.selection,field.selection);}catch(_){}}});
+    const details=content?.querySelector('details');if(details&&expanded!==undefined) details.open=expanded;
+    if(focused) document.getElementById(focused)?.focus({preventScroll:true});
+  }
+}
+function buildShiftModal(){
   ensureStateShape();
   const active = getActiveShiftForCurrentUser();
   const subtitle = $('#shift-modal-subtitle');
@@ -8145,7 +8310,7 @@ function renderShiftModal(){
   if(!active){
     const staff = (STATE.staff||[])
       .filter(person=>person && !person.deleted && person.active!==false)
-      .sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'es',{sensitivity:'base'}));
+      .sort((a,b)=>spanishCollator.compare(String(a.name||''),String(b.name||'')));
     const openShifts = (STATE.shifts||[])
       .filter(shift=>shift && shift.status==='OPEN')
       .sort((a,b)=>new Date(b.openedAt||0)-new Date(a.openedAt||0));
@@ -8173,8 +8338,8 @@ function renderShiftModal(){
       const newShiftBody = availableStaff.length ?`<div class="shift-new-body"><div class="small-muted">Solo aparece el personal que no tiene otro turno abierto.</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3"><div><label class="small-muted">Persona que inicia el turno</label><select id="shift-staff-id" class="input-pro mt-1" onchange="updateShiftOpeningHint()">${options}</select></div><div><label class="small-muted">PIN personal</label><input id="shift-staff-pin" type="password" class="input-pro mt-1" placeholder="Ingresa su PIN" autocomplete="current-password" onkeydown="if(event.key==='Enter'){event.preventDefault();openCurrentShift();}"></div></div><div class="mt-3"><label class="small-muted">Fondo inicial de caja</label><input id="shift-opening-cash" type="number" min="0" step="0.01" value="0.00" class="input-pro mt-1"></div><div id="shift-opening-hint" class="small-muted mt-2"></div><button id="btn-confirm-open-shift" type="button" onclick="openCurrentShift()" class="btn-primary w-full mt-3">VALIDAR PIN Y ABRIR TURNO</button></div>`
         :`<div class="shift-new-body"><div class="shift-no-new">Todo el personal activo ya tiene un turno abierto. Selecciona uno arriba para retomarlo.</div></div>`;
       content.innerHTML = resumePanel + `<details class="shift-new-details" ${openShifts.length?'':'open'}><summary><i data-lucide="circle-plus" class="w-4 h-4 text-orange-600"></i>Abrir un turno nuevo</summary>${newShiftBody}</details>`;
-      if(availableStaff.length) setTimeout(()=>updateShiftOpeningHint(!openShifts.length),0);
-      if(preferredShift) setTimeout(()=>selectOpenShiftForResume(preferredShift.id,false),0);
+      if(availableStaff.length) updateShiftOpeningHint(false);
+      if(preferredShift) selectOpenShiftForResume(preferredShift.id,false);
     }
   }else{
     const summary = calculateShiftSummary(active);
@@ -8208,23 +8373,15 @@ function showShiftResumeError(message){
 
 function openShiftModal(){
   openModal('modal-shift');
-  try{
-    renderShiftModal();
-    safeCreateIcons();
-  }catch(error){
-    console.error('No se pudo mostrar Turnos',error);
-    if($('#shift-modal-subtitle')) $('#shift-modal-subtitle').textContent='La ventana se abrió, pero un dato necesita actualizarse';
-    if($('#shift-modal-content')) $('#shift-modal-content').innerHTML=`<div class="card"><div class="font-bold text-red-700">No se pudieron leer los turnos</div><div class="small-muted mt-1">Actualiza los datos e inténtalo nuevamente. Ningún turno ni venta fue eliminado.</div><button type="button" onclick="openShiftModal()" class="btn-primary w-full mt-3">ACTUALIZAR Y REINTENTAR</button></div>`;
-    showToast('No se pudieron leer los turnos. Intenta actualizar.');
-  }
-  if(navigator.onLine && isCloudAllowed()){
-    loadPersonnelForLoginFromCloud(false).then(()=>{
-      if($('#modal-shift')?.classList.contains('visible')){
-        try{ renderShiftModal(); safeCreateIcons(); }
-        catch(error){ console.error('Turnos sincronizados no se pudieron mostrar',error); }
-      }
+  const content=$('#shift-modal-content');
+  if(content && !content.children.length) content.innerHTML='<div class="small-muted" role="status">Cargando turnos guardados en este equipo...</div>';
+  afterModalPaint('modal-shift',()=>{
+    try{renderShiftModal();safeCreateIcons($('#modal-shift'));}
+    catch(error){console.error('No se pudo mostrar Turnos',error);if(content) content.textContent='No se pudieron leer los turnos. Cierra y vuelve a abrir la ventana.';}
+    if(navigator.onLine&&isCloudAllowed()) loadPersonnelForLoginFromCloud(false).then(changed=>{
+      if(changed&&isModalVisible('modal-shift')) renderShiftModal();
     });
-  }
+  });
 }
 
 function getSelectedShiftPerson(){
@@ -8256,7 +8413,7 @@ function updateShiftOpeningHint(focusPin=true){
   if(pin){ pin.value=''; if(focusPin) pin.focus(); }
 }
 
-function attachOpenShiftToCurrentSession(existing,person){
+async function attachOpenShiftToCurrentSession(existing,person){
   if(!existing || existing.status!=='OPEN' || !person) return false;
   const previousDeviceId=existing.deviceId||'';
   const anotherDevice=previousDeviceId && previousDeviceId!==getDeviceId();
@@ -8264,6 +8421,10 @@ function attachOpenShiftToCurrentSession(existing,person){
     const continueRemote=confirm('Este turno figura abierto en otro equipo. ¿Deseas asumirlo aquí sin crear uno nuevo? La acción quedará auditada.');
     if(!continueRemote) return false;
   }
+  if(criticalWriteDepth) return false;
+  const rollback=captureCriticalRollback([],['shifts','auditLogs','syncConflicts']);criticalWriteDepth++;
+  let committed=false;
+  try{
   const now=new Date().toISOString();
   if(anotherDevice){
     const conflict={id:`SHIFT-DEVICE-${existing.id}-${getDeviceId()}`,type:'SHIFT_OTHER_DEVICE',shiftId:existing.id,staffId:person.id,previousDeviceId,currentDeviceId:getDeviceId(),status:'OPEN',createdAt:now};
@@ -8286,12 +8447,15 @@ function attachOpenShiftToCurrentSession(existing,person){
   activateShiftLocally(existing.id);
   saveLocalBackup();
   addPendingOp({id:`SHIFT-RESUME-${existing.id}-${now}`,type:'shift',payload:{...existing},silent:true});
+  await persistLocalState(true);committed=true;
   processPendingOps();
   updateShiftUI();
   renderShiftModal();
   safeCreateIcons();
   showToast(`Turno de ${person.name} recuperado`);
   return true;
+  }catch(error){if(!committed){rollback();clearActiveShiftUnlock(true);}reportLocalSaveError(error);return false;}
+  finally{criticalWriteDepth--;scheduleSyncIndicators();if(committed) processPendingOps();}
 }
 
 async function resumeSelectedOpenShift(){
@@ -8318,7 +8482,7 @@ async function resumeSelectedOpenShift(){
     if(pinInput){ pinInput.value=''; pinInput.focus(); }
     return showShiftResumeError('PIN incorrecto. Verifica el PIN de la trabajadora.');
   }
-  attachOpenShiftToCurrentSession(existing,person);
+  await attachOpenShiftToCurrentSession(existing,person);
 }
 
 async function openCurrentShift(){
@@ -8347,7 +8511,7 @@ async function openCurrentShift(){
     .filter(shift=>shift && shift.status==='OPEN' && String(shift.staffId||'')===String(person.id||''))
     .sort((a,b)=>new Date(b.openedAt||0)-new Date(a.openedAt||0))[0] || null;
   if(existing){
-    attachOpenShiftToCurrentSession(existing,person);
+    await attachOpenShiftToCurrentSession(existing,person);
     return;
   }
   const openingCash = Number($('#shift-opening-cash')?.value||0);
@@ -8358,18 +8522,25 @@ async function openCurrentShift(){
     openedAt:now, createdAt:now, updatedAt:now, openingCash:Number(openingCash.toFixed(2)), status:'OPEN', openedBy:getCurrentActor(),
     deviceId:getDeviceId(),deviceLabel:navigator.userAgent.slice(0,120),syncStatus:'PENDING'
   };
+  if(criticalWriteDepth) return;
+  const rollback=captureCriticalRollback([],['shifts','auditLogs']);criticalWriteDepth++;
+  let committed=false;
+  try{
   STATE.shifts.unshift(shift);
   activateShiftLocally(shift.id);
   STATE.auditLogs.unshift({id:uid(),ts:now,source:'SHIFT',action:'OPEN_SHIFT',entity:'shift',entityId:shift.id,actor:getCurrentActor(),note:`Turno de ${shift.staffName} abierto con S/ ${money(openingCash)}`,details:{staffId:shift.staffId,staffName:shift.staffName,openingCash:shift.openingCash}});
   saveLocalBackup();
   addPendingOp({type:'shift',payload:shift,silent:true});
+  await persistLocalState(true);committed=true;
   processPendingOps();
   updateShiftUI();
   renderShiftModal();
   showToast('Turno abierto. Ya puedes registrar ventas.');
+  }catch(error){if(!committed){rollback();clearActiveShiftUnlock(true);}reportLocalSaveError(error);}
+  finally{criticalWriteDepth--;scheduleSyncIndicators();if(committed) processPendingOps();}
 }
 
-function closeCurrentShift(exitAfter = false){
+async function closeCurrentShift(exitAfter = false){
   const shift = getActiveShiftForCurrentUser();
   if(!shift) return alert('No tienes un turno abierto');
   const actualCashRaw = ($('#shift-actual-cash')?.value||'').trim();
@@ -8384,6 +8555,10 @@ function closeCurrentShift(exitAfter = false){
   const note = ($('#shift-close-note')?.value||'').trim();
   if((Math.abs(cashDifference)>=0.01 || Math.abs(yapeDifference)>=0.01) && !note) return alert('Existe diferencia de dinero. Escribe una observación antes de cerrar.');
   if(!confirm(`Cerrar turno? Diferencia de caja: S/ ${money(cashDifference)} · Diferencia Yape: S/ ${money(yapeDifference)}`)) return;
+  if(criticalWriteDepth) return;
+  const rollback=captureCriticalRollback([],['shifts','auditLogs']);criticalWriteDepth++;
+  let committed=false;
+  try{
   const now = new Date().toISOString();
   Object.assign(shift,{
     status:'CLOSED', closedAt:now, updatedAt:now, actualCash:Number(actualCash.toFixed(2)), actualYape:Number(actualYape.toFixed(2)),
@@ -8391,9 +8566,11 @@ function closeCurrentShift(exitAfter = false){
     salesCount:summary.sales.length, salesTotal:Number(summary.total.toFixed(2)), paymentSummary:{...summary.payments}, productsSummary:summary.products, closeNote:note, closedBy:getCurrentActor()
   });
   STATE.auditLogs.unshift({id:uid(),ts:now,source:'SHIFT',action:'CLOSE_SHIFT',entity:'shift',entityId:shift.id,actor:getCurrentActor(),note:`Turno cerrado. Caja dif. S/ ${money(cashDifference)}`,details:{staffId:shift.staffId,staffName:shift.staffName,salesTotal:shift.salesTotal,cashDifference,yapeDifference}});
-  clearActiveShiftUnlock(true);
+
   saveLocalBackup();
   addPendingOp({type:'shift',payload:shift,silent:true});
+  await persistLocalState(true);committed=true;
+  clearActiveShiftUnlock(true);
   processPendingOps();
   updateShiftUI();
   renderShiftModal();
@@ -8402,27 +8579,29 @@ function closeCurrentShift(exitAfter = false){
     closeModal('modal-shift');
     performLogout();
   }
+  }catch(error){if(!committed) rollback();reportLocalSaveError(error);}
+  finally{criticalWriteDepth--;scheduleSyncIndicators();if(committed) processPendingOps();}
 }
 
+let personnelLoadPromise=null,personnelLoadedAt=0;
 async function loadPersonnelForLoginFromCloud(showFeedback=false){
-  if(!navigator.onLine) return false;
-  try{
-    const ready = await ensureFirebaseLoaded();
-    if(!ready) return false;
-    initFirebase();
-    if(!db) return false;
-    await resolveDbCollectionName();
-    const [staff,shifts] = await Promise.all([
-      fetchSubcollectionDocs(SUBCOLS.staff).catch(()=>[]),
-      fetchSubcollectionDocs(SUBCOLS.shifts).catch(()=>[])
-    ]);
-    mergeState({products:[],customers:[],sales:[],stockClosures:[],staff,shifts});
-    if(showFeedback && staff.length) showToast('Usuarios del personal actualizados');
-    return staff.length>0 || shifts.length>0;
-  }catch(err){
-    console.warn('No se pudo cargar personal para login',err);
-    return false;
-  }
+  if(!navigator.onLine || !isCloudAllowed()) return false;
+  if(unsubscribers.staff && unsubscribers.shifts) return false;
+  if(Date.now()-personnelLoadedAt<60000) return false;
+  if(personnelLoadPromise) return personnelLoadPromise;
+  personnelLoadPromise=(async()=>{
+    try{
+      if(!await ensureFirebaseLoaded()) return false;
+      initFirebase();if(!db) return false;await resolveDbCollectionName();
+      if(!isCloudAllowed()) return false;
+      const [staff,shifts]=await Promise.all([fetchSubcollectionDocs(SUBCOLS.staff),fetchSubcollectionDocs(SUBCOLS.shifts)]);
+      if(!isCloudAllowed()) return false;
+      mergeFromSubcollection(SUBCOLS.staff,staff);mergeFromSubcollection(SUBCOLS.shifts,shifts);personnelLoadedAt=Date.now();
+      if(showFeedback&&staff.length) showToast('Usuarios del personal actualizados');
+      enforceCurrentStaffAccess();return true;
+    }catch(error){console.warn('Personal: se conservan los registros locales',error);return false;}
+    finally{personnelLoadPromise=null;}
+  })();return personnelLoadPromise;
 }
 
 /* =========
@@ -8430,7 +8609,12 @@ async function loadPersonnelForLoginFromCloud(showFeedback=false){
    ========= */
 const ADMIN_PASS_SHA256 = '019a3062c34e1a9907ef9470160a280ff0a60c64419eec5d5483c9eaa0186049';
 document.getElementById('form-stock-auth')?.addEventListener('submit', submitStockAuth);
+let loginInProgress=false;
 $('#btn-login')?.addEventListener('click', async ()=> {
+  if(loginInProgress) return;
+  loginInProgress=true;$('#btn-login').disabled=true;
+  try{
+  await localReadyPromise;
   const user = normalizeStaffUsername($('#l-user').value);
   const pass = ($('#l-pass').value||'').trim();
   const err = $('#login-error'); err.classList.add('hidden'); err.textContent = '';
@@ -8472,6 +8656,7 @@ $('#btn-login')?.addEventListener('click', async ()=> {
     $('#l-pass').value = '';
     $('#l-pass').focus();
   }
+  }finally{loginInProgress=false;$('#btn-login').disabled=false;}
 });
 ['#l-user','#l-pass'].forEach(selector=>$(selector)?.addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); $('#btn-login')?.click(); } }));
 
@@ -8492,97 +8677,77 @@ function logout(){
 
 /* Modal helpers with visualViewport handling to avoid keyboard overlapping on mobile */
 function openModal(id){
-  if(id === 'modal-sale' && !getActiveShiftForCurrentUser()){
-    showToast('Abre tu turno antes de vender');
-    openShiftModal();
-    return;
-  }
-  const m = document.getElementById(id);
-  if(!m) return;
-  m.classList.add('visible');
-  if(id === 'modal-sale'){
-    setTimeout(()=>renderCart(),0);
-    setTimeout(()=> $('#pos-search')?.focus(), 40);
-  }
-  if(id === 'modal-clients') setTimeout(()=>renderClients(),0);
-  if(id === 'modal-gestion') setTimeout(()=>renderGestionList(),0);
-  if(id === 'modal-product'){
-    setTimeout(()=> { $('#p-name')?.focus(); }, 40);
-  }
-  if(id === 'modal-stock-auth'){
-    setTimeout(()=> { $('#stock-auth-pass')?.focus(); }, 40);
-  }
-  if(id === 'modal-ingreso'){
-    setTimeout(()=> { $('#ing-supplier-name')?.focus(); }, 40);
-  }
-  if(id === 'modal-purchase-history'){
-    setTimeout(()=> { $('#purchase-history-search')?.focus(); }, 40);
-  }
-  // adjust modal position to center even with keyboard: set max-height to visualViewport.height - 40
-  const sheet = m.querySelector('.modal-sheet');
+  if(id==='modal-sale'&&!getActiveShiftForCurrentUser()){showToast('Abre tu turno antes de vender');openShiftModal();return;}
+  const modal=document.getElementById(id);if(!modal || modal.classList.contains('visible')) return;
+  modal.classList.add('visible');modal._tasks=new Set();
+  const sheet=modal.querySelector('.modal-sheet');
   if(sheet){
-    try{
-      const vv = (window.visualViewport && window.visualViewport.height) ?window.visualViewport.height : window.innerHeight;
-      sheet.style.maxHeight = (vv - 40) + 'px';
-      // attach visualViewport resize handler
-      const adjust = ()=> {
-        const vh = (window.visualViewport && window.visualViewport.height) ?window.visualViewport.height : window.innerHeight;
-        sheet.style.maxHeight = (vh - 40) + 'px';
-        // keep sheet centered visually if keyboard open
-        if(window.visualViewport){
-          const offset = Math.max(0, (window.innerHeight - window.visualViewport.height));
-          sheet.style.transform = `translateY(-${offset/4}px)`;
-        }
-      };
-      // store handler reference for closure
-      m._vvHandler = adjust;
-      if(window.visualViewport) window.visualViewport.addEventListener('resize', adjust);
-    }catch(e){}
+    const adjust=()=>{
+      const viewport=window.visualViewport;
+      sheet.style.maxHeight=Math.max(120,(viewport?.height||innerHeight)-40)+'px';
+      sheet.style.transform=viewport?`translateY(-${Math.max(0,innerHeight-viewport.height)/4}px)`:'';
+    };
+    adjust();modal._vvHandler=adjust;
+    window.visualViewport?.addEventListener('resize',adjust);
+    window.visualViewport?.addEventListener('scroll',adjust);
   }
+  afterModalPaint(id,()=>{
+    if(id==='modal-sale') renderCart();
+    if(id==='modal-clients') renderClients();
+    if(id==='modal-gestion') renderGestionList();
+    const focus={'modal-sale':'pos-search','modal-product':'p-name','modal-stock-auth':'stock-auth-pass','modal-ingreso':'ing-supplier-name','modal-purchase-history':'purchase-history-search'}[id];
+    if(focus) document.getElementById(focus)?.focus({preventScroll:true});
+  });
+}
+function afterModalPaint(id,task){
+  const modal=document.getElementById(id);if(!modal?.classList.contains('visible')) return;
+  const token={frame:0,timer:0};(modal._tasks||(modal._tasks=new Set())).add(token);
+  token.frame=requestAnimationFrame(()=>{token.timer=setTimeout(()=>{
+    modal._tasks.delete(token);if(modal.classList.contains('visible')) task();
+  },0);});
 }
 
 function closeModal(id){
-  const m = document.getElementById(id);
-  if(!m) return;
-  m.classList.remove('visible');
-  if(id === 'modal-stock-auth') stockAuthPendingAction = null;
-  const sheet = m.querySelector('.modal-sheet');
-  if(sheet && m._vvHandler && window.visualViewport) try{ window.visualViewport.removeEventListener('resize', m._vvHandler); }catch(e){}
-  // stop scanner if closing scanner modal
-  if(id === 'modal-scan' && window.stopScanner) window.stopScanner();
+  const modal=document.getElementById(id);if(!modal) return;
+  modal.classList.remove('visible');
+  modal._tasks?.forEach(token=>{cancelAnimationFrame(token.frame);clearTimeout(token.timer);});modal._tasks?.clear();
+  if(id==='modal-stock-auth') stockAuthPendingAction=null;
+  if(modal._vvHandler){
+    window.visualViewport?.removeEventListener('resize',modal._vvHandler);
+    window.visualViewport?.removeEventListener('scroll',modal._vvHandler);modal._vvHandler=null;
+  }
+  const sheet=modal.querySelector('.modal-sheet');if(sheet){sheet.style.transform='';sheet.style.maxHeight='';}
+  if(id==='modal-stock-history') stockHistoryAnalyzing=false;
+  if(id==='modal-scan') window.stopScanner?.();
 }
 
+let tabSequence=0;
 /* Utility to switch tabs */
 function switchTab(tab){
-  $('#tab-home').classList.add('hidden'); $('#tab-inventory').classList.add('hidden'); $('#tab-reports').classList.add('hidden');
-  if(tab === 'home'){
-    $('#tab-home').classList.remove('hidden');
-    setTimeout(()=>renderDashboard(),0);
-  }
-  if(tab === 'inventory'){
-    $('#tab-inventory').classList.remove('hidden');
-    scheduleInventoryRender(0);
-  }
-  if(tab === 'reports'){
-    $('#tab-reports').classList.remove('hidden');
-    setTimeout(()=>updateReportsIfOpen(),0);
-  }
-  safeCreateIcons();
+  const sequence=++tabSequence;
+  ['home','inventory','reports'].forEach(key=>document.getElementById('tab-'+key)?.classList.toggle('hidden',key!==tab));
+  requestAnimationFrame(()=>setTimeout(()=>{
+    if(sequence!==tabSequence) return;
+    if(tab==='home') renderDashboard(true);
+    if(tab==='inventory') scheduleInventoryRender(0);
+    if(tab==='reports') updateReportsIfOpen();
+  },0));
 }
 
 /* Bind header buttons */
 $('#btn-personnel')?.addEventListener('click', ()=> requireStockAccess(openPersonnelModal));
 $('#btn-gestion')?.addEventListener('click', ()=> requireStockAccess(()=>openModal('modal-gestion')));
-$('#btn-sync')?.addEventListener('click', async ()=> {
-  const ok = await bootstrapCloudSync(true);
-  if(ok) forceSync();
-});
+$('#btn-sync')?.addEventListener('click',openSyncCenter);
 
 /* =========
    FORCE SYNC (admin action)
    - normalizes remote and writes back merged data
    ========= */
 async function forceSync(){
+  if(!isCloudAllowed()||!navigator.onLine) return alert('Activa Automático y conecta Internet para actualizar desde la nube.');
+  if(syncRefreshInProgress) return;
+  syncRefreshInProgress=true;renderSyncCenter();
+  try{
   if(!db){
     const ready = await bootstrapCloudSync(true);
     if(!ready) return alert('Cloud no inicializado');
@@ -8608,33 +8773,33 @@ async function forceSync(){
     processPendingOps();
     showToast('Sincronía forzada OK');
   }catch(e){ console.error(e); alert('forceSync error: ' + (e.message||e)); }
+  }finally{syncRefreshInProgress=false;renderSyncCenter();}
 }
 
 /* =========
    startApp
    ========= */
-async function registerPWA(){
-  if(!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return false;
-  try{
-    const registration=await navigator.serviceWorker.register('./service-worker.js?v=20261109-rendimiento-v4',{scope:'./',updateViaCache:'none'});
-    registration.update().catch(()=>{});
-    return true;
-  }catch(error){ console.warn('No se pudo registrar el service worker',error); return false; }
+let pwaRegistrationPromise=null,appStarted=false;
+function registerPWA(){
+  if(pwaRegistrationPromise) return pwaRegistrationPromise;
+  if(!('serviceWorker' in navigator)||!/^https?:$/.test(location.protocol)) return Promise.resolve(false);
+  pwaRegistrationPromise=navigator.serviceWorker.register('./service-worker.js?v=20261110-excel-sync-v6',{scope:'./',updateViaCache:'none'})
+    .then(()=>true).catch(error=>{console.warn('Service worker',error);pwaRegistrationPromise=null;return false;});
+  return pwaRegistrationPromise;
 }
 
 async function startApp(){
+  if(appStarted) return;
+  appStarted=true;
   registerPWA();
-  await ensureLucideLoaded();
   safeCreateIcons();
   tryRecoverStateFromLocalStorage();
   renderAll();
-  queueLegacyCloudRecords();
   bindConnectivityEvents();
+  updateOnline(false);
   if(!navigator.onLine || !isCloudAllowed()){
     updateOnline(false);
     showToast(!isCloudAllowed()?'Modo solo local activo':'Modo local activo (sin internet)');
-  } else {
-    await bootstrapCloudSync(false);
   }
   $('#rep-from').value = todayYMD(); $('#rep-to').value = todayYMD();
   if($('#search-inv') && !$('#search-inv').dataset.fastSearchBound){
@@ -8648,13 +8813,23 @@ async function startApp(){
   window.STATE = STATE; window.pendingOps = pendingOps;
   window.upsertProduct = upsertProduct; window.upsertCustomer = upsertCustomer; window.upsertSale = upsertSale;
   window.processPendingOps = processPendingOps; window.addPendingOp = addPendingOp;
+  window.TiendaPerf?.record('startup.controlsReady',performance.now());
+  requestAnimationFrame(()=>setTimeout(()=>{
+    window.TiendaPerf?.record('startup.firstLocalPaint',performance.now());
+    queueLegacyCloudRecords();
+    if(navigator.onLine&&isCloudAllowed()) bootstrapCloudSync(false);
+  },0));
 }
 
 /* DOM Ready */
+let resolveLocalReady;
+const localReadyPromise=new Promise(resolve=>{resolveLocalReady=resolve;});
 document.addEventListener('DOMContentLoaded', async ()=>{
   safeCreateIcons();
   registerPWA();
   await initializeLocalPersistence();
+  renderSyncCenter();
+  resolveLocalReady();
   let validSession = false;
   if(localStorage.getItem('auth_token')){
     const user = normalizeStaffUsername(localStorage.getItem('auth_user'));
@@ -8686,8 +8861,50 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   }
 });
 
+/* Diagnóstico voluntario: ?diagnostics=1. No almacena datos del negocio. */
+(function installPerformanceDiagnostics(){
+  if(new URLSearchParams(location.search).get('diagnostics')!=='1') return;
+  const samples=[],counts={},limit=500;
+  let observer;
+  const record=(name,duration)=>{
+    counts[name]=(counts[name]||0)+1;
+    samples.push({name,ms:Number(duration.toFixed(2)),at:Number(performance.now().toFixed(2))});
+    if(samples.length>limit) samples.shift();
+  };
+  window.TiendaPerf={
+    record,
+    report:()=>({samples:samples.slice(),counts:{...counts},navigation:performance.getEntriesByType('navigation').map(e=>e.toJSON()),
+      resources:performance.getEntriesByType('resource').filter(e=>e.name.includes('/libs/')).map(e=>({name:e.name.split('/').pop(),ms:e.duration,bytes:e.decodedBodySize})),
+      memory:performance.memory?{usedBytes:performance.memory.usedJSHeapSize,totalBytes:performance.memory.totalJSHeapSize}:null}),
+    reset:()=>{samples.length=0;Object.keys(counts).forEach(key=>delete counts[key]);},
+    stop:()=>observer?.disconnect()
+  };
+  for(const name of ['startApp','initializeLocalPersistence','renderAll','renderDashboard','renderInventoryList','renderClients','renderGestionList','renderCart','rebuildLinkedStocks','saveLocalBackup','savePending','persistLocalState','getPosMatches','renderShiftModal','calculateShiftSummary','bootstrapCloudSync','processPendingOps','mergeState','mergeFromSubcollection','openModal','closeModal','switchTab']){
+    const original=window[name];if(typeof original!=='function') continue;
+    window[name]=function(...args){
+      const started=performance.now();
+      try{
+        const result=original.apply(this,args);
+        if(result&&typeof result.then==='function') return result.finally(()=>record(name,performance.now()-started));
+        record(name,performance.now()-started);return result;
+      }catch(error){record(name,performance.now()-started);throw error;}
+    };
+  }
+  try{
+    observer=new PerformanceObserver(list=>list.getEntries().forEach(entry=>record('longtask',entry.duration)));
+    observer.observe({type:'longtask',buffered:true});
+  }catch(_){}
+  document.addEventListener('click',()=>{
+    const started=performance.now();
+    requestAnimationFrame(()=>setTimeout(()=>record('click.visual',performance.now()-started),0));
+  },{capture:true,passive:true});
+})();
+
 /* periodic local backup */
-setInterval(()=> { try{ saveLocalBackup(); }catch(e){} }, 15000);
+// No serializar nada cuando el estado no ha cambiado.
+setInterval(()=>{if(savedRevision!==stateRevision) persistLocalState().catch(reportLocalSaveError);},15000);
+document.addEventListener('visibilitychange',()=>{if(document.hidden) persistLocalState().catch(reportLocalSaveError);});
+window.addEventListener('pagehide',()=>{persistLocalState().catch(reportLocalSaveError);});
 
 </script>
 </body>
