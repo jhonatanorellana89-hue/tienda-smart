@@ -1,0 +1,21 @@
+{
+  "passed": 14,
+  "tests": [
+    "reportes sólo Excel; sin exportador ni dependencias PDF activas",
+    "panel diferencia espera, envío y error sin interpretar conexión como confirmación",
+    "un estado de envío heredado tras recargar vuelve a mostrarse en espera",
+    "cola extensa paginada conserva las 2001 operaciones y permite filtrar errores",
+    "datos de caché, Internet y actualización completa muestran estados distintos",
+    "snapshot no retira un envío en curso ni crea un recibo de confirmación",
+    "confirmación de escritura guarda recibo y retirada de cola juntos",
+    "error visible y doble reintento conservan ID y realizan un solo envío adicional",
+    "fallo al guardar recibo aborta la retirada y reintenta sin repetir escritura confirmada",
+    "actualizar una operación con el mismo ID invalida la confirmación del contenido anterior",
+    "un recibo local tardío conserva la fecha de la confirmación más reciente",
+    "conflictos muestran stock y turnos sin modificar ni resolver registros automáticamente",
+    "actualización manual de datos comparte una sola lectura y no crea confirmaciones de escritura",
+    "Excel exporta los 5000 productos aunque la pantalla muestre sólo una página"
+  ],
+  "errors": [],
+  "externalRequests": 0
+}
