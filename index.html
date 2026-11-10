@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8"/>
@@ -711,6 +711,7 @@
   @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   @keyframes pop{from{opacity:.7;transform:scale(.98)}to{opacity:1;transform:scale(1)}}
   .card{animation:rise .25s ease both}
+  #inventory-list .card,#clients-list .card{animation:none;content-visibility:auto;contain-intrinsic-size:auto 58px}
 
   @media (max-width:420px){
     :root{--maxw:100vw}
@@ -1993,15 +1994,24 @@ function renderIconFallbacks(){
   });
 }
 
+let iconRenderScheduled = false;
 function safeCreateIcons(){
-  try{
-    if(window.lucide && typeof window.lucide.createIcons === 'function'){
-      window.lucide.createIcons();
-      return true;
-    }
-  }catch(_){}
-  renderIconFallbacks();
-  return false;
+  const hasLucide = !!(window.lucide && typeof window.lucide.createIcons === 'function');
+  if(iconRenderScheduled) return hasLucide;
+  iconRenderScheduled = true;
+  const renderIcons = ()=>{
+    iconRenderScheduled = false;
+    try{
+      if(window.lucide && typeof window.lucide.createIcons === 'function'){
+        window.lucide.createIcons();
+        return;
+      }
+    }catch(_){}
+    renderIconFallbacks();
+  };
+  if(typeof window.requestIdleCallback === 'function') window.requestIdleCallback(renderIcons,{timeout:180});
+  else setTimeout(renderIcons,0);
+  return hasLucide;
 }
 
 const _extScriptPromises = {};
@@ -2159,6 +2169,16 @@ function ensureStateShape(){
 ensureStateShape();
 
 /* Persist helpers */
+let mergedStateBackupTimer = 0;
+function scheduleMergedStateBackup(){
+  if(mergedStateBackupTimer) clearTimeout(mergedStateBackupTimer);
+  mergedStateBackupTimer = setTimeout(()=>{
+    mergedStateBackupTimer = 0;
+    try{ localStorage.setItem(LOCAL_BACKUP_KEY,JSON.stringify(STATE)); }catch(_){}
+    if(window.POSStorage) POSStorage.scheduleStateSave(STATE);
+  },120);
+}
+
 function queueUnsentAuditLogs(){
   let queued=false;
   (STATE.auditLogs||[]).forEach(log=>{
@@ -2535,8 +2555,9 @@ function mergeState(remoteState){
   }
   const mergedCustomers = Array.from(cMap.values());
 
+  const mergedProductsById = new Map(mergedProds.map(product=>[String(product?.id||''),product]));
   stockMovementsMerged.forEach(movement=>{
-    const product = mergedProds.find(p=>String(p.id||'')===String(movement.productId||''));
+    const product = mergedProductsById.get(String(movement.productId||''));
     if(!product) return;
     product.movements = Array.isArray(product.movements)?product.movements:[];
     if(!product.movements.some(m=>String(m.id||m.movementId||'')===String(movement.id||movement.movementId||''))) product.movements.push(movement);
@@ -2546,7 +2567,7 @@ function mergeState(remoteState){
   STATE.stockMovements = stockMovementsMerged; STATE.syncConflicts = conflictsMerged;
   STATE.stockClosures = Array.from(closuresMap.values()); STATE.staff = Array.from(staffMap.values()); STATE.shifts = Array.from(shiftMap.values());
   ensureStateShape();
-  try { localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(STATE)); } catch(e){}
+  scheduleMergedStateBackup();
 }
 
 /* ==========
@@ -2805,7 +2826,7 @@ async function startFirestoreSync(){
     unsubscribers.products = subcolRef(SUBCOLS.products).onSnapshot(snap => {
       const docs = snap.docs.map(d => d.data());
       mergeFromSubcollection(SUBCOLS.products, docs);
-      renderAll();
+      scheduleRenderAll();
       updateOnline(true);
       processPendingOps();
     }, err => { console.error('products onSnapshot err', err); updateOnline(false); });
@@ -2813,7 +2834,7 @@ async function startFirestoreSync(){
     unsubscribers.customers = subcolRef(SUBCOLS.customers).onSnapshot(snap => {
       const docs = snap.docs.map(d => d.data());
       mergeFromSubcollection(SUBCOLS.customers, docs);
-      renderAll();
+      scheduleRenderAll();
       updateOnline(true);
       processPendingOps();
     }, err => { console.error('customers onSnapshot err', err); updateOnline(false); });
@@ -2821,7 +2842,7 @@ async function startFirestoreSync(){
     unsubscribers.sales = subcolRef(SUBCOLS.sales).onSnapshot(snap => {
       const docs = snap.docs.map(d => d.data());
       mergeFromSubcollection(SUBCOLS.sales, docs);
-      renderAll();
+      scheduleRenderAll();
       updateOnline(true);
       processPendingOps();
     }, err => { console.error('sales onSnapshot err', err); updateOnline(false); });
@@ -3089,20 +3110,39 @@ function updateOnline(on){
 /* =========
    RENDERS (dashboard, inventory, cart, clients, gestion)
    ========= */
+let renderAllTimer = 0;
+function isElementVisible(id){
+  const element = document.getElementById(id);
+  return !!element && !element.classList.contains('hidden') && !element.classList.contains('invisible');
+}
+
+function isModalVisible(id){
+  return !!document.getElementById(id)?.classList.contains('visible');
+}
+
+function scheduleRenderAll(delay = 40){
+  if(renderAllTimer) return;
+  renderAllTimer = setTimeout(()=>{
+    renderAllTimer = 0;
+    renderAll();
+  },delay);
+}
+
 function renderAll(){
+  if(renderAllTimer){ clearTimeout(renderAllTimer); renderAllTimer = 0; }
   rebuildLinkedStocks();
-  renderDashboard();
-  renderInventoryList();
-  renderCart();
-  renderClients();
-  renderGestionList();
+  renderDashboard(true);
+  if(isElementVisible('tab-inventory')) renderInventoryList(true);
+  if(isModalVisible('modal-sale')) renderCart();
+  if(isModalVisible('modal-clients')) renderClients();
+  if(isModalVisible('modal-gestion')) renderGestionList();
   updateShiftUI();
   updateReportsIfOpen();
   if($('#modal-stock-history')?.classList.contains('visible') && !stockHistoryCacheDirty) renderStockHistory();
 }
 
-function renderDashboard(){
-  rebuildLinkedStocks();
+function renderDashboard(stockPrepared = false){
+  if(!stockPrepared) rebuildLinkedStocks();
   const now = new Date();
   const ventasHoy = (STATE.sales||[]).filter(s => !s.deleted && isSameLocalDay(s.date, now));
   const total = ventasHoy.reduce((a,b)=> a + Number(b.total||0), 0);
@@ -3172,19 +3212,30 @@ function renderDashboard(){
   buildSection('Stock bajo', lowStock, 'low');
 }
 
-function renderInventoryList(){
-  rebuildLinkedStocks();
+let inventoryRenderTimer = 0;
+function scheduleInventoryRender(delay = 80){
+  if(inventoryRenderTimer) clearTimeout(inventoryRenderTimer);
+  inventoryRenderTimer = setTimeout(()=>{
+    inventoryRenderTimer = 0;
+    if(isElementVisible('tab-inventory')) renderInventoryList();
+  },delay);
+}
+
+function renderInventoryList(stockPrepared = false){
+  if(!stockPrepared) rebuildLinkedStocks();
   const container = $('#inventory-list'); if(!container) return; container.innerHTML='';
   const q = ($('#search-inv')?.value||'').toLowerCase();
   const list = (STATE.products||[]).filter(p => p && !p.deleted && (!q || (p.name||'').toLowerCase().includes(q) || (p.barcode||'').includes(q)));
   if(list.length === 0) container.innerHTML = '<div class="small-muted">No hay productos</div>';
+  const fragment = document.createDocumentFragment();
   list.forEach(p=>{
     const stockView = getAvailableQtyForSale(p);
     const d = document.createElement('div'); d.className='card flex justify-between items-center'; d.style.padding='8px';
     d.onclick = ()=> editProduct(p.id);
     d.innerHTML = `<div><div style="font-weight:800">${escapeHtml(p.name)}</div><div class="small-muted">STOCK: ${stockView} • S/ ${money(p.price)}</div></div><div class="text-indigo-600"><i data-lucide="edit-3"></i></div>`;
-    container.appendChild(d);
+    fragment.appendChild(d);
   });
+  container.appendChild(fragment);
   safeCreateIcons();
 }
 
@@ -3543,13 +3594,14 @@ async function completeSale(){
     });
     saveLocalBackup();
 
-    // post-sale UI updates (close modal immediately)
+    // Close first so the sale feels immediate; refresh only the visible views afterwards.
     cart = [];
-    renderCart();
-    renderInventoryList();
-    renderDashboard();
-    updateShiftUI();
     closeModal('modal-sale');
+    renderCart();
+    rebuildLinkedStocks();
+    renderDashboard(true);
+    if(isElementVisible('tab-inventory')) scheduleInventoryRender(0);
+    updateShiftUI();
     if($('#pos-customer')) $('#pos-customer').value = '';
 
     // Build op and either process immediately or queue
@@ -5913,9 +5965,33 @@ function syncParentFromChild(parentProduct){
 }
 
 function rebuildLinkedStocks(){
-  const roots = (STATE.products||[]).filter(p => p && !p.deleted && !p.parentProductId);
-  roots.forEach(parent => {
-    syncParentFromChild(parent);
+  const childrenByParent = new Map();
+  const roots = [];
+  (STATE.products||[]).forEach(product=>{
+    if(!product || product.deleted) return;
+    if(!product.parentProductId){ roots.push(product); return; }
+    const parentId = String(product.parentProductId);
+    if(!childrenByParent.has(parentId)) childrenByParent.set(parentId,[]);
+    childrenByParent.get(parentId).push(product);
+  });
+  roots.forEach(parent=>{
+    const children = childrenByParent.get(String(parent.id)) || [];
+    if(children.length === 0) return;
+    let parentStock = Number(parent.stock || 0);
+    if(!(parentStock > 0)){
+      children.forEach(child=>{
+        const factor = getLinkedFactor(parent,child);
+        if(factor > 0) parentStock = Math.max(parentStock,Number(child.stock || 0) / factor);
+      });
+    }
+    parent.stock = Math.max(0,roundStock(parentStock));
+    children.forEach(child=>{
+      const factor = getLinkedFactor(parent,child);
+      child.parentProductId = parent.id;
+      child.subFactor = factor;
+      child.isSubProduct = true;
+      child.stock = Math.max(0,Math.floor((parent.stock * factor) + 1e-9));
+    });
   });
 }
 
@@ -5925,11 +6001,9 @@ function getAvailableQtyForSale(productOrId){
   if(p.parentProductId){
     const parent = getProductById(p.parentProductId);
     if(!parent) return Math.max(0, Math.floor(Number(p.stock || 0)));
-    syncParentFromChild(parent);
     const factor = getLinkedFactor(parent, p);
     return Math.max(0, Math.floor((Number(parent.stock || 0) * factor) + 1e-9));
   }
-  syncParentFromChild(p);
   return Math.max(0, Math.floor(Number(p.stock || 0)));
 }
 
@@ -8427,8 +8501,11 @@ function openModal(id){
   if(!m) return;
   m.classList.add('visible');
   if(id === 'modal-sale'){
+    setTimeout(()=>renderCart(),0);
     setTimeout(()=> $('#pos-search')?.focus(), 40);
   }
+  if(id === 'modal-clients') setTimeout(()=>renderClients(),0);
+  if(id === 'modal-gestion') setTimeout(()=>renderGestionList(),0);
   if(id === 'modal-product'){
     setTimeout(()=> { $('#p-name')?.focus(); }, 40);
   }
@@ -8478,16 +8555,24 @@ function closeModal(id){
 /* Utility to switch tabs */
 function switchTab(tab){
   $('#tab-home').classList.add('hidden'); $('#tab-inventory').classList.add('hidden'); $('#tab-reports').classList.add('hidden');
-  if(tab === 'home') $('#tab-home').classList.remove('hidden');
-  if(tab === 'inventory') $('#tab-inventory').classList.remove('hidden');
-  if(tab === 'reports') $('#tab-reports').classList.remove('hidden');
+  if(tab === 'home'){
+    $('#tab-home').classList.remove('hidden');
+    setTimeout(()=>renderDashboard(),0);
+  }
+  if(tab === 'inventory'){
+    $('#tab-inventory').classList.remove('hidden');
+    scheduleInventoryRender(0);
+  }
+  if(tab === 'reports'){
+    $('#tab-reports').classList.remove('hidden');
+    setTimeout(()=>updateReportsIfOpen(),0);
+  }
   safeCreateIcons();
-  updateReportsIfOpen();
 }
 
 /* Bind header buttons */
 $('#btn-personnel')?.addEventListener('click', ()=> requireStockAccess(openPersonnelModal));
-$('#btn-gestion')?.addEventListener('click', ()=> requireStockAccess(()=> { openModal('modal-gestion'); renderGestionList(); }));
+$('#btn-gestion')?.addEventListener('click', ()=> requireStockAccess(()=>openModal('modal-gestion')));
 $('#btn-sync')?.addEventListener('click', async ()=> {
   const ok = await bootstrapCloudSync(true);
   if(ok) forceSync();
@@ -8531,7 +8616,7 @@ async function forceSync(){
 async function registerPWA(){
   if(!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return false;
   try{
-    const registration=await navigator.serviceWorker.register('./service-worker.js?v=20261109-turnos-v3',{scope:'./',updateViaCache:'none'});
+    const registration=await navigator.serviceWorker.register('./service-worker.js?v=20261109-rendimiento-v4',{scope:'./',updateViaCache:'none'});
     registration.update().catch(()=>{});
     return true;
   }catch(error){ console.warn('No se pudo registrar el service worker',error); return false; }
@@ -8552,7 +8637,10 @@ async function startApp(){
     await bootstrapCloudSync(false);
   }
   $('#rep-from').value = todayYMD(); $('#rep-to').value = todayYMD();
-  $('#search-inv')?.addEventListener('input', renderInventoryList);
+  if($('#search-inv') && !$('#search-inv').dataset.fastSearchBound){
+    $('#search-inv').dataset.fastSearchBound = '1';
+    $('#search-inv').addEventListener('input',()=>scheduleInventoryRender(80));
+  }
   setupPosSearch();
   setupIngresoProductSearch();
   setupHardwareScannerSupport();
