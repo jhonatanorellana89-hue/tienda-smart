@@ -1,6 +1,6 @@
 'use strict';
 
-const CACHE_NAME = 'tiendasmart-github-v5';
+const CACHE_NAME = 'tiendasmart-github-v6';
 const APP_SHELL = [
   './',
   './index.html',
@@ -12,8 +12,6 @@ const APP_SHELL = [
   './libs/app-tailwind.css',
   './libs/lucide-0.468.0.min.js',
   './libs/xlsx.full.min.js',
-  './libs/html2canvas-1.4.1.min.js',
-  './libs/jspdf-2.5.1.umd.min.js',
   './libs/quagga2-1.8.4.min.js',
   './libs/firebase-app-9.22.2-compat.js',
   './libs/firebase-auth-9.22.2-compat.js',
