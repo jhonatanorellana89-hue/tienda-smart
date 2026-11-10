@@ -14,7 +14,7 @@
 <!-- Dependencias locales: la caja debe poder iniciar sin Internet. -->
 <script src="./libs/lucide-0.468.0.min.js"></script>
 
-<!-- Utilities: XLSX, html2canvas, jsPDF -->
+<!-- Excel se carga desde libs cuando se solicita una exportación. -->
 
 
 
@@ -974,6 +974,7 @@
     .shift-resume-grid{grid-template-columns:1fr}
     .shift-resume-grid .btn-primary{width:100%}
   }
+  #modal-sync-center button:disabled{opacity:0.55;cursor:not-allowed}
 </style>
 <link rel="stylesheet" href="./libs/app-tailwind.css"/>
 </head>
@@ -1096,8 +1097,7 @@
       </div>
       <div class="flex gap-2 mt-3">
         <button onclick="previewReportRange()" class="btn-primary">Vista previa</button>
-        <button onclick="exportReportRangeBothXLSX()" class="px-3 py-2 border rounded">Exportar XLSX</button>
-        <button onclick="downloadReportPDF()" class="px-3 py-2 border rounded">Exportar PDF (A4)</button>
+        <button onclick="exportReportRangeBothXLSX()" class="px-3 py-2 border rounded">Exportar Excel</button>
       </div>
     </div>
     <div id="report-summary" class="mt-4"></div>
@@ -1821,7 +1821,7 @@
     <div class="flex justify-between items-center mb-3">
       <div>
         <h3 class="font-bold text-lg">Centro de sincronización</h3>
-        <p class="small-muted">Control local, cola pendiente y respaldo</p>
+        <p class="small-muted">Envíos pendientes, confirmaciones y respaldo</p>
       </div>
       <button type="button" onclick="closeModal('modal-sync-center')"><i data-lucide="x"></i></button>
     </div>
@@ -1829,21 +1829,36 @@
       <button id="sync-mode-auto" type="button" onclick="setWorkMode('auto')" class="px-3 py-3 rounded-xl border text-sm font-semibold">Automático</button>
       <button id="sync-mode-local" type="button" onclick="setWorkMode('local')" class="px-3 py-3 rounded-xl border text-sm font-semibold">Solo sin conexión</button>
     </div>
+    <p id="sync-center-detail" class="small-muted mb-3" role="status" aria-live="polite"></p>
     <div class="rounded-2xl bg-slate-50 border p-3 space-y-2 text-sm">
       <div class="flex justify-between gap-3"><span class="small-muted">Estado</span><strong id="sync-center-status">Local</strong></div>
       <div class="flex justify-between gap-3"><span class="small-muted">Operaciones pendientes</span><strong id="sync-center-pending">0</strong></div>
       <div class="flex justify-between gap-3"><span class="small-muted">Última confirmación</span><strong id="sync-center-last" class="text-right">Nunca</strong></div>
-      <div id="sync-center-error-row" class="hidden border-t pt-2 text-red-700"><strong>Último error:</strong> <span id="sync-center-error"></span></div>
+      <div id="sync-center-error-row" class="hidden border-t pt-2 text-red-700"><strong>Último error registrado:</strong> <span id="sync-center-error"></span></div>
     </div>
-    <div id="sync-conflicts-box" class="hidden mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-      <div class="font-semibold text-amber-900">Conflictos por revisar: <span id="sync-conflicts-count">0</span></div>
-      <div id="sync-conflicts-list" class="small-muted mt-2 max-h-28 overflow-auto"></div>
+    <div class="grid grid-cols-3 gap-2 mt-3 text-center text-sm">
+      <div class="rounded-xl border p-2"><div class="small-muted">En espera</div><strong id="sync-center-waiting">0</strong></div>
+      <div class="rounded-xl border p-2"><div class="small-muted">Enviando</div><strong id="sync-center-sending">0</strong></div>
+      <div class="rounded-xl border p-2"><div class="small-muted">Con error</div><strong id="sync-center-errors">0</strong></div>
     </div>
     <div class="grid grid-cols-2 gap-2 mt-3">
-      <button type="button" onclick="syncNow()" class="btn-primary">Sincronizar ahora</button>
+      <button id="btn-sync-now" type="button" onclick="syncNow()" class="btn-primary">Enviar pendientes</button>
       <button type="button" onclick="downloadDataBackup()" class="px-3 py-2 rounded-xl border bg-white font-semibold">Exportar respaldo JSON</button>
     </div>
-    <p class="small-muted mt-3">En modo local las ventas continúan y quedan en cola. No cierres ni borres los datos del navegador antes de exportar un respaldo.</p>
+    <div class="mt-3">
+      <label class="small-muted" for="sync-queue-filter">Operaciones guardadas en este equipo</label>
+      <select id="sync-queue-filter" class="input-pro mt-1" onchange="syncQueuePage=0;renderSyncOperations()"><option value="all">Todas las pendientes</option><option value="errors">Sólo con error</option><option value="waiting">En espera o enviando</option></select>
+      <div id="sync-queue-list" class="mt-2 space-y-2 max-h-64 overflow-auto"></div>
+      <button id="btn-sync-retry-errors" type="button" onclick="syncNow(true)" class="hidden px-3 py-2 border rounded-xl mt-2 text-sm">Reintentar operaciones con error</button>
+    </div>
+    <details class="mt-3 rounded-xl border p-3"><summary class="font-semibold text-sm">Últimas confirmaciones en este equipo</summary><p class="small-muted mt-2">Se muestran las últimas 20 escrituras confirmadas. El historial de ventas y movimientos se conserva completo.</p><div id="sync-receipts-list" class="mt-2 space-y-2 max-h-64 overflow-auto"></div></details>
+    <div id="sync-conflicts-box" class="hidden mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+      <div class="font-semibold text-amber-900">Conflictos por revisar: <span id="sync-conflicts-count">0</span></div>
+      <p class="small-muted mt-2">Estos registros requieren revisión. Sincronizar no elige automáticamente cantidades ni corrige diferencias.</p>
+      <div id="sync-conflicts-list" class="small-muted mt-2 max-h-64 overflow-auto"></div>
+    </div>
+    <p class="small-muted mt-3">Las ventas pueden continuar mientras se sincroniza. Conserva los datos del navegador y exporta un respaldo antes de cambiar de equipo.</p>
+    <details class="mt-3"><summary class="small-muted">Opciones avanzadas</summary><p class="small-muted mt-2">Si faltan cambios de otro equipo, puedes volver a leer los datos de la nube. Se conserva la cola local.</p><button id="btn-sync-refresh" type="button" onclick="requireStockAccess(forceSync)" class="px-3 py-2 border rounded-xl mt-2 text-sm">Actualizar datos desde la nube</button></details>
   </div>
 </div>
 
@@ -2061,12 +2076,7 @@ async function ensureXLSXLoaded(showError = true){
   return false;
 }
 
-async function ensurePDFLoaded(){
-  const ok = await loadExternalScript('./libs/html2canvas-1.4.1.min.js',()=>!!window.html2canvas)
-    && await loadExternalScript('./libs/jspdf-2.5.1.umd.min.js',()=>!!window.jspdf?.jsPDF);
-  if(!ok) alert('No se pudo cargar el módulo PDF. Comprueba los archivos locales.');
-  return ok;
-}
+
 
 async function ensureFirebaseLoaded(){
   if(window.firebase?.firestore) return true;
@@ -2089,6 +2099,7 @@ let saleSubmitInProgress = false;
 /* pendingOps: offline queue persistent in localStorage.
    Each op has shape { id, type: 'sale'|'product'|'customer', payload, ts, retries } */
 let pendingOps = [];
+let syncReceipts = [];
 let localPersistenceReady = false, stateRevision = 0, savedRevision = -1, criticalWriteDepth = 0;
 let productIndex = null, salesIndex = null;
 const normalizedRecords = new WeakSet();
@@ -2139,7 +2150,7 @@ function getDeviceId(){
 /* Load persisted state and pending ops */
 try { const b = (!localStorage.getItem('tienda_idb_authoritative_v1')||localStorage.getItem('tienda_critical_fallback_v1'))?localStorage.getItem(LOCAL_BACKUP_KEY):null; if(b) STATE = JSON.parse(b); } catch(e){ console.warn('local parse err', e); }
 try { const p = localStorage.getItem(PENDING_KEY); if(p) pendingOps = JSON.parse(p) || []; } catch(e){ pendingOps = []; }
-try{const fallback=JSON.parse(localStorage.getItem('tienda_critical_fallback_v1')||'null');if(fallback?.state){STATE=fallback.state;pendingOps=fallback.ops||[];}}catch(error){console.warn('Respaldo alternativo inválido',error);}
+try{const fallback=JSON.parse(localStorage.getItem('tienda_critical_fallback_v1')||'null');if(fallback?.state){STATE=fallback.state;pendingOps=fallback.ops||[];syncReceipts=Array.isArray(fallback.syncReceipts)?fallback.syncReceipts:[];}}catch(error){console.warn('Respaldo alternativo inválido',error);}
 
 function ensureStateShape(){
   let normalizeStocks=false;
@@ -2251,9 +2262,9 @@ function saveLocalBackup(){
   }
   if(queued) savePending();
 }
-function writeLegacyBackup(){
+function writeLegacyBackup(receipts=syncReceipts){
   // Un solo setItem es atómico: nunca queda una venta sin su cola por falta de cuota.
-  localStorage.setItem('tienda_critical_fallback_v1',JSON.stringify({state:STATE,ops:pendingOps}));
+  localStorage.setItem('tienda_critical_fallback_v1',JSON.stringify({state:STATE,ops:pendingOps,syncReceipts:receipts}));
 }
 function reportLocalSaveError(error){
   console.error('No se confirmó el guardado local',error);
@@ -2297,8 +2308,9 @@ async function initializeLocalPersistence(){
       if(op?.id) opMap.set(op.id,op);
     });
     pendingOps = Array.from(opMap.values()).sort((a,b)=>String(a.ts||'').localeCompare(String(b.ts||'')));
+    if(!localStorage.getItem('tienda_critical_fallback_v1')) syncReceipts=Array.isArray(loaded.receipts)?loaded.receipts:[];
     localPersistenceReady=true;
-    if(localStorage.getItem('tienda_critical_fallback_v1')){await POSStorage.commit(STATE,pendingOps);localStorage.removeItem('tienda_critical_fallback_v1');}
+    if(localStorage.getItem('tienda_critical_fallback_v1')){await POSStorage.commit(STATE,pendingOps,syncReceipts);localStorage.removeItem('tienda_critical_fallback_v1');}
     localStorage.setItem('tienda_idb_authoritative_v1','1');
     ensureStateShape();
     scheduleMergedStateBackup();
@@ -2535,13 +2547,15 @@ const SUBCOLS = {
 };
 const MIGRATION_KEY = 'tienda_migration_v1';
 let syncInProgress = false, cloudBootstrapPromise=null, firestoreStartPromise=null, syncGeneration=0;
-let syncIndicatorTimer=0;
+let syncIndicatorTimer=0, syncActionInProgress=false, syncRefreshInProgress=false, syncQueuePage=0, syncConflictPage=0, pendingFlushPromise=null, activeSyncOperationId=null;
+const syncCollectionStates={};
 function scheduleSyncIndicators(){
   if(syncIndicatorTimer) return;
   syncIndicatorTimer=setTimeout(()=>{syncIndicatorTimer=0;updateOnline(cloudOn);},50);
 }
 function stopCloudListeners(){
   syncGeneration++;
+  Object.keys(syncCollectionStates).forEach(key=>delete syncCollectionStates[key]);
   Object.entries(unsubscribers).forEach(([key,stop])=>{try{stop?.();}catch(_){}unsubscribers[key]=null;});
 }
 const remoteEntityIndexes=new Map();
@@ -2808,7 +2822,8 @@ async function startFirestoreSync(){
     if(generation!==syncGeneration||!isCloudAllowed()) return false;
     Object.entries(SUBCOLS).forEach(([key,name])=>{
       if(unsubscribers[key]) return;
-      let pending=new Map(),timer=0,stopped=false;
+      syncCollectionStates[key]={state:'connecting',error:''};
+      let pending=new Map(),timer=0,stopped=false,fromCache=true;
       const flush=()=>{
         timer=0;if(stopped||generation!==syncGeneration||!isCloudAllowed()) return;
         const batch=[...pending.values()].slice(0,200);batch.forEach(row=>pending.delete(String(row.id)));
@@ -2822,21 +2837,25 @@ async function startFirestoreSync(){
           if(key==='purchases'&&isModalVisible('modal-purchase-history')) renderPurchaseHistoryList();
         }
         scheduleSyncIndicators();
+        syncCollectionStates[key]={state:pending.size?'loading':fromCache?'cache':'ready',error:''};
         if(pending.size) timer=setTimeout(flush,0);
       };
-      const stop=subcolRef(name).onSnapshot(snapshot=>{
+      const stop=subcolRef(name).onSnapshot({includeMetadataChanges:true},snapshot=>{
         if(stopped||generation!==syncGeneration||!isCloudAllowed()) return;
         // La primera instantánea ya contiene la colección: no se hace un get() completo previo.
+        fromCache=snapshot.metadata?.fromCache===true;
         const changes=snapshot.docChanges();
         changes.forEach(change=>{
           // No borrar historia por una salida de la consulta; sólo se aplican tombstones explícitos.
           if(change.type==='removed') return;
           const row=change.doc.data();if(row) pending.set(String(row.id||change.doc.id),{...row,id:row.id||change.doc.id});
         });
+        syncCollectionStates[key]={state:pending.size?'loading':fromCache?'cache':'ready',error:''};
         if(pending.size&&!timer) timer=setTimeout(flush,0);
-        updateOnline(true);processPendingOps();
+        cloudOn=true;scheduleSyncIndicators();processPendingOps();
       },error=>{
         console.warn(name+' onSnapshot: datos locales conservados',error);
+        syncCollectionStates[key]={state:'error',error:String(error.message||error)};
         localStorage.setItem(LAST_SYNC_ERROR_KEY,String(error.message||error));
         stopped=true;clearTimeout(timer);pending.clear();unsubscribers[key]=null;updateOnline(false);
       });
@@ -2846,18 +2865,18 @@ async function startFirestoreSync(){
   try{return await firestoreStartPromise;}finally{firestoreStartPromise=null;}
 }
 
-async function bootstrapCloudSync(showFeedback=false){
+async function bootstrapCloudSync(showFeedback=false,startQueue=true){
   if(!isCloudAllowed()||!navigator.onLine){updateOnline(false);if(showFeedback) showToast('Trabajando en modo local');return false;}
   if(cloudBootstrapPromise) return cloudBootstrapPromise;
   cloudBootstrapPromise=(async()=>{
     try{
-      if(!await ensureFirebaseLoaded()) return false;
+      if(!await ensureFirebaseLoaded()) throw new Error('No se pudo cargar el servicio de sincronización. Los cambios siguen guardados en este equipo.');
       initFirebase();if(!db) return false;
       await resolveDbCollectionName();if(!isCloudAllowed()) return false;
       const started=await startFirestoreSync();
-      if(started){processPendingOps();if(showFeedback) showToast('Sincronización iniciada');}
+      if(started){if(startQueue) processPendingOps();if(showFeedback) showToast('Sincronización iniciada');}
       return started;
-    }catch(error){console.error('bootstrapCloudSync',error);updateOnline(false);return false;}
+    }catch(error){console.error('bootstrapCloudSync',error);localStorage.setItem(LAST_SYNC_ERROR_KEY,String(error.message||error));updateOnline(false);return false;}
   })();
   try{return await cloudBootstrapPromise;}finally{cloudBootstrapPromise=null;}
 }
@@ -2866,7 +2885,9 @@ let connectivityEventsBound = false;
 function bindConnectivityEvents(){
   if(connectivityEventsBound) return;
   connectivityEventsBound = true;
+  const markUnverified=()=>Object.values(syncCollectionStates).forEach(item=>{if(item.state!=='error') item.state='cache';});
   window.addEventListener('online', async ()=>{
+    markUnverified();updateOnline(false);
     if(isCloudAllowed()){
       showToast('Internet detectado, sincronizando...');
       await bootstrapCloudSync(false);
@@ -2875,7 +2896,7 @@ function bindConnectivityEvents(){
     safeCreateIcons();
   });
   window.addEventListener('offline', ()=>{
-    updateOnline(false);
+    markUnverified();updateOnline(false);
     showToast('Sin internet: guardando en local');
   });
 }
@@ -2894,7 +2915,7 @@ function addPendingOp(op){
   op.status = 'pending';
   op.lastError = '';
   const existingIndex = pendingOps.findIndex(item=>item.id===op.id);
-  if(existingIndex >= 0) pendingOps[existingIndex] = {...pendingOps[existingIndex],...op};
+  if(existingIndex >= 0) pendingOps[existingIndex] = {...pendingOps[existingIndex],...op,cloudConfirmedAt:null};
   else pendingOps.push(op);
   savePending();
   if(!op.silent && !criticalWriteDepth) showToast(isCloudAllowed() && navigator.onLine ?'Operación guardada; esperando confirmación':'Operación guardada en cola local');
@@ -2918,11 +2939,15 @@ async function executePendingOperation(op){
 }
 
 /* Solo se retira una operación después de que Firestore confirma la escritura. */
-async function processPendingOps(){
+function processPendingOps(){
+  if(pendingFlushPromise) return pendingFlushPromise;
+  pendingFlushPromise=flushPendingOperations().finally(()=>{pendingFlushPromise=null;});
+  return pendingFlushPromise;
+}
+async function flushPendingOperations(){
   if(!db||!navigator.onLine||!isCloudAllowed()||!pendingOps.length||syncInProgress||criticalWriteDepth) return;
-  syncInProgress=true;
+  syncInProgress=true;scheduleSyncIndicators();
   try{
-    // Nunca enviar una operación que aún no se ha confirmado en el almacenamiento local.
     await persistLocalState(true);
     const blockedEntities=new Set();
     const entityKeys=op=>op.type==='purchaseBundle'
@@ -2935,12 +2960,26 @@ async function processPendingOps(){
       if(keys.some(key=>blockedEntities.has(key))) continue;
       if(op.nextAttemptAt&&new Date(op.nextAttemptAt).getTime()>Date.now()){keys.forEach(key=>blockedEntities.add(key));continue;}
       try{
-        op.status='processing';op.lastAttemptAt=new Date().toISOString();
-        const confirmed=await executePendingOperation(op);
-        if(!confirmed) throw new Error('La nube no confirmó la escritura');
+        op.status='processing';activeSyncOperationId=op.id;op.lastAttemptAt=new Date().toISOString();scheduleSyncIndicators();
+        // Una recepción de documentos nunca confirma la escritura de esta operación.
+        if(!op.cloudConfirmedAt){
+          const confirmed=await executePendingOperation(op);
+          if(!confirmed) throw new Error('La nube no confirmó la escritura');
+          op.cloudConfirmedAt=new Date().toISOString();
+        }
+        const receipt={id:op.id,type:op.type,reference:syncOperationReference(op),confirmedAt:op.cloudConfirmedAt};
+        const receipts=[receipt,...syncReceipts.filter(item=>item.id!==receipt.id)].sort((a,b)=>new Date(b.confirmedAt)-new Date(a.confirmedAt)).slice(0,20);
         const index=pendingOps.indexOf(op);if(index>=0) pendingOps.splice(index,1);
-        const confirmedAt=new Date().toISOString();localStorage.setItem(LAST_SYNC_KEY,confirmedAt);localStorage.removeItem(LAST_SYNC_ERROR_KEY);
-        if(localPersistenceReady) await POSStorage.savePendingOps(pendingOps);else savePending();
+        try{
+          // La retirada y su recibo local forman una sola transacción.
+          if(localPersistenceReady) await POSStorage.savePendingOps(pendingOps,receipts);
+          else writeLegacyBackup(receipts);
+        }catch(error){
+          if(!pendingOps.includes(op)) pendingOps.splice(Math.min(Math.max(0,index),pendingOps.length),0,op);
+          throw error;
+        }
+        syncReceipts=receipts;
+        try{localStorage.setItem(LAST_SYNC_KEY,receipts[0].confirmedAt);localStorage.removeItem(LAST_SYNC_ERROR_KEY);}catch(error){console.warn('No se pudo actualizar el indicador secundario',error);}
         if(!op.silent) showToast('Operación confirmada en la nube');
       }catch(error){
         keys.forEach(key=>blockedEntities.add(key));
@@ -2951,8 +2990,8 @@ async function processPendingOps(){
       }
       scheduleSyncIndicators();
     }
-  }catch(error){console.error('processPendingOps',error);}
-  finally{syncInProgress=false;scheduleSyncIndicators();}
+  }catch(error){console.error('processPendingOps',error);localStorage.setItem(LAST_SYNC_ERROR_KEY,String(error.message||error));}
+  finally{syncInProgress=false;activeSyncOperationId=null;scheduleSyncIndicators();}
 }
 
 /* Try periodic flush when online */
@@ -2980,45 +3019,128 @@ async function setWorkMode(mode){
 }
 
 function renderSyncCenter(){
-  const mode = getWorkMode();
-  const pending = pendingOps.filter(op=>op.status!=='confirmed').length;
-  const errors = pendingOps.filter(op=>op.status==='error').length;
-  const badge = $('#pending-count');
-  if(badge){ badge.textContent=String(pending); badge.classList.toggle('hidden',pending===0); }
-  $('#sync-center-pending') && ($('#sync-center-pending').textContent=errors?`${pending} (${errors} con error)`:String(pending));
-  $('#sync-center-status') && ($('#sync-center-status').textContent=mode==='local'?'Solo local':cloudOn?'Conectado y confirmado':navigator.onLine?'Conectando':'Sin Internet');
-  const last = localStorage.getItem(LAST_SYNC_KEY);
-  $('#sync-center-last') && ($('#sync-center-last').textContent=last?new Date(last).toLocaleString():'Nunca');
-  const error = localStorage.getItem(LAST_SYNC_ERROR_KEY)||'';
-  $('#sync-center-error-row')?.classList.toggle('hidden',!error);
-  $('#sync-center-error') && ($('#sync-center-error').textContent=error);
-  $('#sync-mode-auto')?.classList.toggle('bg-emerald-50',mode==='auto');
-  $('#sync-mode-auto')?.classList.toggle('border-emerald-500',mode==='auto');
-  $('#sync-mode-local')?.classList.toggle('bg-amber-50',mode==='local');
-  $('#sync-mode-local')?.classList.toggle('border-amber-500',mode==='local');
-  const conflicts = (STATE.syncConflicts||[]).filter(item=>item.status!=='RESOLVED');
-  $('#sync-conflicts-box')?.classList.toggle('hidden',conflicts.length===0);
-  $('#sync-conflicts-count') && ($('#sync-conflicts-count').textContent=String(conflicts.length));
-  if($('#sync-conflicts-list')) $('#sync-conflicts-list').innerHTML=conflicts.slice(0,20).map(item=>`<div>${escapeHtml(item.productName||item.type||'Conflicto')}: local ${escapeHtml(item.localStock??'')} / nube ${escapeHtml(item.remoteStock??'')}</div>`).join('');
-}
-
-function openSyncCenter(){ renderSyncCenter(); openModal('modal-sync-center'); safeCreateIcons(); }
-
-async function syncNow(){
-  if(!isCloudAllowed()) return alert('Activa el modo Automático para sincronizar con la nube.');
-  if(!navigator.onLine) return alert('No hay conexión a Internet. Los cambios permanecen seguros en este equipo.');
-  const ready = db ?true:await bootstrapCloudSync(true);
-  if(ready || db){
-    pendingOps.forEach(op=>{ if(op.status==='error') op.nextAttemptAt=null; });
-    savePending();
-    await processPendingOps();
-    renderSyncCenter();
+  const summary=getSyncSummary(),mode=getWorkMode();
+  const setText=(id,text)=>{const el=document.getElementById(id);if(el&&el.textContent!==String(text)) el.textContent=String(text);};
+  const badge=$('#pending-count');if(badge){badge.textContent=String(summary.total);badge.classList.toggle('hidden',summary.total===0);}
+  setText('sync-center-status',summary.label);setText('sync-center-detail',summary.detail);
+  setText('sync-center-pending',summary.total);setText('sync-center-waiting',summary.waiting);
+  setText('sync-center-sending',summary.sending);setText('sync-center-errors',summary.errors);
+  const last=syncReceipts[0]?.confirmedAt;
+  setText('sync-center-last',last?formatSyncTime(last):'Todavía no hay confirmaciones');
+  const error=Object.values(syncCollectionStates).find(item=>item.error)?.error||localStorage.getItem(LAST_SYNC_ERROR_KEY)||'';
+  $('#sync-center-error-row')?.classList.toggle('hidden',!error);setText('sync-center-error',error);
+  $('#sync-mode-auto')?.classList.toggle('bg-emerald-50',mode==='auto');$('#sync-mode-auto')?.classList.toggle('border-emerald-500',mode==='auto');
+  $('#sync-mode-local')?.classList.toggle('bg-amber-50',mode==='local');$('#sync-mode-local')?.classList.toggle('border-amber-500',mode==='local');
+  for(const id of ['btn-sync-now','btn-sync-retry-errors','btn-sync-refresh']){
+    const button=document.getElementById(id);if(button) button.disabled=mode==='local'||!navigator.onLine||syncActionInProgress||syncRefreshInProgress||syncInProgress;
   }
+  $('#btn-sync-retry-errors')?.classList.toggle('hidden',summary.errors===0);
+  if(isModalVisible('modal-sync-center')){renderSyncOperations();renderSyncReceipts();renderSyncConflicts();}
 }
+const SYNC_TYPE_LABELS={sale:'Venta',product:'Producto',customer:'Cliente',purchaseBundle:'Compra',purchase:'Compra',supplier:'Proveedor',audit:'Auditoría',stockMovement:'Movimiento de stock',stockClosure:'Cierre de stock',staff:'Personal',shift:'Turno',syncConflict:'Conflicto'};
+function syncOperationReference(op){
+  const p=op.payload||{};
+  return String(p.purchase?.docNumber||p.docNumber||p.name||p.staffName||p.id||op.id||'');
+}
+function formatSyncTime(value){
+  const date=new Date(value);return Number.isNaN(date.getTime())?'Fecha no disponible':date.toLocaleString('es-PE');
+}
+function getSyncSummary(){
+  const total=pendingOps.length,sending=syncInProgress?pendingOps.filter(op=>op.status==='processing'&&op.id===activeSyncOperationId).length:0,errors=pendingOps.filter(op=>op.status==='error').length;
+  const waiting=total-sending-errors,states=Object.values(syncCollectionStates);
+  const ready=cloudOn&&Object.keys(SUBCOLS).every(key=>syncCollectionStates[key]?.state==='ready');
+  let label,detail,tone='pending';
+  if(!isCloudAllowed()){label='Solo en este equipo';detail=total?`${total} operación(es) guardada(s) aquí. Activa Automático para enviarlas.`:'Los registros se guardan en este equipo. El envío a la nube está pausado.';}
+  else if(!navigator.onLine){label='Sin Internet';detail=total?`${total} operación(es) guardada(s) aquí. Se reintentará al recuperar la conexión.`:'Puedes seguir trabajando con los datos locales.';}
+  else if(syncRefreshInProgress){label='Actualizando desde la nube';detail='Revisando cambios de otros equipos. Las operaciones locales siguen guardadas.';}
+  else if(errors){label='Hay operaciones por revisar';tone='error';detail=`${errors} operación(es) con error. Permanecen guardadas en la cola; revisa el detalle antes de reintentar.`;}
+  else if(states.some(item=>item.state==='error')){label='Actualización incompleta';tone='error';detail='No se pudieron actualizar todos los datos de la nube. Puedes seguir trabajando con los datos locales.';}
+  else if(syncInProgress&&!activeSyncOperationId){label='Preparando envío';detail='Comprobando el guardado local antes de enviar las operaciones.';}
+  else if(sending||syncInProgress){label='Enviando operaciones';detail=`${sending} en envío · ${waiting} en espera. Se retiran de la cola sólo al recibir confirmación.`;}
+  else if(total){label='Cambios pendientes de envío';detail=`${total} operación(es) guardada(s) en este equipo y todavía pendientes de confirmación.`;}
+  else if(states.some(item=>item.state==='loading')){label='Actualizando datos';detail='Se están incorporando cambios recibidos de la nube. Los controles locales siguen disponibles.';}
+  else if(!ready){label='Esperando respuesta de la nube';detail=states.some(item=>item.state==='cache')?'Se muestran datos guardados. Falta verificar la conexión con la nube.':'Comprobando la conexión. Puedes seguir trabajando con tus datos locales.';}
+  else if((STATE.syncConflicts||[]).some(item=>item.status!=='RESOLVED')){label='Revisión pendiente';detail='Los envíos están confirmados, pero hay conflictos de stock o turno por revisar. No se corrigen automáticamente.';}
+  else{label='Al día';tone='ready';detail='No hay operaciones pendientes y los datos de la nube se han actualizado.';}
+  return {total,sending,waiting,errors,label,detail,tone,ready};
+}
+function createSyncText(tag,text,className=''){
+  const el=document.createElement(tag);el.textContent=text;el.className=className;return el;
+}
+function renderSyncOperations(){
+  const container=$('#sync-queue-list');if(!container) return;
+  const filter=$('#sync-queue-filter')?.value||'all';
+  const rows=pendingOps.filter(op=>filter==='all'||(filter==='errors'?op.status==='error':op.status!=='error'));
+  const size=20;syncQueuePage=Math.min(syncQueuePage,Math.max(0,Math.ceil(rows.length/size)-1));
+  const fragment=document.createDocumentFragment();
+  if(!rows.length) fragment.appendChild(createSyncText('p',filter==='errors'?'No hay operaciones con error.':'No hay operaciones en esta lista.','small-muted'));
+  rows.slice(syncQueuePage*size,(syncQueuePage+1)*size).forEach(op=>{
+    const row=createSyncText('div','','rounded-xl border bg-white p-3 space-y-1');row.dataset.syncOpId=op.id;
+    row.appendChild(createSyncText('div',`${SYNC_TYPE_LABELS[op.type]||'Operación'} · ${syncOperationReference(op)}`,'font-semibold break-all'));
+    const status=op.cloudConfirmedAt?'Confirmada en nube; recibo local pendiente':op.status==='processing'&&syncInProgress&&op.id===activeSyncOperationId?'Enviando; esperando confirmación':op.status==='error'?'Error; guardada para reintento':'En espera de envío';
+    row.appendChild(createSyncText('div',status,op.status==='error'?'text-red-700 text-sm':'small-muted'));
+    row.appendChild(createSyncText('div',`Registrada: ${formatSyncTime(op.ts)} · Intentos fallidos: ${Number(op.retries||0)}`,'small-muted'));
+    if(op.lastAttemptAt) row.appendChild(createSyncText('div',`Último intento: ${formatSyncTime(op.lastAttemptAt)}`,'small-muted'));
+    if(op.nextAttemptAt) row.appendChild(createSyncText('div',`Reintento disponible: ${formatSyncTime(op.nextAttemptAt)}`,'small-muted'));
+    if(op.lastError) row.appendChild(createSyncText('div',op.lastError,'small-muted break-all'));
+    row.appendChild(createSyncText('div',`ID: ${op.id}`,'small-muted break-all'));
+    if(op.status==='error'){
+      const button=createSyncText('button','Reintentar esta operación','px-3 py-2 border rounded-xl text-sm');button.type='button';
+      button.disabled=!isCloudAllowed()||!navigator.onLine||syncActionInProgress||syncRefreshInProgress||syncInProgress;
+      button.onclick=()=>retrySyncOperation(op.id);row.appendChild(button);
+    }
+    fragment.appendChild(row);
+  });
+  appendListPagination(fragment,syncQueuePage,rows.length,size,page=>{syncQueuePage=page;renderSyncOperations();});
+  const top=container.scrollTop;container.replaceChildren(fragment);container.scrollTop=top;
+}
+function renderSyncReceipts(){
+  const container=$('#sync-receipts-list');if(!container) return;const fragment=document.createDocumentFragment();
+  if(!syncReceipts.length) fragment.appendChild(createSyncText('p','Todavía no hay confirmaciones registradas en este equipo.','small-muted'));
+  syncReceipts.forEach(receipt=>{
+    const row=createSyncText('div','','border-t pt-2');
+    row.appendChild(createSyncText('div',`${SYNC_TYPE_LABELS[receipt.type]||'Operación'} · ${receipt.reference}`,'font-semibold text-sm break-all'));
+    row.appendChild(createSyncText('div',`Confirmada: ${formatSyncTime(receipt.confirmedAt)}`,'small-muted'));fragment.appendChild(row);
+  });container.replaceChildren(fragment);
+}
+function renderSyncConflicts(){
+  const rows=(STATE.syncConflicts||[]).filter(item=>item.status!=='RESOLVED');
+  $('#sync-conflicts-box')?.classList.toggle('hidden',rows.length===0);
+  if($('#sync-conflicts-count')) $('#sync-conflicts-count').textContent=String(rows.length);
+  const container=$('#sync-conflicts-list');if(!container) return;const fragment=document.createDocumentFragment();
+  syncConflictPage=Math.min(syncConflictPage,Math.max(0,Math.ceil(rows.length/20)-1));
+  rows.slice(syncConflictPage*20,(syncConflictPage+1)*20).forEach(item=>{
+    const label=item.type==='SHIFT_OTHER_DEVICE'?'Turno abierto en otro equipo':item.productName||item.type||'Conflicto';
+    const detail=item.localStock!==undefined||item.remoteStock!==undefined?`Stock en este equipo: ${item.localStock??'sin dato'} · Stock recibido: ${item.remoteStock??'sin dato'}`:item.note||item.description||'Revisa el registro antes de hacer una corrección.';
+    const row=createSyncText('div','','border-t pt-2');row.appendChild(createSyncText('strong',label));row.appendChild(createSyncText('p',detail,'small-muted break-all'));fragment.appendChild(row);
+  });
+  appendListPagination(fragment,syncConflictPage,rows.length,20,page=>{syncConflictPage=page;renderSyncConflicts();});container.replaceChildren(fragment);
+}
+
+function openSyncCenter(){
+  openModal('modal-sync-center');renderSyncCenter();safeCreateIcons($('#modal-sync-center'));
+}
+
+async function syncNow(onlyErrors=false,operationId=null){
+  if(syncActionInProgress||syncRefreshInProgress||syncInProgress) return;
+  if(!isCloudAllowed()) return alert('Activa Automático para enviar las operaciones guardadas.');
+  if(!navigator.onLine) return alert('No hay Internet. Las operaciones permanecen guardadas en este equipo.');
+  syncActionInProgress=true;renderSyncCenter();
+  try{
+    pendingOps.forEach(op=>{if((!operationId||op.id===operationId)&&(!onlyErrors||op.status==='error')) op.nextAttemptAt=null;});
+    savePending();
+    const ready=await bootstrapCloudSync(true,false);
+    if(ready||db){
+      await processPendingOps();
+    }
+  }catch(error){showToast('No se pudo completar el envío. Las operaciones siguen en la cola.',4000);console.warn('Sincronización manual',error);}
+  finally{syncActionInProgress=false;updateOnline(cloudOn);}
+}
+function retrySyncOperation(id){return syncNow(true,id);}
 
 async function downloadDataBackup(){
   try{
-    const backup = window.POSStorage ?await POSStorage.createBackup(STATE,pendingOps,{deviceId:getDeviceId(),workMode:getWorkMode()}):{createdAt:new Date().toISOString(),state:STATE,pendingOps};
+    const backup = window.POSStorage ?await POSStorage.createBackup(STATE,pendingOps,{deviceId:getDeviceId(),workMode:getWorkMode(),syncReceipts}):{createdAt:new Date().toISOString(),state:STATE,pendingOps};
     const blob = new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -3030,10 +3152,9 @@ async function downloadDataBackup(){
 }
 
 function updateOnline(on){
-  cloudOn=!!on;
-  const localOnly=!isCloudAllowed(),pending=pendingOps.filter(op=>op.status!=='confirmed').length;
-  if($('#dot')) $('#dot').style.background=localOnly?'#64748b':on?(pending?'#f59e0b':'#10b981'):'#ef4444';
-  if($('#cloud-text')) $('#cloud-text').textContent=localOnly?'Solo local':on?(pending?`Pendientes ${pending}`:'Sincronizado'):(navigator.onLine?'Sin confirmar':'Sin Internet');
+  cloudOn=!!on;const summary=getSyncSummary();
+  if($('#dot')) $('#dot').style.background=summary.tone==='ready'?'#10b981':summary.tone==='error'?'#ef4444':!isCloudAllowed()?'#64748b':'#f59e0b';
+  if($('#cloud-text')) $('#cloud-text').textContent=summary.total?`${summary.label} (${summary.total})`:summary.label;
   renderSyncCenter();
 }
 
@@ -4288,7 +4409,7 @@ function generateReportData(from,to){
 }
 
 let reportSalesPage=0,reportInventoryPage=0,reportRangeKey='';
-function renderReportSummary(from,to,full=false){
+function renderReportSummary(from,to){
   if(reportRangeKey!==from+'|'+to){reportRangeKey=from+'|'+to;reportSalesPage=0;reportInventoryPage=0;}
   const { groups, grand, totalOps, sales } = generateReportData(from,to);
   const parts = [];
@@ -4301,49 +4422,28 @@ function renderReportSummary(from,to,full=false){
   parts.push(`</div><hr style="margin:12px 0"/>`);
   // sales table
   reportSalesPage=Math.min(reportSalesPage,Math.max(0,Math.ceil(sales.length/80)-1));
-  const rows = (full?sales:sales.slice(reportSalesPage*80,(reportSalesPage+1)*80)).map(s=>{
+  const rows = sales.slice(reportSalesPage*80,(reportSalesPage+1)*80).map(s=>{
     const items = (s.items||[]).map(it => ((getProductIndexes().byId.get(it.productId)||{name:it.rawName||it.productId}).name) + ' x' + it.qty).join('; ');
     return `<tr><td>${new Date(s.date).toLocaleString()}</td><td>${s.id}</td><td>${escapeHtml(s.responsible||s.meta?.responsible||s.createdBy||'SIN RESPONSABLE')}</td><td>${escapeHtml(s.customerName||'-')}</td><td>${escapeHtml(s.paymentType||s.method||'EFECTIVO')}</td><td style="text-align:right">S/ ${money(s.total)}</td><td>${escapeHtml(items)}</td></tr>`;
   }).join('');
   const table = `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th>Fecha</th><th>ID</th><th>Responsable</th><th>Cliente</th><th>Pago</th><th style="text-align:right">Total</th><th>Productos</th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="small-muted">No hay ventas</td></tr>'}</tbody></table>`;
   const container=$('#report-summary');container.innerHTML=parts.join('')+table;
-  if(!full) appendListPagination(container,reportSalesPage,sales.length,80,page=>{reportSalesPage=page;renderReportSummary(from,to);});
-  const inventory=document.createElement('div');inventory.innerHTML='<hr/>'+buildInventoryMiniHTML(full);container.appendChild(inventory);
-  if(!full) appendListPagination(inventory,reportInventoryPage,getProductIndexes().search.length,80,page=>{reportInventoryPage=page;renderReportSummary(from,to);});
+  appendListPagination(container,reportSalesPage,sales.length,80,page=>{reportSalesPage=page;renderReportSummary(from,to);});
+  const inventory=document.createElement('div');inventory.innerHTML='<hr/>'+buildInventoryMiniHTML();container.appendChild(inventory);
+  appendListPagination(inventory,reportInventoryPage,getProductIndexes().search.length,80,page=>{reportInventoryPage=page;renderReportSummary(from,to);});
 }
 
-function buildInventoryMiniHTML(full=false){
+function buildInventoryMiniHTML(){
   const products=(STATE.products||[]).filter(p=>!p.deleted);
   reportInventoryPage=Math.min(reportInventoryPage,Math.max(0,Math.ceil(products.length/80)-1));
-  const invRows = (full?products:products.slice(reportInventoryPage*80,(reportInventoryPage+1)*80)).map(p=>`<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.barcode||'')}</td><td style="text-align:right">${p.stock}</td><td style="text-align:right">S/ ${money(p.price||0)}</td></tr>`).join('');
+  const invRows = products.slice(reportInventoryPage*80,(reportInventoryPage+1)*80).map(p=>`<tr><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.barcode||'')}</td><td style="text-align:right">${p.stock}</td><td style="text-align:right">S/ ${money(p.price||0)}</td></tr>`).join('');
   return `<h3 style="margin-top:10px">Inventario</h3><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th>Producto</th><th>Cod</th><th style="text-align:right">Stock</th><th style="text-align:right">Precio</th></tr></thead><tbody>${invRows}</tbody></table>`;
 }
 
 function previewReportRange(){ const from = $('#rep-from').value || todayYMD(); const to = $('#rep-to').value || todayYMD(); renderReportSummary(from,to); }
 function updateReportsIfOpen(){ if(!document.getElementById('tab-reports').classList.contains('hidden')) previewReportRange(); }
 
-async function downloadReportPDF(){
-  if(!await ensurePDFLoaded()) return;
-  const from = $('#rep-from').value || todayYMD(); const to = $('#rep-to').value || todayYMD();
-  renderReportSummary(from,to,true); // El PDF conserva todos los registros del periodo.
-  const el = document.getElementById('report-summary');
-  if(!el) return alert('Generando PDF: no se encontró contenido del reporte');
-  showToast('Generando PDF, espere...');
-  try{
-    const canvas = await html2canvas(el, { scale:2, useCORS:true, logging:false });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jspdf.jsPDF('p','mm','a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfHeight = (imgProps.height * pageWidth) / imgProps.width;
-    pdf.addImage(imgData, 'PNG', 10, 10, pageWidth-20, pdfHeight > (pageHeight-20) ?pageHeight-20 : pdfHeight);
-    const filename = `Reporte del dia ${todayYMD()}.pdf`;
-    pdf.save(filename);
-    showToast('PDF descargado: ' + filename);
-  }catch(e){ console.error(e); alert('Error generando PDF: ' + (e.message||e)); }
-  finally{renderReportSummary(from,to);}
-}
+
 
 /* =========
    CONTROL DIARIO DE STOCK Y CAJA
@@ -8637,16 +8737,17 @@ function switchTab(tab){
 /* Bind header buttons */
 $('#btn-personnel')?.addEventListener('click', ()=> requireStockAccess(openPersonnelModal));
 $('#btn-gestion')?.addEventListener('click', ()=> requireStockAccess(()=>openModal('modal-gestion')));
-$('#btn-sync')?.addEventListener('click', async ()=> {
-  const ok = await bootstrapCloudSync(true);
-  if(ok) forceSync();
-});
+$('#btn-sync')?.addEventListener('click',openSyncCenter);
 
 /* =========
    FORCE SYNC (admin action)
    - normalizes remote and writes back merged data
    ========= */
 async function forceSync(){
+  if(!isCloudAllowed()||!navigator.onLine) return alert('Activa Automático y conecta Internet para actualizar desde la nube.');
+  if(syncRefreshInProgress) return;
+  syncRefreshInProgress=true;renderSyncCenter();
+  try{
   if(!db){
     const ready = await bootstrapCloudSync(true);
     if(!ready) return alert('Cloud no inicializado');
@@ -8672,6 +8773,7 @@ async function forceSync(){
     processPendingOps();
     showToast('Sincronía forzada OK');
   }catch(e){ console.error(e); alert('forceSync error: ' + (e.message||e)); }
+  }finally{syncRefreshInProgress=false;renderSyncCenter();}
 }
 
 /* =========
@@ -8681,7 +8783,7 @@ let pwaRegistrationPromise=null,appStarted=false;
 function registerPWA(){
   if(pwaRegistrationPromise) return pwaRegistrationPromise;
   if(!('serviceWorker' in navigator)||!/^https?:$/.test(location.protocol)) return Promise.resolve(false);
-  pwaRegistrationPromise=navigator.serviceWorker.register('./service-worker.js?v=20261110-rendimiento-v5',{scope:'./',updateViaCache:'none'})
+  pwaRegistrationPromise=navigator.serviceWorker.register('./service-worker.js?v=20261110-excel-sync-v6',{scope:'./',updateViaCache:'none'})
     .then(()=>true).catch(error=>{console.warn('Service worker',error);pwaRegistrationPromise=null;return false;});
   return pwaRegistrationPromise;
 }
