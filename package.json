@@ -1,0 +1,15 @@
+{
+  "name": "tiendasmart-el-erizo",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.cjs -i styles/tailwind-input.css -o libs/app-tailwind.css --minify",
+    "check": "node tests/check.cjs",
+    "test": "node tests/run.cjs",
+    "benchmark": "node tests/run.cjs --benchmark",
+    "preview": "node tests/server.cjs"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1",
+    "tailwindcss": "3.4.17"
+  }
+}
