@@ -55,7 +55,7 @@
     const db=await openDb();return (await requestResult(db.transaction('pendingOps').objectStore('pendingOps').getAll())).sort((a,b)=>String(a.ts||'').localeCompare(String(b.ts||'')));
   }
   // Sólo filas modificadas; estado y cola se confirman en la misma transacción.
-  function commit(state,ops){
+  function commit(state,ops,receipts){
     const run=async()=>{
       const db=await openDb(), changes=[], next=new Map(), order={};
       if(state) ENTITY_STORES.forEach(name=>{
@@ -89,6 +89,7 @@
           tx.objectStore('meta').put({key:'entityStateV1',value:{savedAt:new Date().toISOString(),order,extra:clone(extra)}});
         }
         if(ops) tx.objectStore('meta').put({key:'queueAuthoritativeV1',value:true});
+        if(Array.isArray(receipts)) tx.objectStore('meta').put({key:'syncReceiptLogV1',value:clone(receipts)});
       }catch(error){tx.abort();await done.catch(()=>{});throw error;}
       await done;next.forEach((value,key)=>signatures.set(key,value));return true;
     };
@@ -120,9 +121,10 @@
       const all=new Map([...ops,...(legacyOps||[])].filter(op=>op?.id).map(op=>[op.id,op]));
       ops=[...all.values()];await commit(null,ops);
     }else signatures.set('pendingOps',new Map(ops.map(op=>[op.id,JSON.stringify(op)])));
-    return {state,ops,authoritative,queueAuthoritative:true};
+    const receipts=await getMeta('syncReceiptLogV1');
+    return {state,ops,receipts:Array.isArray(receipts)?receipts:[],authoritative,queueAuthoritative:true};
   }
   window.POSStorage={DB_NAME,DB_VERSION,open:openDb,initialize,loadState,saveState:state=>commit(state),scheduleStateSave,flushState,
-    loadPendingOps,savePendingOps:ops=>commit(null,ops),schedulePendingSave,setMeta,getMeta,commit,cancelScheduled,settleWrites:()=>writeChain,
+    loadPendingOps,savePendingOps:(ops,receipts)=>commit(null,ops,receipts),schedulePendingSave,setMeta,getMeta,commit,cancelScheduled,settleWrites:()=>writeChain,
     createBackup:async(state,ops,extra)=>({format:'TIENDASMART_BACKUP_V2',createdAt:new Date().toISOString(),state:clone(state||{}),pendingOps:clone(ops||[]),meta:clone(extra||{})})};
 })();
