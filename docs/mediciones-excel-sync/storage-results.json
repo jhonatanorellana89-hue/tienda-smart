@@ -1,0 +1,11 @@
+{
+  "passed": 5,
+  "tests": [
+    "migración del esquema v3 conserva instantánea y cola originales",
+    "respaldos antiguos no resucitan entidades ni operaciones ya confirmadas",
+    "abortar una transacción no guarda sólo una parte del estado y la cola",
+    "respaldo alternativo atómico se reimporta con venta y cola tras recargar",
+    "stock remoto cero no se reconstruye desde un subproducto desactualizado"
+  ],
+  "errors": []
+}
