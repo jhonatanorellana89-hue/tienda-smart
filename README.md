@@ -3,6 +3,11 @@
 Versión de TiendaSmart preparada para GitHub Pages.
 El archivo de entrada es `index.html` y las dependencias usan rutas relativas.
 
+Los reportes se exportan exclusivamente a Excel. Se retiraron el botón, el
+exportador PDF y las bibliotecas que utilizaba. El respaldo JSON se conserva.
+El Centro de sincronización muestra espera, envío, errores, reintentos,
+confirmaciones verificadas y conflictos pendientes de revisión.
+
 La lógica principal permanece dentro del HTML. `pos-offline.js` conserva la base
 IndexedDB existente y añade guardado incremental y transacciones de estado + cola.
 Las bibliotecas siguen en `libs` y la PWA las conserva para uso sin conexión.
@@ -15,6 +20,8 @@ Las bibliotecas siguen en `libs` y la PWA las conserva para uso sin conexión.
 - `libs/app-tailwind.css` (nuevo, sustituye la ejecución de Tailwind en el navegador)
 
 Los demás archivos, incluidos los logotipos y bibliotecas, deben conservarse.
+En esta actualización se eliminan `libs/html2canvas-1.4.1.min.js` y
+`libs/jspdf-2.5.1.umd.min.js`. El Service Worker v6 deja de incluirlos en la caché.
 No es necesario instalar Node ni ejecutar una compilación para publicar esta copia:
 el CSS ya está generado. No borrar los datos del sitio ni desinstalar la PWA.
 Antes de actualizar una caja real, exportar su respaldo JSON desde Sincronización.
@@ -53,5 +60,6 @@ sincronización y tareas largas. Conserva hasta 500 muestras en memoria; no env�
 telemetría ni guarda datos del negocio. Sin ese parámetro no instala observadores.
 El consumo de memoria sólo aparece si el navegador expone `performance.memory`.
 
-El informe completo, las mediciones antes/después y las limitaciones se encuentran
-en `docs/AUDITORIA.md`. Los objetivos de Android necesitan una prueba en el equipo real.
+La actualización actual se documenta en `docs/EXCEL-Y-SINCRONIZACION.md`.
+La auditoría inicial y sus mediciones se conservan en `docs/AUDITORIA.md` como
+evidencia histórica. Los objetivos de Android necesitan una prueba en el equipo real.
