@@ -231,4 +231,4 @@ de laboratorio para comparar con las muestras conservadas. El archivo
 
 Para diagnóstico real: abrir `?diagnostics=1`, reproducir el problema y consultar
 `TiendaPerf.report()`. Está desactivado por defecto, acota muestras y no transmite
-datos. Las trazas CDP originales se entregan en el paquete de evidencias de auditoría.
+datos. Las trazas CDP originales están en `docs/trazas/original.json` y `docs/trazas/optimizado.json`; pueden importarse en Performance de Chrome DevTools.
