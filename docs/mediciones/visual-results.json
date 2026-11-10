@@ -1,0 +1,61 @@
+{
+  "differences": [],
+  "missing": [
+    "*, ::before, ::after",
+    "legend"
+  ],
+  "beforeStyles": [
+    {
+      "tag": "LINK",
+      "href": "./manifest.webmanifest",
+      "text": ""
+    },
+    {
+      "tag": "LINK",
+      "href": "./assets/icon-192.png",
+      "text": ""
+    },
+    {
+      "tag": "LINK",
+      "href": "./assets/icon-192.png",
+      "text": ""
+    },
+    {
+      "tag": "STYLE",
+      "href": null,
+      "text": "\n  :root{\n    --primary:#e65100;\n    --primary-2:#e6510"
+    },
+    {
+      "tag": "STYLE",
+      "href": null,
+      "text": "*, ::before, ::after{--tw-border-spacing-x:0;--tw-borde"
+    }
+  ],
+  "afterStyles": [
+    {
+      "tag": "LINK",
+      "href": "./manifest.webmanifest",
+      "text": ""
+    },
+    {
+      "tag": "LINK",
+      "href": "./assets/icon-192.png",
+      "text": ""
+    },
+    {
+      "tag": "LINK",
+      "href": "./assets/icon-192.png",
+      "text": ""
+    },
+    {
+      "tag": "STYLE",
+      "href": null,
+      "text": "\n  :root{\n    --primary:#e65100;\n    --primary-2:#e6510"
+    },
+    {
+      "tag": "LINK",
+      "href": "./libs/app-tailwind.css",
+      "text": ""
+    }
+  ]
+}
