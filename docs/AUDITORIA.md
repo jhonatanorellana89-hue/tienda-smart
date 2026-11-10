@@ -1,5 +1,10 @@
 # Auditoría e implementación de rendimiento — TiendaSmart / MINIMARKET EL ERIZO
 
+> Documento histórico de la primera optimización. Después de esta auditoría,
+> por solicitud del usuario se retiró completamente la exportación PDF y se amplió
+> el panel de sincronización. El estado actual y sus pruebas están en
+> [EXCEL-Y-SINCRONIZACION.md](EXCEL-Y-SINCRONIZACION.md).
+
 Fecha del informe: 9 de noviembre de 2026 (America/Lima). Repositorio base:
 `jhonatanorellana89-hue/tienda-smart`, commit `4afbd2491073052db760cf4efc2e3430c467d875`.
 Se conservó una copia íntegra antes de modificarlo y una etiqueta local
