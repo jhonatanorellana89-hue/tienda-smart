@@ -1,0 +1,144 @@
+{
+  "baseline": {
+    "scripts": [
+      {
+        "name": "tailwindcss-3.4.17.js",
+        "ms": 252.464
+      },
+      {
+        "name": "lucide-0.468.0.min.js",
+        "ms": 93.249
+      },
+      {
+        "name": "xlsx.full.min.js",
+        "ms": 201.444
+      },
+      {
+        "name": "html2canvas-1.4.1.min.js",
+        "ms": 17.687
+      },
+      {
+        "name": "jspdf-2.5.1.umd.min.js",
+        "ms": 95.796
+      },
+      {
+        "name": "quagga2-1.8.4.min.js",
+        "ms": 24.624
+      },
+      {
+        "name": "firebase-app-9.22.2-compat.js",
+        "ms": 3.328
+      },
+      {
+        "name": "firebase-auth-9.22.2-compat.js",
+        "ms": 43.167
+      },
+      {
+        "name": "firebase-firestore-9.22.2-compat.js",
+        "ms": 19.755
+      },
+      {
+        "name": "pos-offline.js",
+        "ms": 0.412
+      },
+      {
+        "name": "",
+        "ms": 20.201
+      }
+    ],
+    "metrics": {
+      "Timestamp": 2345.257071,
+      "AudioHandlers": 0,
+      "AudioWorkletProcessors": 0,
+      "Documents": 1,
+      "Frames": 1,
+      "JSEventListeners": 146,
+      "LayoutObjects": 185,
+      "MediaKeySessions": 0,
+      "MediaKeys": 0,
+      "Nodes": 3119,
+      "Resources": 11,
+      "ContextLifecycleStateObservers": 21,
+      "V8PerContextDatas": 2,
+      "WorkerGlobalScopes": 0,
+      "UACSSResources": 0,
+      "RTCPeerConnections": 0,
+      "ResourceFetchers": 1,
+      "AdSubframes": 0,
+      "DetachedScriptStates": 0,
+      "ArrayBufferContents": 25,
+      "LayoutCount": 6,
+      "RecalcStyleCount": 14,
+      "LayoutDuration": 0.0403,
+      "RecalcStyleDuration": 0.042284,
+      "DevToolsCommandDuration": 0.025627,
+      "ScriptDuration": 0.848221,
+      "V8CompileDuration": 0.017593,
+      "TaskDuration": 1.989697,
+      "TaskOtherDuration": 1.015672,
+      "ThreadTime": 2.189676,
+      "ProcessTime": 2.72,
+      "JSHeapUsedSize": 16203916,
+      "JSHeapTotalSize": 35921920,
+      "FirstMeaningfulPaint": 0,
+      "DomContentLoaded": 2344.52257,
+      "NavigationStart": 2342.666016
+    },
+    "listenerLeak": 50
+  },
+  "tienda-smart": {
+    "scripts": [
+      {
+        "name": "lucide-0.468.0.min.js",
+        "ms": 132.621
+      },
+      {
+        "name": "pos-offline.js",
+        "ms": 0.118
+      },
+      {
+        "name": "",
+        "ms": 55.942
+      }
+    ],
+    "metrics": {
+      "Timestamp": 2346.769924,
+      "AudioHandlers": 0,
+      "AudioWorkletProcessors": 0,
+      "Documents": 4,
+      "Frames": 4,
+      "JSEventListeners": 165,
+      "LayoutObjects": 183,
+      "MediaKeySessions": 0,
+      "MediaKeys": 0,
+      "Nodes": 2739,
+      "Resources": 5,
+      "ContextLifecycleStateObservers": 15,
+      "V8PerContextDatas": 4,
+      "WorkerGlobalScopes": 0,
+      "UACSSResources": 0,
+      "RTCPeerConnections": 0,
+      "ResourceFetchers": 4,
+      "AdSubframes": 0,
+      "DetachedScriptStates": 2,
+      "ArrayBufferContents": 0,
+      "LayoutCount": 4,
+      "RecalcStyleCount": 16,
+      "LayoutDuration": 0.042085,
+      "RecalcStyleDuration": 0.027719,
+      "DevToolsCommandDuration": 0.030599,
+      "ScriptDuration": 0.195332,
+      "V8CompileDuration": 0.015973,
+      "TaskDuration": 0.652045,
+      "TaskOtherDuration": 0.340337,
+      "ThreadTime": 0.859718,
+      "ProcessTime": 1.06,
+      "JSHeapUsedSize": 3594184,
+      "JSHeapTotalSize": 6610944,
+      "FirstMeaningfulPaint": 0,
+      "DomContentLoaded": 2346.133733,
+      "NavigationStart": 2345.599031
+    },
+    "listenerLeak": 0
+  }
+}

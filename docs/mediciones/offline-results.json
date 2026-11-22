@@ -1,0 +1,16 @@
+{
+  "passed": 10,
+  "tests": [
+    "una única inscripción PWA",
+    "recarga completamente offline desde Service Worker e IndexedDB",
+    "módulos no esenciales no se ejecutan al iniciar offline",
+    "Excel y PDF cargan diferidos desde caché sin red",
+    "abrir turno sin conexión con PIN válido",
+    "venta sin conexión guardada de forma durable",
+    "PDF real con módulos locales y archivo válido",
+    "Excel real offline con archivo ZIP/XLSX válido",
+    "cinco ciclos de cámara sintética sin streams vivos después del cierre",
+    "cierre de turno durable y conciliación exacta"
+  ],
+  "errors": []
+}

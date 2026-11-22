@@ -1,0 +1,92 @@
+{
+  "100": {
+    "baseline": {
+      "startupMs": 1331,
+      "inventoryMs": 5.699999999720603,
+      "backupScheduleMs": 161,
+      "flushMs": 1965.4000000003725,
+      "shiftRenderMs": 110,
+      "stringifyMs": 15.700000000186265,
+      "resourceBytes": 3975069,
+      "inventoryNodes": 600,
+      "memory": 72792244,
+      "searchMs": 0.20000000018626451,
+      "modalMs": 16.1500000001397,
+      "maxLongTaskMs": 1703
+    },
+    "tienda-smart": {
+      "startupMs": 509.70000000018626,
+      "inventoryMs": 7.300000000279397,
+      "backupScheduleMs": 0.2999999998137355,
+      "flushMs": 33.90000000037253,
+      "shiftRenderMs": 49.700000000186265,
+      "stringifyMs": 18.600000000093132,
+      "resourceBytes": 1492548,
+      "inventoryNodes": 644,
+      "memory": 36749177,
+      "searchMs": 0.10000000009313226,
+      "modalMs": 16.350000000093132,
+      "maxLongTaskMs": 103
+    }
+  },
+  "1000": {
+    "baseline": {
+      "startupMs": 1354.2000000001863,
+      "inventoryMs": 28.600000000093132,
+      "backupScheduleMs": 165.59999999962747,
+      "flushMs": 1977.3000000002794,
+      "shiftRenderMs": 266.79999999981374,
+      "stringifyMs": 17.699999999720603,
+      "resourceBytes": 3975069,
+      "inventoryNodes": 8000,
+      "memory": 91720780,
+      "searchMs": 4.800000000279397,
+      "modalMs": 21.350000000093132,
+      "maxLongTaskMs": 1482
+    },
+    "tienda-smart": {
+      "startupMs": 538.7000000001863,
+      "inventoryMs": 15.400000000372529,
+      "backupScheduleMs": 0.8999999999068677,
+      "flushMs": 46.39999999990687,
+      "shiftRenderMs": 52.39999999990687,
+      "stringifyMs": 19.200000000186265,
+      "resourceBytes": 1492548,
+      "inventoryNodes": 644,
+      "memory": 36844917,
+      "searchMs": 1.6000000000931323,
+      "modalMs": 16.3499999998603,
+      "maxLongTaskMs": 106
+    }
+  },
+  "5000": {
+    "baseline": {
+      "startupMs": 3279,
+      "inventoryMs": 125.6999999997206,
+      "backupScheduleMs": 131.70000000018626,
+      "flushMs": 2619.899999999907,
+      "shiftRenderMs": 826.2999999998137,
+      "stringifyMs": 24.799999999813735,
+      "resourceBytes": 3975069,
+      "inventoryNodes": 40000,
+      "memory": 65783343,
+      "searchMs": 23.299999999813735,
+      "modalMs": 76.79999999981374,
+      "maxLongTaskMs": 2080
+    },
+    "tienda-smart": {
+      "startupMs": 696.2999999998137,
+      "inventoryMs": 41.5,
+      "backupScheduleMs": 1.1000000000931323,
+      "flushMs": 52,
+      "shiftRenderMs": 77.5,
+      "stringifyMs": 23.700000000186265,
+      "resourceBytes": 1492548,
+      "inventoryNodes": 644,
+      "memory": 53159229,
+      "searchMs": 5.5,
+      "modalMs": 16.200000000186265,
+      "maxLongTaskMs": 137
+    }
+  }
+}
