@@ -122,6 +122,7 @@ const artifacts=path.resolve(__dirname,'../work/test-results');fs.mkdirSync(arti
   await test('Excel exporta los 5000 productos aunque la pantalla muestre sólo una página',async()=>{
    await page.evaluate(data=>{STATE.products=data.products;ensureStateShape();renderInventoryList();},fixture(5000));
    const download=page.waitForEvent('download');await page.evaluate(()=>exportInventoryXLSX());const file=await download;const output=path.join(artifacts,'inventario-5000.xlsx');await file.saveAs(output);
+   await page.evaluate(()=>ensureXLSXLoaded(true,true));
    const result=await page.evaluate(bytes=>{const wb=XLSX.read(new Uint8Array(bytes),{type:'array'});const rows=XLSX.utils.sheet_to_json(wb.Sheets.Inventario_Actual);return {count:rows.length,first:rows[0].codigo,last:rows.at(-1).productoId};},[...fs.readFileSync(output)]);
    assert.deepEqual(result,{count:5000,first:'0000000000000',last:'P4999'});
   });

@@ -1,0 +1,420 @@
+{
+  "variant": "click-current",
+  "cpu": 6,
+  "viewport": "412x915",
+  "browser": "156.0.8078.79",
+  "scenarios": [
+    {
+      "size": 1000,
+      "metrics": [
+        {
+          "name": "export",
+          "handlerMs": 20.100000000093132,
+          "visible": true,
+          "maxFrameGap": 200,
+          "longTasks": [
+            58,
+            143,
+            62
+          ],
+          "run": 0
+        },
+        {
+          "name": "export",
+          "handlerMs": 2.6000000000931323,
+          "visible": true,
+          "maxFrameGap": 49.900000000001455,
+          "longTasks": [],
+          "run": 1
+        },
+        {
+          "name": "purchase",
+          "handlerMs": 60.3000000002794,
+          "visible": true,
+          "maxFrameGap": 133.33600000000297,
+          "longTasks": [
+            125
+          ],
+          "run": 0
+        },
+        {
+          "name": "purchase",
+          "handlerMs": 15,
+          "visible": true,
+          "maxFrameGap": 83.20000000000073,
+          "longTasks": [
+            69
+          ],
+          "run": 1
+        },
+        {
+          "name": "purchases",
+          "handlerMs": 5.899999999906868,
+          "visible": true,
+          "maxFrameGap": 283.3000000000029,
+          "longTasks": [
+            98,
+            188
+          ],
+          "run": 0
+        },
+        {
+          "name": "purchases",
+          "handlerMs": 16.200000000186265,
+          "visible": true,
+          "maxFrameGap": 216.59999999999854,
+          "longTasks": [
+            203,
+            98,
+            162
+          ],
+          "run": 1
+        },
+        {
+          "name": "personnel",
+          "handlerMs": 0.8999999999068677,
+          "visible": true,
+          "maxFrameGap": 66.70000000000073,
+          "longTasks": [
+            63
+          ],
+          "run": 0
+        },
+        {
+          "name": "personnel",
+          "handlerMs": 10.5,
+          "visible": true,
+          "maxFrameGap": 66.70000000000073,
+          "longTasks": [
+            59,
+            63
+          ],
+          "run": 1
+        },
+        {
+          "name": "daily",
+          "handlerMs": 6.699999999720603,
+          "visible": true,
+          "maxFrameGap": 250,
+          "longTasks": [
+            234,
+            60
+          ],
+          "run": 0
+        },
+        {
+          "name": "daily",
+          "handlerMs": 3.6000000000931323,
+          "visible": true,
+          "maxFrameGap": 216.79999999999927,
+          "longTasks": [
+            96,
+            62,
+            57,
+            198
+          ],
+          "run": 1
+        },
+        {
+          "name": "shift",
+          "handlerMs": 4.7999999998137355,
+          "visible": true,
+          "maxFrameGap": 283.2000000000007,
+          "longTasks": [
+            170,
+            125
+          ],
+          "run": 0
+        },
+        {
+          "name": "shift",
+          "handlerMs": 10.899999999906868,
+          "visible": true,
+          "maxFrameGap": 100,
+          "longTasks": [
+            58,
+            79
+          ],
+          "run": 1
+        },
+        {
+          "name": "clients",
+          "handlerMs": 7,
+          "visible": true,
+          "maxFrameGap": 83.30000000000291,
+          "longTasks": [
+            56
+          ],
+          "run": 0
+        },
+        {
+          "name": "clients",
+          "handlerMs": 9.799999999813735,
+          "visible": true,
+          "maxFrameGap": 116.79999999999927,
+          "longTasks": [
+            57
+          ],
+          "run": 1
+        },
+        {
+          "name": "gestion",
+          "handlerMs": 10,
+          "visible": true,
+          "maxFrameGap": 149.89999999999782,
+          "longTasks": [
+            120
+          ],
+          "run": 0
+        },
+        {
+          "name": "gestion",
+          "handlerMs": 15.299999999813735,
+          "visible": true,
+          "maxFrameGap": 166.70000000000073,
+          "longTasks": [
+            110,
+            132
+          ],
+          "run": 1
+        },
+        {
+          "name": "product",
+          "handlerMs": 6.7999999998137355,
+          "visible": true,
+          "maxFrameGap": 16.799999999999272,
+          "longTasks": [],
+          "run": 0
+        },
+        {
+          "name": "product",
+          "handlerMs": 4.7999999998137355,
+          "visible": true,
+          "maxFrameGap": 16.700000000000728,
+          "longTasks": [],
+          "run": 1
+        },
+        {
+          "name": "sync",
+          "handlerMs": 59.299999999813735,
+          "visible": true,
+          "maxFrameGap": 66.59999999999854,
+          "longTasks": [],
+          "run": 0
+        },
+        {
+          "name": "sync",
+          "handlerMs": 27.5,
+          "visible": true,
+          "maxFrameGap": 33.39999999999782,
+          "longTasks": [],
+          "run": 1
+        }
+      ],
+      "errors": []
+    },
+    {
+      "size": 5000,
+      "metrics": [
+        {
+          "name": "export",
+          "handlerMs": 22.399999999906868,
+          "visible": true,
+          "maxFrameGap": 233.29999999999927,
+          "longTasks": [
+            76,
+            204
+          ],
+          "run": 0
+        },
+        {
+          "name": "export",
+          "handlerMs": 4.099999999627471,
+          "visible": true,
+          "maxFrameGap": 50,
+          "longTasks": [],
+          "run": 1
+        },
+        {
+          "name": "purchase",
+          "handlerMs": 52.5,
+          "visible": true,
+          "maxFrameGap": 133.29999999999927,
+          "longTasks": [
+            99
+          ],
+          "run": 0
+        },
+        {
+          "name": "purchase",
+          "handlerMs": 11.5,
+          "visible": true,
+          "maxFrameGap": 16.736000000000786,
+          "longTasks": [],
+          "run": 1
+        },
+        {
+          "name": "purchases",
+          "handlerMs": 4.100000000093132,
+          "visible": true,
+          "maxFrameGap": 166.60000000000218,
+          "longTasks": [
+            133
+          ],
+          "run": 0
+        },
+        {
+          "name": "purchases",
+          "handlerMs": 10.599999999627471,
+          "visible": true,
+          "maxFrameGap": 183.39999999999782,
+          "longTasks": [
+            107,
+            156
+          ],
+          "run": 1
+        },
+        {
+          "name": "personnel",
+          "handlerMs": 8.900000000372529,
+          "visible": true,
+          "maxFrameGap": 66.70000000000073,
+          "longTasks": [
+            72
+          ],
+          "run": 0
+        },
+        {
+          "name": "personnel",
+          "handlerMs": 6.2000000001862645,
+          "visible": true,
+          "maxFrameGap": 83.40000000000146,
+          "longTasks": [
+            70,
+            65
+          ],
+          "run": 1
+        },
+        {
+          "name": "daily",
+          "handlerMs": 12.800000000279397,
+          "visible": true,
+          "maxFrameGap": 300,
+          "longTasks": [
+            61,
+            287
+          ],
+          "run": 0
+        },
+        {
+          "name": "daily",
+          "handlerMs": 3.5,
+          "visible": true,
+          "maxFrameGap": 83.29999999999927,
+          "longTasks": [
+            77
+          ],
+          "run": 1
+        },
+        {
+          "name": "shift",
+          "handlerMs": 4.7000000001862645,
+          "visible": true,
+          "maxFrameGap": 183.29999999999927,
+          "longTasks": [
+            89,
+            93
+          ],
+          "run": 0
+        },
+        {
+          "name": "shift",
+          "handlerMs": 10.100000000093132,
+          "visible": true,
+          "maxFrameGap": 133.29999999999927,
+          "longTasks": [
+            65,
+            110
+          ],
+          "run": 1
+        },
+        {
+          "name": "clients",
+          "handlerMs": 8.800000000279397,
+          "visible": true,
+          "maxFrameGap": 100,
+          "longTasks": [
+            50,
+            57
+          ],
+          "run": 0
+        },
+        {
+          "name": "clients",
+          "handlerMs": 10.200000000186265,
+          "visible": true,
+          "maxFrameGap": 50,
+          "longTasks": [
+            55
+          ],
+          "run": 1
+        },
+        {
+          "name": "gestion",
+          "handlerMs": 0.10000000009313226,
+          "visible": true,
+          "maxFrameGap": 166.6999999999971,
+          "longTasks": [
+            153
+          ],
+          "run": 0
+        },
+        {
+          "name": "gestion",
+          "handlerMs": 0,
+          "visible": true,
+          "maxFrameGap": 250.09999999999854,
+          "longTasks": [
+            178,
+            58,
+            187
+          ],
+          "run": 1
+        },
+        {
+          "name": "product",
+          "handlerMs": 13.899999999906868,
+          "visible": true,
+          "maxFrameGap": 33.400000000001455,
+          "longTasks": [],
+          "run": 0
+        },
+        {
+          "name": "product",
+          "handlerMs": 5.2000000001862645,
+          "visible": true,
+          "maxFrameGap": 16.700000000004366,
+          "longTasks": [],
+          "run": 1
+        },
+        {
+          "name": "sync",
+          "handlerMs": 55,
+          "visible": true,
+          "maxFrameGap": 50.099999999998545,
+          "longTasks": [],
+          "run": 0
+        },
+        {
+          "name": "sync",
+          "handlerMs": 24.100000000093132,
+          "visible": true,
+          "maxFrameGap": 16.700000000004366,
+          "longTasks": [],
+          "run": 1
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

@@ -209,7 +209,7 @@
     overflow:auto;
     box-shadow:0 18px 60px rgba(2,6,23,0.18);
   }
-  .modal.visible .modal-sheet{animation:pop .18s ease}
+  .modal.visible .modal-sheet{animation:none}
   .bottom-nav{
     position:fixed;
     left:0;
@@ -1576,9 +1576,9 @@
       <button type="button" onclick="closeModal('modal-export-center')"><i data-lucide="x"></i></button>
     </div>
     <div class="card export-period">
-      <div><label class="small-muted">Desde</label><input id="export-from" type="date" class="input-pro mt-1" onchange="renderExportCenterPreview()"></div>
-      <div><label class="small-muted">Hasta</label><input id="export-to" type="date" class="input-pro mt-1" onchange="renderExportCenterPreview()"></div>
-      <button type="button" onclick="renderExportCenterPreview()" class="btn-primary">Actualizar vista</button>
+      <div><label class="small-muted">Desde</label><input id="export-from" type="date" class="input-pro mt-1" onchange="renderExportCenterPreview(true)"></div>
+      <div><label class="small-muted">Hasta</label><input id="export-to" type="date" class="input-pro mt-1" onchange="renderExportCenterPreview(true)"></div>
+      <button type="button" onclick="renderExportCenterPreview(true)" class="btn-primary">Actualizar vista</button>
     </div>
     <div id="export-center-summary" class="daily-kpis"></div>
     <div class="card">
@@ -1726,13 +1726,13 @@
     <div class="daily-control-toolbar card">
       <div>
         <label class="small-muted">Fecha a revisar</label>
-        <input id="daily-stock-date" type="date" class="input-pro mt-1" onchange="renderDailyStockControl()">
+        <input id="daily-stock-date" type="date" class="input-pro mt-1" onchange="renderDailyStockControl(true)">
       </div>
       <div>
         <label class="small-muted">Responsable del conteo</label>
         <input id="daily-stock-responsible" class="input-pro mt-1" placeholder="Nombre de quien realizó el conteo">
       </div>
-      <button type="button" onclick="renderDailyStockControl()" class="btn-primary">Actualizar resumen</button>
+      <button type="button" onclick="renderDailyStockControl(true)" class="btn-primary">Actualizar resumen</button>
     </div>
 
     <div id="daily-stock-kpis" class="daily-kpis"></div>
@@ -2062,7 +2062,8 @@ async function ensureLucideLoaded(){
   return false;
 }
 
-async function ensureXLSXLoaded(showError = true){
+async function ensureXLSXLoaded(showError = true,forceMain=false){
+  if(!forceMain&&typeof Worker==='function') return true;
   const test = ()=> !!(window.XLSX && XLSX.utils && typeof XLSX.writeFile === 'function');
   if(test()) return true;
   showToast('Cargando módulo de Excel...');
@@ -2102,8 +2103,10 @@ let pendingOps = [];
 let syncReceipts = [];
 let localPersistenceReady = false, stateRevision = 0, savedRevision = -1, criticalWriteDepth = 0;
 let productIndex = null, salesIndex = null;
+let normalizedShapeStamp=null,purchaseSummaryCache=null,dailyDataCache=null,exportPreviewDataCache=null;
+const STATE_ARRAY_KEYS=['products','sales','customers','purchases','suppliers','auditLogs','stockClosures','staff','shifts','stockMovements','syncConflicts'];
 const normalizedRecords = new WeakSet();
-function invalidateProductIndexes(){ productIndex=null; salesIndex=null; }
+function invalidateProductIndexes(){ productIndex=null; salesIndex=null; purchaseSummaryCache=null; dailyDataCache=null; exportPreviewDataCache=null; normalizedShapeStamp=null; }
 function getProductIndexes(){
   const rows=STATE.products||[];
   if(productIndex?.rows===rows && productIndex.length===rows.length) return productIndex;
@@ -2152,8 +2155,9 @@ try { const b = (!localStorage.getItem('tienda_idb_authoritative_v1')||localStor
 try { const p = localStorage.getItem(PENDING_KEY); if(p) pendingOps = JSON.parse(p) || []; } catch(e){ pendingOps = []; }
 try{const fallback=JSON.parse(localStorage.getItem('tienda_critical_fallback_v1')||'null');if(fallback?.state){STATE=fallback.state;pendingOps=fallback.ops||[];syncReceipts=Array.isArray(fallback.syncReceipts)?fallback.syncReceipts:[];}}catch(error){console.warn('Respaldo alternativo inválido',error);}
 
-function ensureStateShape(){
-  let normalizeStocks=false;
+function ensureStateShape(allowCached=false){
+  if(allowCached&&normalizedShapeStamp?.state===STATE&&normalizedShapeStamp.revision===stateRevision&&STATE_ARRAY_KEYS.every(key=>Array.isArray(STATE[key])&&normalizedShapeStamp.arrays[key]===STATE[key]&&normalizedShapeStamp.lengths[key]===STATE[key].length)) return;
+  let normalizeStocks=false,normalizedAny=false;
   if(!STATE || typeof STATE !== 'object') STATE = {};
   if(!Array.isArray(STATE.products)) STATE.products = [];
   if(!Array.isArray(STATE.sales)) STATE.sales = [];
@@ -2168,7 +2172,7 @@ function ensureStateShape(){
   if(!Array.isArray(STATE.syncConflicts)) STATE.syncConflicts = [];
   (STATE.products||[]).forEach(p => {
     if(!p || typeof p!=='object' || normalizedRecords.has(p)) return;
-    normalizedRecords.add(p);normalizeStocks=true;
+    normalizedAny=true;normalizedRecords.add(p);normalizeStocks=true;
     if(!p || typeof p !== 'object') return;
     p.id = String(p.id || uid());
     p.name = String(p.name || '').trim();
@@ -2183,19 +2187,19 @@ function ensureStateShape(){
   });
   (STATE.purchases||[]).forEach(p => {
     if(!p || typeof p!=='object' || normalizedRecords.has(p)) return;
-    normalizedRecords.add(p);
+    normalizedAny=true;normalizedRecords.add(p);
     if(!p.id) p.id = uid();
     if(!Array.isArray(p.items)) p.items = [];
   });
   (STATE.auditLogs||[]).forEach(l => {
     if(!l || typeof l!=='object' || normalizedRecords.has(l)) return;
-    normalizedRecords.add(l);
+    normalizedAny=true;normalizedRecords.add(l);
     if(!l.id) l.id = uid();
     if(!l.ts) l.ts = new Date().toISOString();
   });
   (STATE.stockClosures||[]).forEach(c => {
     if(!c || typeof c!=='object' || normalizedRecords.has(c)) return;
-    normalizedRecords.add(c);
+    normalizedAny=true;normalizedRecords.add(c);
     if(!c.id) c.id = 'CIERRE-' + uid();
     if(!c.createdAt) c.createdAt = new Date().toISOString();
     if(!Array.isArray(c.items)) c.items = [];
@@ -2203,7 +2207,7 @@ function ensureStateShape(){
   });
   (STATE.staff||[]).forEach(person => {
     if(!person || typeof person!=='object' || normalizedRecords.has(person)) return;
-    normalizedRecords.add(person);
+    normalizedAny=true;normalizedRecords.add(person);
     if(!person || typeof person!=='object') return;
     if(!person.id) person.id = 'PERSONAL-' + uid();
     person.name = String(person.name || '').trim();
@@ -2212,7 +2216,7 @@ function ensureStateShape(){
   });
   (STATE.shifts||[]).forEach(shift => {
     if(!shift || typeof shift!=='object' || normalizedRecords.has(shift)) return;
-    normalizedRecords.add(shift);
+    normalizedAny=true;normalizedRecords.add(shift);
     if(!shift || typeof shift!=='object') return;
     if(!shift.id) shift.id = 'TURNO-' + uid();
     if(!shift.status) shift.status = shift.closedAt ?'CLOSED':'OPEN';
@@ -2221,13 +2225,15 @@ function ensureStateShape(){
   });
   (STATE.customers||[]).forEach(c => {
     if(!c || typeof c!=='object' || normalizedRecords.has(c)) return;
-    normalizedRecords.add(c);
+    normalizedAny=true;normalizedRecords.add(c);
     if(!c || typeof c !== 'object') return;
     if(!c.id) c.id = 'C-' + uid();
     else c.id = String(c.id);
     c.balance = Number(c.balance || 0);
   });
   if(normalizeStocks) rebuildLinkedStocks();
+  if(normalizedAny){purchaseSummaryCache=null;dailyDataCache=null;exportPreviewDataCache=null;}
+  normalizedShapeStamp={state:STATE,revision:stateRevision,arrays:Object.fromEntries(STATE_ARRAY_KEYS.map(key=>[key,STATE[key]])),lengths:Object.fromEntries(STATE_ARRAY_KEYS.map(key=>[key,STATE[key].length]))};
 }
 ensureStateShape();
 
@@ -3558,9 +3564,16 @@ function captureCriticalRollback(productIds,keys){
     scheduleRenderAll(0);
   };
 }
+function markActionBusy(button,label){
+  if(!button) return ()=>{};
+  const disabled=button.disabled,text=button.textContent,busy=button.getAttribute('aria-busy');
+  button.disabled=true;button.textContent=label;button.setAttribute('aria-busy','true');
+  return ()=>{button.disabled=disabled;button.textContent=text;if(busy===null) button.removeAttribute('aria-busy');else button.setAttribute('aria-busy',busy);};
+}
 async function completeSale(){
   if(saleSubmitInProgress||criticalWriteDepth) return;
   saleSubmitInProgress=true;criticalWriteDepth++;
+  const releaseButton=markActionBusy(document.querySelector('#modal-sale button[onclick="completeSale()"]'),'Guardando venta...');
   let rollback=null,committed=false;
   try{
     window.POSStorage?.cancelScheduled();
@@ -3683,8 +3696,7 @@ async function completeSale(){
     cart = [];
     closeModal('modal-sale');
     renderCart();
-    rebuildLinkedStocks();
-    renderDashboard(true);
+    if(isElementVisible('tab-home')) requestAnimationFrame(()=>setTimeout(()=>renderDashboard(true),0));
     if(isElementVisible('tab-inventory')) scheduleInventoryRender(0);
     updateShiftUI();
     if($('#pos-customer')) $('#pos-customer').value = '';
@@ -3700,7 +3712,7 @@ async function completeSale(){
     console.error('completeSale err', e);
     alert('Error registrando venta: ' + (e && e.message || ''));
   }finally{
-    saleSubmitInProgress=false;criticalWriteDepth--;scheduleSyncIndicators();
+    releaseButton();saleSubmitInProgress=false;criticalWriteDepth--;scheduleSyncIndicators();
     if(committed) processPendingOps();
   }
 }
@@ -3806,7 +3818,7 @@ function appendGestionAuditSheet(wb, from = '', to = ''){
     cambios: '',
     detalleJSON: ''
   }];
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), 'Auditoria_Gestion');
+  appendRawJsonSheet(wb,'Auditoria_Gestion',data);
 }
 
 function localYmdFromDate(value){
@@ -3908,12 +3920,12 @@ function appendDailyControlSheets(wb, from = '', to = ''){
     motivo:row.reference, responsable:row.actor, estado:row.review?'REVISAR':'CORRECTO', observaciones:(row.issues||[]).join(' | ')
   }));
 
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(workerRows.length ?workerRows:[{ nota:'Sin ventas en el periodo' }]), 'Resumen_Trabajadoras');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(productRows.length ?productRows:[{ nota:'Sin productos vendidos en el periodo' }]), 'Ventas_Producto_Dia');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(closureRows.length ?closureRows:[{ nota:'Sin cierres de stock en el periodo' }]), 'Cierres_Stock');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detailRows.length ?detailRows:[{ nota:'Sin detalle de cierres en el periodo' }]), 'Detalle_Cierres');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stockAuditRows.length ?stockAuditRows:[{ nota:'Sin eventos de stock o compras en el periodo' }]), 'Auditoria_Stock');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(stockMovementRows.length ?stockMovementRows:[{ nota:'Sin modificaciones manuales de stock en el periodo' }]), 'Cambios_Manual_Stock');
+  appendRawJsonSheet(wb,'Resumen_Trabajadoras',workerRows.length ?workerRows:[{ nota:'Sin ventas en el periodo' }]);
+  appendRawJsonSheet(wb,'Ventas_Producto_Dia',productRows.length ?productRows:[{ nota:'Sin productos vendidos en el periodo' }]);
+  appendRawJsonSheet(wb,'Cierres_Stock',closureRows.length ?closureRows:[{ nota:'Sin cierres de stock en el periodo' }]);
+  appendRawJsonSheet(wb,'Detalle_Cierres',detailRows.length ?detailRows:[{ nota:'Sin detalle de cierres en el periodo' }]);
+  appendRawJsonSheet(wb,'Auditoria_Stock',stockAuditRows.length ?stockAuditRows:[{ nota:'Sin eventos de stock o compras en el periodo' }]);
+  appendRawJsonSheet(wb,'Cambios_Manual_Stock',stockMovementRows.length ?stockMovementRows:[{ nota:'Sin modificaciones manuales de stock en el periodo' }]);
   appendShiftControlSheets(wb,from,to);
 }
 
@@ -3951,10 +3963,10 @@ function appendShiftControlSheets(wb, from = '', to = ''){
     audit=audit.filter(log=>{const time=new Date(log.ts||0).getTime();return !Number.isNaN(time)&&time>=start&&time<=end;});
   }
   const auditRows=audit.sort((a,b)=>new Date(b.ts||0)-new Date(a.ts||0)).map(log=>({evento:log.ts||'',tipo:log.source||'',accion:log.action||'',usuario:log.actor||'',entidadId:log.entityId||'',nota:log.note||'',detalle:JSON.stringify(log.details||{})}));
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(shiftRows.length?shiftRows:[{nota:'Sin turnos en el periodo'}]),'Turnos_Caja');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(detailRows.length?detailRows:[{nota:'Sin productos vendidos por turno'}]),'Productos_Turno');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(staffRows.length?staffRows:[{nota:'Sin personal registrado'}]),'Personal');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(auditRows.length?auditRows:[{nota:'Sin eventos de personal o turnos'}]),'Auditoria_Personal');
+  appendRawJsonSheet(wb,'Turnos_Caja',shiftRows.length?shiftRows:[{nota:'Sin turnos en el periodo'}]);
+  appendRawJsonSheet(wb,'Productos_Turno',detailRows.length?detailRows:[{nota:'Sin productos vendidos por turno'}]);
+  appendRawJsonSheet(wb,'Personal',staffRows.length?staffRows:[{nota:'Sin personal registrado'}]);
+  appendRawJsonSheet(wb,'Auditoria_Personal',auditRows.length?auditRows:[{nota:'Sin eventos de personal o turnos'}]);
 }
 
 let gestionPage=0,clientsPage=0;
@@ -4141,8 +4153,14 @@ function deleteSaleConfirm(saleId){
 /* =========
    IMPORT / EXPORT / REPORTS
    ========= */
+function createExcelWorkbook(){return {SheetNames:[],Sheets:{},sheetRecipes:[],Props:{}};}
+function appendRawJsonSheet(wb,name,rows){
+  if(wb.sheetRecipes){wb.SheetNames.push(name);wb.sheetRecipes.push({name,rows,styled:false});return;}
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),name);
+}
 function appendJsonSheet(wb, name, rows, emptyNote = 'Sin registros'){
   const data = Array.isArray(rows) && rows.length ?rows:[{ nota:emptyNote }];
+  if(wb.sheetRecipes){wb.SheetNames.push(name);wb.sheetRecipes.push({name,rows:data,styled:true});return;}
   const ws = XLSX.utils.json_to_sheet(data);
   if(ws['!ref']) ws['!autofilter'] = { ref:ws['!ref'] };
   const keys = Object.keys(data[0]||{});
@@ -4177,19 +4195,80 @@ function polishWorkbook(wb){
   wb.Props={...(wb.Props||{}),Title:'Reporte Minimarket El Erizo',Author:'TiendaSmart',CreatedDate:new Date()};
 }
 
-function writeWorkbookFile(wb, filename){
-  polishWorkbook(wb);
-  XLSX.writeFile(wb,filename,{compression:true});
+function materializeExcelWorkbook(input){
+  const wb=input.sheetRecipes?XLSX.utils.book_new():input;
+  if(input.sheetRecipes){
+    for(const sheet of input.sheetRecipes){
+      if(sheet.styled) appendJsonSheet(wb,sheet.name,sheet.rows);
+      else appendRawJsonSheet(wb,sheet.name,sheet.rows);
+    }
+    wb.Props={...input.Props};
+  }
+  polishWorkbook(wb);return wb;
 }
+let excelWriter=null,excelWriterURL=null,excelWriterIdleTimer=0,excelJobNumber=0,excelWriteMode='none';
+const excelWriterJobs=new Map();
+function stopExcelWriter(error=null){
+  clearTimeout(excelWriterIdleTimer);excelWriter?.terminate();excelWriter=null;
+  if(excelWriterURL){URL.revokeObjectURL(excelWriterURL);excelWriterURL=null;}
+  if(error){excelWriterJobs.forEach(job=>job.reject(error));excelWriterJobs.clear();}
+}
+function compressWorkbookInBackground(workbook){
+  if(typeof Worker!=='function') return Promise.reject(new Error('Worker no disponible'));
+  clearTimeout(excelWriterIdleTimer);
+  if(!excelWriter){
+    const libraryURL=new URL('./libs/xlsx.full.min.js',location.href).href;
+    const source='importScripts('+JSON.stringify(libraryURL)+');'+[appendJsonSheet,appendRawJsonSheet,polishWorkbook,materializeExcelWorkbook].map(fn=>fn.toString()).join('\n')+';self.onmessage=function(event){var id=event.data.id;try{var result=XLSX.write(materializeExcelWorkbook(event.data.workbook),{bookType:"xlsx",type:"array",compression:true});var buffer=result instanceof ArrayBuffer?result:new Uint8Array(result).buffer;self.postMessage({id:id,buffer:buffer},[buffer]);}catch(error){self.postMessage({id:id,error:String(error.message||error)});}};self.postMessage({ready:true});';
+    excelWriterURL=URL.createObjectURL(new Blob([source],{type:'text/javascript'}));
+    try{excelWriter=new Worker(excelWriterURL);}catch(error){stopExcelWriter();return Promise.reject(error);}
+    const writer=excelWriter;
+    writer.onmessage=event=>{
+      if(writer!==excelWriter) return;
+      if(event.data.ready){if(excelWriterURL) URL.revokeObjectURL(excelWriterURL);excelWriterURL=null;return;}
+      const job=excelWriterJobs.get(event.data.id);if(!job) return;
+      excelWriterJobs.delete(event.data.id);
+      if(event.data.error) job.reject(new Error(event.data.error));else job.resolve(event.data.buffer);
+      if(!excelWriterJobs.size) excelWriterIdleTimer=setTimeout(()=>stopExcelWriter(),30000);
+    };
+    writer.onerror=event=>{event.preventDefault();if(writer===excelWriter) stopExcelWriter(new Error('No se pudo comprimir el Excel en segundo plano'));};
+  }
+  return new Promise((resolve,reject)=>{
+    const id=++excelJobNumber;excelWriterJobs.set(id,{resolve,reject});
+    try{excelWriter.postMessage({id,workbook});}catch(error){excelWriterJobs.delete(id);reject(error);}
+  });
+}
+async function writeWorkbookFile(wb,filename){
+  let buffer;
+  try{buffer=await compressWorkbookInBackground(wb);excelWriteMode='worker';}
+  catch(error){
+    // Compatibilidad con navegadores que bloquean Workers; la exportación se conserva.
+    if(error.name==='AbortError') throw error;
+    console.warn('Excel: usando exportador compatible',error);excelWriteMode='main-fallback';
+    if(!await ensureXLSXLoaded(true,true)) throw new Error('No se pudo cargar el exportador Excel');
+    XLSX.writeFile(materializeExcelWorkbook(wb),filename,{compression:true});return;
+  }
+  const url=URL.createObjectURL(new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  const link=document.createElement('a');link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function allowInterfacePaint(){
+  return new Promise(resolve=>{
+    let done=false,frame=0,timer=0;
+    const finish=()=>{if(done) return;done=true;cancelAnimationFrame(frame);clearTimeout(timer);resolve();};
+    timer=setTimeout(finish,100);frame=requestAnimationFrame(()=>setTimeout(finish,0));
+  });
+}
+
 
 function buildSoldProductsForRange(from, to){
   const sales = salesInRange(from,to);
-  const map = new Map();
+  const map = new Map(),productsById=new Map(),cutoffStocks=new Map();
+  (STATE.products||[]).forEach(p=>{const key=String(p.id||'');if(!productsById.has(key)) productsById.set(key,p);});
   const cutoff = getLocalDayBounds(to).end;
   sales.forEach(sale=>{
     const responsible=String(sale.responsible||sale.meta?.responsible||sale.createdBy||'SIN RESPONSABLE').trim();
     (sale.items||[]).forEach(item=>{
-      const product=(STATE.products||[]).find(p=>String(p.id||'')===String(item.productId||''))||{id:item.productId||'',name:item.rawName||'Producto eliminado',barcode:'',category:''};
+      const product=productsById.get(String(item.productId||''))||{id:item.productId||'',name:item.rawName||'Producto eliminado',barcode:'',category:''};
       const key=String(item.productId||product.id||product.name);
       if(!map.has(key)) map.set(key,{productId:key,name:product.name||'Producto',barcode:product.barcode||'',category:product.category||'',qty:0,amount:0,responsibles:new Set(),sales:new Set(),expectedStock:null});
       const row=map.get(key);
@@ -4199,7 +4278,8 @@ function buildSoldProductsForRange(from, to){
       row.sales.add(String(sale.id||''));
       const root=getRootStockProduct(product);
       if(root){
-        const rootExpected=getStockAtCutoff(root,cutoff);
+        if(!cutoffStocks.has(root)) cutoffStocks.set(root,getStockAtCutoff(root,cutoff));
+        const rootExpected=cutoffStocks.get(root);
         row.expectedStock=product.parentProductId ?Math.max(0,Math.floor((rootExpected*getLinkedFactor(root,product))+1e-9)):rootExpected;
       }
     });
@@ -4218,7 +4298,8 @@ function getExportRange(){
   return {from,to,valid:from<=to};
 }
 
-function renderExportCenterPreview(){
+let exportPreviewPage=0,exportPreviewRange='';
+function renderExportCenterPreview(progressive=false){
   const summary=$('#export-center-summary');
   const preview=$('#export-products-preview');
   if(!summary||!preview) return;
@@ -4228,21 +4309,29 @@ function renderExportCenterPreview(){
     preview.innerHTML='<div class="small-muted" style="padding:18px">La fecha Desde no puede ser posterior a Hasta.</div>';
     return;
   }
-  const sales=salesInRange(from,to);
-  const sold=buildSoldProductsForRange(from,to);
-  const total=sales.reduce((sum,sale)=>sum+Number(sale.total||0),0);
-  const units=sold.reduce((sum,row)=>sum+Number(row.cantidadVendida||0),0);
+  const rangeKey=from+'|'+to;
+  if(exportPreviewRange!==rangeKey){exportPreviewRange=rangeKey;exportPreviewPage=0;}
+  if(exportPreviewDataCache?.range!==rangeKey||exportPreviewDataCache.revision!==stateRevision||exportPreviewDataCache.products!==STATE.products||exportPreviewDataCache.sales!==STATE.sales||exportPreviewDataCache.productCount!==STATE.products.length||exportPreviewDataCache.salesCount!==STATE.sales.length){
+    const sales=salesInRange(from,to),sold=buildSoldProductsForRange(from,to);
+    exportPreviewDataCache={range:rangeKey,revision:stateRevision,products:STATE.products,sales:STATE.sales,productCount:STATE.products.length,salesCount:STATE.sales.length,salesRows:sales,sold,total:sales.reduce((sum,sale)=>sum+Number(sale.total||0),0),units:sold.reduce((sum,row)=>sum+Number(row.cantidadVendida||0),0)};
+  }
+  const {salesRows:sales,sold,total,units}=exportPreviewDataCache;
   summary.innerHTML=`<div class="daily-kpi"><span class="small-muted">Ventas</span><strong>${sales.length}</strong><span class="small-muted">Operaciones registradas</span></div><div class="daily-kpi"><span class="small-muted">Total vendido</span><strong>S/ ${money(total)}</strong><span class="small-muted">Todos los métodos de pago</span></div><div class="daily-kpi"><span class="small-muted">Productos diferentes</span><strong>${sold.length}</strong><span class="small-muted">En el periodo</span></div><div class="daily-kpi"><span class="small-muted">Unidades vendidas</span><strong>${formatStockQty(units)}</strong><span class="small-muted">Cantidad acumulada</span></div>`;
-  const rows=sold.slice(0,300).map(row=>`<tr><td><strong>${escapeHtml(row.producto)}</strong><div class="small-muted">${escapeHtml(row.codigo||'Sin código')}</div></td><td style="text-align:right">${formatStockQty(row.cantidadVendida)}</td><td style="text-align:right">S/ ${money(row.importeTotal)}</td><td style="text-align:right">${row.stockEsperadoAlCierre===null?'-':formatStockQty(row.stockEsperadoAlCierre)}</td><td>${escapeHtml(row.responsables||'SIN RESPONSABLE')}</td></tr>`).join('');
-  preview.innerHTML=`<table class="daily-table"><thead><tr><th>Producto vendido</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Importe</th><th style="text-align:right">Stock esperado</th><th>Responsable(s)</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="small-muted">No hay ventas registradas en este periodo.</td></tr>'}</tbody></table>${sold.length>300?`<div class="small-muted" style="padding:8px">Vista limitada a 300 productos. El Excel incluirá los ${sold.length} registros.</div>`:''}`;
+  exportPreviewPage=Math.min(exportPreviewPage,Math.max(0,Math.ceil(sold.length/80)-1));
+  const rows=sold.slice(exportPreviewPage*80,(exportPreviewPage+1)*80).map(row=>`<tr><td><strong>${escapeHtml(row.producto)}</strong><div class="small-muted">${escapeHtml(row.codigo||'Sin código')}</div></td><td style="text-align:right">${formatStockQty(row.cantidadVendida)}</td><td style="text-align:right">S/ ${money(row.importeTotal)}</td><td style="text-align:right">${row.stockEsperadoAlCierre===null?'-':formatStockQty(row.stockEsperadoAlCierre)}</td><td>${escapeHtml(row.responsables||'SIN RESPONSABLE')}</td></tr>`);
+  preview.innerHTML=`<table class="daily-table"><thead><tr><th>Producto vendido</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Importe</th><th style="text-align:right">Stock esperado</th><th>Responsable(s)</th></tr></thead><tbody></tbody></table>`;
+  fillTableRows(preview.querySelector('tbody'),rows,'<tr><td colspan="5" class="small-muted">No hay ventas registradas en este periodo.</td></tr>','modal-export-center',progressive);
+  appendListPagination(preview,exportPreviewPage,sold.length,80,page=>{exportPreviewPage=page;renderExportCenterPreview(progressive);});
 }
 
 function openExportCenter(){
   const from=$('#export-from'),to=$('#export-to');
   if(from&&!from.value) from.value=todayYMD();
   if(to&&!to.value) to.value=todayYMD();
-  renderExportCenterPreview();
   openModal('modal-export-center');
+  $('#export-center-summary').textContent='Calculando vista previa...';
+  $('#export-products-preview').replaceChildren();
+  afterModalPaint('modal-export-center',()=>renderExportCenterPreview(true));
   safeCreateIcons();
 }
 
@@ -4267,9 +4356,9 @@ async function exportInventoryXLSX(){
       valorStockCosto:Number((Number(p.stock||0)*Number(p.costPrice||0)).toFixed(2)),
       valorStockVenta:Number((Number(p.stock||0)*Number(p.price||0)).toFixed(2))
     }));
-    const wb = XLSX.utils.book_new();
+    const wb = createExcelWorkbook();
     appendJsonSheet(wb,'Inventario_Actual',rows,'No hay productos registrados');
-    writeWorkbookFile(wb,`Inventario_${todayYMD()}.xlsx`);
+    await writeWorkbookFile(wb,`Inventario_${todayYMD()}.xlsx`);
     showToast('Inventario exportado');
     return true;
   }catch(e){
@@ -4292,12 +4381,12 @@ async function exportSalesXLSX(){
       clienteId:s.customerId||'', cliente:s.customerName||'', medioPago:s.paymentType||s.method||'',
       total:Number(s.total||0), productos:(s.items||[]).map(it=>((getProductIndexes().byId.get(it.productId)||{name:it.rawName||it.productId}).name+' x'+it.qty)).join(' | ')
     }));
-    const wb=XLSX.utils.book_new();
+    const wb=createExcelWorkbook();
     appendJsonSheet(wb,'Productos_Vendidos',buildSoldProductsForRange(from,to),'No hay productos vendidos');
     appendJsonSheet(wb,'Ventas_Detalle',rows,'No hay ventas registradas');
     appendGestionAuditSheet(wb,from,to);
     appendDailyControlSheets(wb,from,to);
-    writeWorkbookFile(wb,`Ventas_${from}_a_${to}.xlsx`);
+    await writeWorkbookFile(wb,`Ventas_${from}_a_${to}.xlsx`);
     showToast('Ventas y productos vendidos exportados');
     return true;
   }catch(e){
@@ -4358,7 +4447,7 @@ async function exportCombinedXLSX(from=todayYMD(),to=todayYMD()){
       });
     }));
 
-    const wb=XLSX.utils.book_new();
+    const wb=createExcelWorkbook();
     appendJsonSheet(wb,'Resumen',summaryRows);
     appendJsonSheet(wb,'Productos_Vendidos',soldRows,'No hay productos vendidos en el periodo');
     appendJsonSheet(wb,'Ventas_Detalle',salesRows,'No hay ventas registradas en el periodo');
@@ -4366,7 +4455,7 @@ async function exportCombinedXLSX(from=todayYMD(),to=todayYMD()){
     appendJsonSheet(wb,'Kardex_Periodo',kardexRows,'No hay movimientos de stock en el periodo');
     appendGestionAuditSheet(wb,from,to);
     appendDailyControlSheets(wb,from,to);
-    writeWorkbookFile(wb,`Reporte_Minimarket_${from}_a_${to}.xlsx`);
+    await writeWorkbookFile(wb,`Reporte_Minimarket_${from}_a_${to}.xlsx`);
     showToast('Excel completo exportado con productos vendidos');
     return true;
   }catch(e){
@@ -4719,9 +4808,9 @@ async function exportStockHistoryXLSX(){
       stockAntes:row.stockBefore, cambio:row.delta, stockDespues:row.stockAfter,
       motivo:row.reference, responsable:row.actor, estado:row.review?'REVISAR':'CORRECTO', observaciones:(row.issues||[]).join(' | ')
     }));
-    const wb = XLSX.utils.book_new();
+    const wb = createExcelWorkbook();
     appendJsonSheet(wb,'Cambios_Manuales',rows,'Sin modificaciones manuales para los filtros seleccionados');
-    writeWorkbookFile(wb,`Cambios_Manuales_Stock_${todayYMD()}.xlsx`);
+    await writeWorkbookFile(wb,`Cambios_Manuales_Stock_${todayYMD()}.xlsx`);
     showToast('Modificaciones manuales exportadas');
     return true;
   }catch(err){
@@ -4836,7 +4925,7 @@ function readDailyMoneyInput(selector){
 
 function renderDailyStockKpis(){
   const date = $('#daily-stock-date')?.value || todayYMD();
-  const sales = salesInRange(date, date);
+  const sales = dailyDataCache?.date===date&&dailyDataCache.revision===stateRevision&&dailyDataCache.sales===STATE.sales&&dailyDataCache.salesCount===STATE.sales.length?dailyDataCache.salesForDay:salesInRange(date,date);
   const total = sales.reduce((sum,s)=> sum + Number(s.total || 0), 0);
   let shortageValue = 0;
   let differences = 0;
@@ -4870,13 +4959,14 @@ function renderDailyStockKpis(){
 }
 
 let dailySalesPage=0,dailyStockPage=0;
-function renderDailySalesProducts(){
+function renderDailySalesProducts(progressive=false){
   const box = $('#daily-sales-products');
   if(!box) return;
   dailySalesPage=Math.min(dailySalesPage,Math.max(0,Math.ceil(dailySalesSummary.length/80)-1));
-  const rows = dailySalesSummary.slice(dailySalesPage*80,(dailySalesPage+1)*80).map(row=>`<tr><td>${escapeHtml(row.name)}</td><td style="text-align:right">${formatStockQty(row.qty)}</td><td style="text-align:right">S/ ${money(row.amount)}</td><td style="text-align:right">${row.expectedStock === null ?'-' : formatStockQty(row.expectedStock)}</td><td>${escapeHtml(row.responsibles || 'SIN RESPONSABLE')}</td></tr>`).join('');
-  box.innerHTML = `<table class="daily-table"><thead><tr><th>Producto vendido</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Importe</th><th style="text-align:right">Stock esperado</th><th>Responsable(s)</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="small-muted">No hay ventas registradas en esta fecha.</td></tr>'}</tbody></table>`;
-  appendListPagination(box,dailySalesPage,dailySalesSummary.length,80,page=>{dailySalesPage=page;renderDailySalesProducts();});
+  const rows = dailySalesSummary.slice(dailySalesPage*80,(dailySalesPage+1)*80).map(row=>`<tr><td>${escapeHtml(row.name)}</td><td style="text-align:right">${formatStockQty(row.qty)}</td><td style="text-align:right">S/ ${money(row.amount)}</td><td style="text-align:right">${row.expectedStock === null ?'-' : formatStockQty(row.expectedStock)}</td><td>${escapeHtml(row.responsibles || 'SIN RESPONSABLE')}</td></tr>`);
+  box.innerHTML = `<table class="daily-table"><thead><tr><th>Producto vendido</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Importe</th><th style="text-align:right">Stock esperado</th><th>Responsable(s)</th></tr></thead><tbody></tbody></table>`;
+  fillTableRows(box.querySelector('tbody'),rows,'<tr><td colspan="5" class="small-muted">No hay ventas registradas en esta fecha.</td></tr>','modal-daily-stock',progressive);
+  appendListPagination(box,dailySalesPage,dailySalesSummary.length,80,page=>{dailySalesPage=page;renderDailySalesProducts(progressive);});
   const workerBox = $('#daily-worker-summary');
   if(workerBox){
     const workerRows = Object.entries(dailyWorkerSummary).map(([name,data])=>`<tr><td><strong>${escapeHtml(name)}</strong></td><td style="text-align:right">${Number(data.sales||0)}</td><td style="text-align:right">S/ ${money(data.EFECTIVO||0)}</td><td style="text-align:right">S/ ${money(data.YAPE||0)}</td><td style="text-align:right">S/ ${money(data.A_CREDITO||0)}</td><td style="text-align:right"><strong>S/ ${money(data.total||0)}</strong></td></tr>`).join('');
@@ -4884,7 +4974,7 @@ function renderDailySalesProducts(){
   }
 }
 
-function renderDailyStockTable(){
+function renderDailyStockTable(progressive=false){
   const box = $('#daily-stock-table');
   if(!box) return;
   dailyStockPage=Math.min(dailyStockPage,Math.max(0,Math.ceil(dailyStockRows.length/80)-1));
@@ -4893,12 +4983,11 @@ function renderDailyStockTable(){
     const diffClass = diff === null || Math.abs(diff) < 1e-6 ?'daily-diff-ok' : (diff < 0 ?'daily-diff-bad':'daily-diff-extra');
     const loss = diff !== null && diff < 0 ?Math.abs(diff) * Number(row.price || 0) : 0;
     return `<tr data-daily-product="${escapeAttr(row.productId)}"><td><strong>${escapeHtml(row.name)}</strong><div class="small-muted">${escapeHtml(row.barcode||'Sin código')}</div></td><td style="text-align:right">${formatStockQty(row.opening)}</td><td style="text-align:right">${formatStockQty(row.entries)}</td><td style="text-align:right">${formatStockQty(row.registeredOut)}</td><td style="text-align:right">${formatStockQty(row.manualAdjustments)}</td><td style="text-align:right"><strong>${formatStockQty(row.expected)}</strong></td><td style="text-align:right"><input class="daily-count-input" type="number" min="0" step="0.001" value="${row.physical === null ?'':escapeAttr(formatStockQty(row.physical))}" data-daily-count="${escapeAttr(row.productId)}"></td><td class="${diffClass}" data-daily-diff="${escapeAttr(row.productId)}" style="text-align:right">${diff === null ?'-':formatStockQty(diff)}</td><td data-daily-loss="${escapeAttr(row.productId)}" style="text-align:right">S/ ${money(loss)}</td></tr>`;
-  }).join('');
-  box.innerHTML = `<table class="daily-table"><thead><tr><th>Producto principal</th><th style="text-align:right">Stock inicial</th><th style="text-align:right">Ingresos</th><th style="text-align:right">Salidas registradas</th><th style="text-align:right">Ajustes manuales</th><th style="text-align:right">Debe quedar</th><th style="text-align:right">Conteo físico</th><th style="text-align:right">Diferencia</th><th style="text-align:right">Faltante S/</th></tr></thead><tbody>${rows || '<tr><td colspan="9" class="small-muted">No hay productos para controlar.</td></tr>'}</tbody></table>`;
-  appendListPagination(box,dailyStockPage,dailyStockRows.length,80,page=>{dailyStockPage=page;renderDailyStockTable();});
-  box.querySelectorAll('[data-daily-count]').forEach(input => {
-    input.addEventListener('input', ()=> updateDailyPhysicalCount(input.getAttribute('data-daily-count'), input.value));
   });
+  box.innerHTML = `<table class="daily-table"><thead><tr><th>Producto principal</th><th style="text-align:right">Stock inicial</th><th style="text-align:right">Ingresos</th><th style="text-align:right">Salidas registradas</th><th style="text-align:right">Ajustes manuales</th><th style="text-align:right">Debe quedar</th><th style="text-align:right">Conteo físico</th><th style="text-align:right">Diferencia</th><th style="text-align:right">Faltante S/</th></tr></thead><tbody></tbody></table>`;
+  fillTableRows(box.querySelector('tbody'),rows,'<tr><td colspan="9" class="small-muted">No hay productos para controlar.</td></tr>','modal-daily-stock',progressive);
+  appendListPagination(box,dailyStockPage,dailyStockRows.length,80,page=>{dailyStockPage=page;renderDailyStockTable(progressive);});
+  box.oninput=event=>{const input=event.target.closest('[data-daily-count]');if(input&&box.contains(input)) updateDailyPhysicalCount(input.getAttribute('data-daily-count'),input.value);};
 }
 
 function updateDailyPhysicalCount(productId, rawValue){
@@ -4950,36 +5039,48 @@ function renderDailyClosureHistory(){
   box.innerHTML = rows.map(c=>`<div class="daily-history-row"><div class="flex justify-between gap-2"><strong>${escapeHtml(c.responsible||'Sin responsable')}</strong><span class="small-muted">${new Date(c.createdAt||0).toLocaleString()}</span></div><div class="small-muted">Ventas S/ ${money(c.salesTotal||0)} · Dif. caja S/ ${money(c.cashDifference||0)} · Dif. stock: ${Number(c.differenceCount||0)} · Faltante S/ ${money(c.shortageValue||0)}</div>${c.note ?`<div class="small-muted mt-1">${escapeHtml(c.note)}</div>`:''}</div>`).join('') || '<div class="small-muted mt-2">Todavía no hay cierres guardados para esta fecha.</div>';
 }
 
-function renderDailyStockControl(){
+function refreshDailyStockData(){
   const dateInput = $('#daily-stock-date');
   const date = dateInput?.value || todayYMD();
   if(dateInput && !dateInput.value) dateInput.value = date;
   if(dailyDraftDate !== date){
     dailyDraftDate = date;
+    dailyDataCache=null;
     dailyPhysicalDraft = new Map();
     if($('#daily-actual-cash')) $('#daily-actual-cash').value = '';
     if($('#daily-actual-yape')) $('#daily-actual-yape').value = '';
     if($('#daily-opening-cash')) $('#daily-opening-cash').value = '0.00';
   }
-  dailySalesSummary = buildDailySalesSummary(date);
-  dailyStockRows = buildDailyStockRows(date);
+  const valid=dailyDataCache?.date===date&&dailyDataCache.revision===stateRevision&&dailyDataCache.products===STATE.products&&dailyDataCache.sales===STATE.sales&&dailyDataCache.productCount===STATE.products.length&&dailyDataCache.salesCount===STATE.sales.length;
+  if(!valid){
+    dailySalesSummary=buildDailySalesSummary(date);dailyStockRows=buildDailyStockRows(date);
+    dailyDataCache={date,revision:stateRevision,products:STATE.products,sales:STATE.sales,productCount:STATE.products.length,salesCount:STATE.sales.length,salesForDay:salesInRange(date,date)};
+  }
+  return date;
+}
+
+function renderDailyStockControl(progressive=false){
+  refreshDailyStockData();
   renderDailyStockKpis();
-  renderDailySalesProducts();
-  renderDailyStockTable();
-  renderDailyClosureHistory();
+  if(progressive){
+    afterModalPaint('modal-daily-stock',()=>renderDailySalesProducts(true));
+    afterModalPaint('modal-daily-stock',()=>renderDailyStockTable(true));
+    afterModalPaint('modal-daily-stock',renderDailyClosureHistory);
+  }else{
+    renderDailySalesProducts();renderDailyStockTable();renderDailyClosureHistory();
+  }
 }
 
 function openDailyStockControl(){
-  ensureStateShape();
+  ensureStateShape(true);
   const dateInput = $('#daily-stock-date');
   if(dateInput){
     dateInput.max = todayYMD();
     dateInput.value = todayYMD();
   }
   if($('#daily-stock-responsible')) $('#daily-stock-responsible').value = getCurrentActor();
-  dailyDraftDate = '';
   openModal('modal-daily-stock');
-  afterModalPaint('modal-daily-stock',renderDailyStockControl);
+  afterModalPaint('modal-daily-stock',()=>renderDailyStockControl(true));
   safeCreateIcons();
 }
 
@@ -5049,7 +5150,7 @@ async function exportDailyStockXLSX(){
   if(!await ensureXLSXLoaded()) return false;
   try{
     const date = $('#daily-stock-date')?.value || todayYMD();
-    renderDailyStockControl();
+    refreshDailyStockData();
     const sales = salesInRange(date,date);
     const total = sales.reduce((sum,s)=>sum+Number(s.total||0),0);
     const summaryRows = [{
@@ -5080,13 +5181,13 @@ async function exportDailyStockXLSX(){
       diferencia:row.difference, precioVenta:Number(row.price||0),
       faltanteSoles:row.difference < 0 ?Number((Math.abs(row.difference)*Number(row.price||0)).toFixed(2)):0
     }));
-    const wb = XLSX.utils.book_new();
+    const wb = createExcelWorkbook();
     appendJsonSheet(wb,'Resumen_Dia',summaryRows);
     appendJsonSheet(wb,'Productos_Vendidos',soldRows,'Sin ventas registradas');
     appendJsonSheet(wb,'Conteo_Actual',stockRows,'No hay productos para controlar');
     appendDailyControlSheets(wb,date,date);
     appendGestionAuditSheet(wb,date,date);
-    writeWorkbookFile(wb,`Control_Diario_Stock_${date}.xlsx`);
+    await writeWorkbookFile(wb,`Control_Diario_Stock_${date}.xlsx`);
     showToast('Control diario exportado a Excel');
     return true;
   }catch(e){
@@ -6232,10 +6333,10 @@ function adjustStockForSaleItem(productId, qtyDelta, movementType = 'OUT', saleI
   };
 }
 
-function normalizePurchaseForView(raw){
+function normalizePurchaseForView(raw,summaryOnly=false){
   if(!raw) return null;
   const itemsRaw = Array.isArray(raw.items) ?raw.items : [];
-  const items = itemsRaw.map((it, idx)=>({
+  const items = summaryOnly?[]:itemsRaw.map((it, idx)=>({
     line: Number(it.line || (idx + 1)),
     movementId: String(it.movementId || '').trim(),
     productId: it.productId || '',
@@ -6271,7 +6372,7 @@ function normalizePurchaseForView(raw){
       })];
     }
   });
-  const totalCost = Number(raw.totalCost || items.reduce((acc, it)=> acc + Number(it.subtotal||0), 0));
+  const totalCost = Number(raw.totalCost || (summaryOnly?itemsRaw.reduce((acc,it)=>acc+Number(Number(it.subtotal||(Number(it.qty||0)*Number(it.costPrice||0)))||0),0):items.reduce((acc,it)=>acc+Number(it.subtotal||0),0)));
   return {
     id: raw.id || uid(),
     docType: raw.docType || 'COMPROBANTE',
@@ -6283,25 +6384,35 @@ function normalizePurchaseForView(raw){
     date: raw.date || (raw.createdAt ?String(raw.createdAt).slice(0,10) : todayYMD()),
     createdAt: raw.createdAt || '',
     totalCost,
-    items
+    items,
+    ...(summaryOnly?{itemCount:itemsRaw.length}:{})
   };
 }
 
 function getNormalizedPurchases(){
   ensureStateShape();
   return (STATE.purchases||[])
-    .map(normalizePurchaseForView)
+    .map(raw=>normalizePurchaseForView(raw))
     .filter(Boolean)
     .sort((a,b)=> new Date(b.createdAt || b.date || 0) - new Date(a.createdAt || a.date || 0));
 }
 
+function getPurchaseSummaries(){
+  ensureStateShape(true);
+  const rows=STATE.purchases||[],day=todayYMD();
+  if(purchaseSummaryCache?.rows===rows&&purchaseSummaryCache.length===rows.length&&purchaseSummaryCache.revision===stateRevision&&purchaseSummaryCache.day===day) return purchaseSummaryCache.views;
+  const entries=rows.map(raw=>({raw,view:normalizePurchaseForView(raw,true)})).filter(entry=>entry.view).sort((a,b)=>new Date(b.view.createdAt||b.view.date||0)-new Date(a.view.createdAt||a.view.date||0));
+  const byId=new Map();entries.forEach(entry=>{if(!byId.has(entry.view.id)) byId.set(entry.view.id,entry.raw);});
+  purchaseSummaryCache={rows,length:rows.length,revision:stateRevision,day,byId,views:entries.map(entry=>entry.view)};
+  return purchaseSummaryCache.views;
+}
 function getSelectedPurchaseFromHistory(){
-  const all = getNormalizedPurchases();
+  const all = getPurchaseSummaries();
   if(all.length === 0) return null;
   if(!purchaseHistorySelectedId || !all.some(p => p.id === purchaseHistorySelectedId)){
     purchaseHistorySelectedId = all[0].id;
   }
-  return all.find(p => p.id === purchaseHistorySelectedId) || all[0] || null;
+  return normalizePurchaseForView(purchaseSummaryCache.byId.get(purchaseHistorySelectedId));
 }
 
 function updatePurchaseHistoryModeUI(selectedPurchase = null){
@@ -6419,7 +6530,7 @@ function renderPurchaseHistoryList(){
   if(!listEl) return;
   const q = String($('#purchase-history-search')?.value || '').trim().toLowerCase();
 
-  const all = getNormalizedPurchases();
+  const all = getPurchaseSummaries();
   const filtered = all.filter(p => {
     if(!q) return true;
     const text = `${p.docType} ${p.docNumber} ${p.supplierName} ${p.supplierRuc}`.toLowerCase();
@@ -6449,7 +6560,7 @@ function renderPurchaseHistoryList(){
           </div>
           <div class="small-muted">${escapeHtml(p.date)}</div>
         </div>
-        <div class="small-muted mt-1">${(p.items||[]).length} producto(s) • Total S/ ${money(p.totalCost||0)}</div>
+        <div class="small-muted mt-1">${p.itemCount} producto(s) • Total S/ ${money(p.totalCost||0)}</div>
       </button>
     `;
   }).join('');
@@ -6463,12 +6574,12 @@ function renderPurchaseHistoryList(){
   });
 
   const selected = filtered.find(p => p.id === purchaseHistorySelectedId) || filtered[0];
-  renderPurchaseHistoryPreview(selected || null);
+  renderPurchaseHistoryPreview(selected?normalizePurchaseForView(purchaseSummaryCache.byId.get(selected.id)):null);
   updatePurchaseHistoryModeUI(selected || null);
 }
 
 function openPurchaseHistoryModal(mode = 'view'){
-  ensureStateShape();
+  ensureStateShape(true);
   purchaseHistoryMode = mode === 'add' ?'add' : 'view';
   const input = $('#purchase-history-search');
   if(input && input.dataset.bound !== '1'){
@@ -6708,8 +6819,8 @@ function useSelectedPurchaseForAdd(){
 }
 
 function openIngresoAddPlusPicker(){
-  ensureStateShape();
-  const purchases = getNormalizedPurchases();
+  ensureStateShape(true);
+  const purchases = getPurchaseSummaries();
   if(purchases.length === 0){
     alert('No hay facturas registradas para usar ADD+');
     return;
@@ -6721,11 +6832,14 @@ function openIngresoAddPlusPicker(){
   openPurchaseHistoryModal('add');
 }
 
+let supplierOptionsCache=null;
 function renderIngresoSupplierOptions(selectedId = ''){
   const select = $('#ing-supplier-id');
   if(!select) return;
-  ensureStateShape();
-  const suppliers = (STATE.suppliers||[])
+  ensureStateShape(true);
+  const source=STATE.suppliers||[];
+  if(supplierOptionsCache?.rows===source&&supplierOptionsCache.length===source.length&&supplierOptionsCache.revision===stateRevision&&supplierOptionsCache.select===select){select.value=selectedId||'';updateIngresoSupplierMeta();return;}
+  const suppliers = source
     .filter(s => !s.deleted)
     .slice()
     .sort((a,b)=> spanishCollator.compare(String(a.name||''),String(b.name||'')));
@@ -6736,6 +6850,7 @@ function renderIngresoSupplierOptions(selectedId = ''){
     opts.push(`<option value="${escapeAttr(s.id)}">${escapeHtml(s.name||'')}${escapeHtml(extra)}</option>`);
   }
   select.innerHTML = opts.join('');
+  supplierOptionsCache={rows:source,length:source.length,revision:stateRevision,select};
 
   const target = selectedId || '';
   if(target && suppliers.some(s => s.id === target)) select.value = target;
@@ -7575,7 +7690,7 @@ function openIngresoModal(){
     openNewProductModal();
     return;
   }
-  ensureStateShape();
+  ensureStateShape(true);
   setupIngresoProductSearch();
   setupIngresoSubproductSearch();
   resetIngresoForm();
@@ -8150,24 +8265,27 @@ document.addEventListener('keydown', event=>{
   if(event.key === 'Escape') closeAdministrationMenu();
 });
 
+let personnelPage=0;
 function renderPersonnelList(){
   const box = $('#personnel-list');
   if(!box) return;
-  ensureStateShape();
+  ensureStateShape(true);
   const allStaff = (STATE.staff||[]);
   const rows = allStaff.filter(person=>person && !person.deleted).slice().sort((a,b)=>spanishCollator.compare(String(a.name||''),String(b.name||'')));
   const deletedCount = allStaff.filter(person=>person?.deleted).length;
-  const staffHtml = rows.map(person=>{
-    const hasOpenShift = (STATE.shifts||[]).some(s=>s.status==='OPEN' && String(s.staffId||'')===String(person.id||''));
+  const openStaff=new Set((STATE.shifts||[]).filter(shift=>shift?.status==='OPEN').map(shift=>String(shift.staffId||'')));
+  personnelPage=Math.min(personnelPage,Math.max(0,Math.ceil(rows.length/40)-1));
+  const staffHtml = rows.slice(personnelPage*40,(personnelPage+1)*40).map(person=>{
+    const hasOpenShift = openStaff.has(String(person.id||''));
     return `<div class="staff-row"><div><div class="font-bold">${escapeHtml(person.name||'Sin nombre')}</div><div class="small-muted">Usuario: ${escapeHtml(person.username||'')} ${hasOpenShift?'· Turno abierto':''}</div></div><div class="flex items-center gap-2 flex-wrap"><span class="staff-badge ${person.active===false?'off':''}">${person.active===false?'INACTIVO':'ACTIVO'}</span><button type="button" onclick="resetStaffPin('${escapeAttr(person.id)}')" class="px-2 py-1 border rounded text-sm">Nuevo PIN</button><button type="button" onclick="toggleStaffActive('${escapeAttr(person.id)}')" class="px-2 py-1 border rounded text-sm">${person.active===false?'Activar':'Desactivar'}</button><button type="button" onclick="deleteStaffUser('${escapeAttr(person.id)}')" class="px-2 py-1 border border-red-200 bg-red-50 text-red-700 rounded text-sm">Eliminar</button></div></div>`;
   }).join('') || '<div class="small-muted mt-2">Todavía no registraste personal.</div>';
   box.innerHTML = staffHtml + (deletedCount ?`<div class="small-muted mt-3">Usuarios eliminados: ${deletedCount}. Sus ventas, turnos y auditorías se conservan.</div>`:'');
+  appendListPagination(box,personnelPage,rows.length,40,page=>{personnelPage=page;renderPersonnelList();});
 }
 
 function openPersonnelModal(){
-  renderPersonnelList();
   openModal('modal-personnel');
-  safeCreateIcons();
+  afterModalPaint('modal-personnel',()=>{renderPersonnelList();safeCreateIcons($('#modal-personnel'));});
 }
 
 let staffSubmitInProgress=false;
@@ -8301,7 +8419,7 @@ function renderShiftModal(){
   }
 }
 function buildShiftModal(){
-  ensureStateShape();
+  ensureStateShape(true);
   const active = getActiveShiftForCurrentUser();
   const subtitle = $('#shift-modal-subtitle');
   const content = $('#shift-modal-content');
@@ -8679,6 +8797,7 @@ function logout(){
 function openModal(id){
   if(id==='modal-sale'&&!getActiveShiftForCurrentUser()){showToast('Abre tu turno antes de vender');openShiftModal();return;}
   const modal=document.getElementById(id);if(!modal || modal.classList.contains('visible')) return;
+  const initialViewport={height:window.visualViewport?.height||innerHeight,offset:window.visualViewport?Math.max(0,innerHeight-window.visualViewport.height):0};
   modal.classList.add('visible');modal._tasks=new Set();
   const sheet=modal.querySelector('.modal-sheet');
   if(sheet){
@@ -8687,7 +8806,7 @@ function openModal(id){
       sheet.style.maxHeight=Math.max(120,(viewport?.height||innerHeight)-40)+'px';
       sheet.style.transform=viewport?`translateY(-${Math.max(0,innerHeight-viewport.height)/4}px)`:'';
     };
-    adjust();modal._vvHandler=adjust;
+    sheet.style.maxHeight=Math.max(120,initialViewport.height-40)+'px';sheet.style.transform=initialViewport.offset?`translateY(-${initialViewport.offset/4}px)`:'';modal._vvHandler=adjust;
     window.visualViewport?.addEventListener('resize',adjust);
     window.visualViewport?.addEventListener('scroll',adjust);
   }
@@ -8699,18 +8818,37 @@ function openModal(id){
     if(focus) document.getElementById(focus)?.focus({preventScroll:true});
   });
 }
+function fillTableRows(body,rows,emptyHTML,modalId,progressive=false){
+  if(!rows.length){body.innerHTML=emptyHTML;return;}
+  if(!progressive){body.innerHTML=rows.join('');return;}
+  body.replaceChildren();body.setAttribute('aria-busy','true');let cursor=0;
+  const loading=document.createElement('tr');const message=document.createElement('td');message.colSpan=body.closest('table')?.querySelector('thead tr')?.children.length||1;message.className='small-muted';message.textContent='Mostrando filas...';loading.appendChild(message);body.appendChild(loading);
+  const append=()=>{
+    if(!body.isConnected||!isModalVisible(modalId)) return;
+    loading.insertAdjacentHTML('beforebegin',rows.slice(cursor,cursor+10).join(''));cursor+=10;
+    if(cursor<rows.length) afterModalPaint(modalId,append);
+    else{loading.remove();body.removeAttribute('aria-busy');}
+  };append();
+}
+function scheduleNextModalPaint(modal){
+  if(modal._paintTask||!modal.classList.contains('visible')||!modal._tasks?.size) return;
+  const token=modal._tasks.values().next().value;modal._paintTask=token;
+  token.frame=requestAnimationFrame(()=>{token.timer=setTimeout(()=>{
+    modal._paintTask=null;modal._tasks.delete(token);
+    try{if(modal.classList.contains('visible')) token.task();}
+    finally{scheduleNextModalPaint(modal);}
+  },0);});
+}
 function afterModalPaint(id,task){
   const modal=document.getElementById(id);if(!modal?.classList.contains('visible')) return;
-  const token={frame:0,timer:0};(modal._tasks||(modal._tasks=new Set())).add(token);
-  token.frame=requestAnimationFrame(()=>{token.timer=setTimeout(()=>{
-    modal._tasks.delete(token);if(modal.classList.contains('visible')) task();
-  },0);});
+  (modal._tasks||(modal._tasks=new Set())).add({frame:0,timer:0,task});
+  scheduleNextModalPaint(modal);
 }
 
 function closeModal(id){
   const modal=document.getElementById(id);if(!modal) return;
   modal.classList.remove('visible');
-  modal._tasks?.forEach(token=>{cancelAnimationFrame(token.frame);clearTimeout(token.timer);});modal._tasks?.clear();
+  modal._tasks?.forEach(token=>{cancelAnimationFrame(token.frame);clearTimeout(token.timer);});modal._tasks?.clear();modal._paintTask=null;
   if(id==='modal-stock-auth') stockAuthPendingAction=null;
   if(modal._vvHandler){
     window.visualViewport?.removeEventListener('resize',modal._vvHandler);
@@ -8783,7 +8921,7 @@ let pwaRegistrationPromise=null,appStarted=false;
 function registerPWA(){
   if(pwaRegistrationPromise) return pwaRegistrationPromise;
   if(!('serviceWorker' in navigator)||!/^https?:$/.test(location.protocol)) return Promise.resolve(false);
-  pwaRegistrationPromise=navigator.serviceWorker.register('./service-worker.js?v=20261110-excel-sync-v6',{scope:'./',updateViaCache:'none'})
+  pwaRegistrationPromise=navigator.serviceWorker.register('./service-worker.js?v=20261122-click-v7',{scope:'./',updateViaCache:'none'})
     .then(()=>true).catch(error=>{console.warn('Service worker',error);pwaRegistrationPromise=null;return false;});
   return pwaRegistrationPromise;
 }
@@ -8860,6 +8998,22 @@ document.addEventListener('DOMContentLoaded', async ()=>{
     loadPersonnelForLoginFromCloud(false);
   }
 });
+
+/* Exportaciones: respuesta visual primero, compresión fuera del hilo de interfaz. */
+const activeExcelExports=new Map();
+for(const name of ['exportInventoryXLSX','exportSalesXLSX','exportCombinedXLSX','exportStockHistoryXLSX','exportDailyStockXLSX']){
+  const original=window[name];
+  window[name]=function(...args){
+    const key=name+'|'+JSON.stringify(args);
+    if(activeExcelExports.has(key)) return activeExcelExports.get(key);
+    const current=window.event?.currentTarget||document.activeElement;
+    const button=current?.tagName==='BUTTON'&&String(current.getAttribute('onclick')||'').includes(name)?current:null;
+    const release=markActionBusy(button,'Preparando Excel...');
+    const job=(async()=>{await allowInterfacePaint();return original.apply(this,args);})().finally(()=>{release();activeExcelExports.delete(key);});
+    activeExcelExports.set(key,job);return job;
+  };
+}
+window.addEventListener('pagehide',()=>stopExcelWriter(new DOMException('La página se cerró durante la exportación','AbortError')));
 
 /* Diagnóstico voluntario: ?diagnostics=1. No almacena datos del negocio. */
 (function installPerformanceDiagnostics(){

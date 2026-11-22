@@ -187,7 +187,7 @@ const {fixture}=require('./benchmark.cjs');
    });assert.equal(result,'1');
  });
  await test('exportación Excel con carga diferida local',async()=>{
-   const download=page.waitForEvent('download');await page.evaluate(()=>exportInventoryXLSX());const file=await download;assert.ok(file.suggestedFilename().endsWith('.xlsx'));assert.equal(await page.evaluate(()=>!!window.XLSX),true);
+   const download=page.waitForEvent('download');await page.evaluate(()=>exportInventoryXLSX());const file=await download;assert.ok(file.suggestedFilename().endsWith('.xlsx'));assert.equal(await page.evaluate(()=>excelWriteMode),'worker');
  });
  await test('lector libera stream al cerrar durante inicio',async()=>{
    await page.evaluate(()=>{window.startScanner('sale');closeModal('modal-scan');});await page.waitForTimeout(800);

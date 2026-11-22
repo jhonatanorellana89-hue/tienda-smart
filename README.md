@@ -21,7 +21,7 @@ Las bibliotecas siguen en `libs` y la PWA las conserva para uso sin conexión.
 
 Los demás archivos, incluidos los logotipos y bibliotecas, deben conservarse.
 En esta actualización se eliminan `libs/html2canvas-1.4.1.min.js` y
-`libs/jspdf-2.5.1.umd.min.js`. El Service Worker v6 deja de incluirlos en la caché.
+`libs/jspdf-2.5.1.umd.min.js`. El Service Worker v7 deja de incluirlos en la caché.
 No es necesario instalar Node ni ejecutar una compilación para publicar esta copia:
 el CSS ya está generado. No borrar los datos del sitio ni desinstalar la PWA.
 Antes de actualizar una caja real, exportar su respaldo JSON desde Sincronización.
@@ -60,6 +60,9 @@ sincronización y tareas largas. Conserva hasta 500 muestras en memoria; no env�
 telemetría ni guarda datos del negocio. Sin ese parámetro no instala observadores.
 El consumo de memoria sólo aparece si el navegador expone `performance.memory`.
 
-La actualización actual se documenta en `docs/EXCEL-Y-SINCRONIZACION.md`.
+La actualización actual se documenta en `docs/RESPUESTA-AL-CLICK.md`.
+Incluye tablas progresivas, apertura inmediata de ventanas, vistas calculadas
+reutilizables y generación de Excel en un Worker local. El PDF sigue retirado.
+Los cambios anteriores de Excel y sincronización están en `docs/EXCEL-Y-SINCRONIZACION.md`.
 La auditoría inicial y sus mediciones se conservan en `docs/AUDITORIA.md` como
 evidencia histórica. Los objetivos de Android necesitan una prueba en el equipo real.
