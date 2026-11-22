@@ -1,0 +1,13 @@
+{
+  "passed": 6,
+  "tests": [
+    "conexión IndexedDB cerrada se reabre y conserva estado y cola sin usar el respaldo pequeño",
+    "reabrir la base conserva las firmas y no resucita productos ni operaciones eliminados",
+    "evento de cierre inesperado permite abrir otra conexión válida",
+    "apertura bloqueada no queda rechazada para siempre ni deja una conexión tardía abierta",
+    "fallo de los dos almacenes conserva la cola, muestra la causa y no apila avisos",
+    "error del guardado de cola en segundo plano llega al indicador y se recupera"
+  ],
+  "errors": [],
+  "externalRequests": 0
+}

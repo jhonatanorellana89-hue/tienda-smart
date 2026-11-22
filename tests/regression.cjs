@@ -124,7 +124,7 @@ const {fixture}=require('./benchmark.cjs');
  });
  await test('una suscripción por colección; eventos no confirman ni borran cola',async()=>{
    const result=await page.evaluate(async()=>{
-    localStorage.setItem(WORK_MODE_KEY,'auto');db={};resolveDbCollectionName=async()=>{};migrateOldDataToSubcollections=async()=>{};
+    localStorage.setItem(WORK_MODE_KEY,'auto');db={};cloudRouteReady=true;cloudWritesReady=true;resolveDbCollectionName=async()=>{};migrateOldDataToSubcollections=async()=>{};
     window.fakeSnapshots={};window.fakeSubscriptions={};subcolRef=name=>({onSnapshot:(options,next,error)=>{fakeSnapshots[name]={next,error};fakeSubscriptions[name]=(fakeSubscriptions[name]||0)+1;return ()=>{};}});
     executePendingOperation=async()=>{throw Object.assign(new Error('offline simulado'),{code:'unavailable'});};
     await Promise.all([bootstrapCloudSync(),bootstrapCloudSync(),bootstrapCloudSync()]);await new Promise(r=>setTimeout(r,40));
@@ -143,7 +143,7 @@ const {fixture}=require('./benchmark.cjs');
  });
  await test('un reintento antiguo no adelanta escrituras posteriores de la misma entidad',async()=>{
    const result=await page.evaluate(async()=>{
-    localStorage.setItem(WORK_MODE_KEY,'auto');db={};pendingOps=[];
+    localStorage.setItem(WORK_MODE_KEY,'auto');db={};cloudRouteReady=true;cloudWritesReady=true;pendingOps=[];
     const future=new Date(Date.now()+60000).toISOString();
     pendingOps.push({id:'old',type:'product',payload:{id:'ORDER'},nextAttemptAt:future},{id:'new',type:'product',payload:{id:'ORDER'}},{id:'other',type:'product',payload:{id:'OTHER'}});
     const sent=[];executePendingOperation=async op=>{sent.push(op.id);return true;};await processPendingOps();

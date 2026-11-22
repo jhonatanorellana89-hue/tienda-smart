@@ -13,7 +13,7 @@ const artifacts=path.resolve(__dirname,'../work/test-results');fs.mkdirSync(arti
  const test=async(name,action)=>{await action();tests.push(name);console.log('PASS',name);};
  const mockCloud=async()=>{
   await page.evaluate(async()=>{
-   localStorage.setItem(WORK_MODE_KEY,'auto');db={};ensureFirebaseLoaded=async()=>true;initFirebase=()=>{};resolveDbCollectionName=async()=>{};migrateOldDataToSubcollections=async()=>{};
+   localStorage.setItem(WORK_MODE_KEY,'auto');db={};cloudRouteReady=true;cloudWritesReady=true;ensureFirebaseLoaded=async()=>true;initFirebase=()=>{};resolveDbCollectionName=async()=>{};migrateOldDataToSubcollections=async()=>{};
    window.mockSnapshots={};subcolRef=name=>({onSnapshot:(options,next,error)=>{if(options.includeMetadataChanges!==true) throw new Error('Faltan cambios de metadatos');mockSnapshots[name]={next,error};return ()=>{};}});
    await startFirestoreSync();
    Object.values(mockSnapshots).forEach(s=>s.next({metadata:{fromCache:false},docChanges:()=>[]}));
@@ -47,7 +47,7 @@ const artifacts=path.resolve(__dirname,'../work/test-results');fs.mkdirSync(arti
   await mockCloud();
   await test('datos de caché, Internet y actualización completa muestran estados distintos',async()=>{
    assert.equal(await page.evaluate(()=>{updateOnline(true);return getSyncSummary().label;}),'Al día');
-   assert.equal(await page.evaluate(()=>{mockSnapshots.products.next({metadata:{fromCache:true},docChanges:()=>[]});return getSyncSummary().label;}),'Esperando respuesta de la nube');
+   assert.equal(await page.evaluate(()=>{mockSnapshots.products.next({metadata:{fromCache:true},docChanges:()=>[]});return getSyncSummary().label;}),'Conectado · Actualizando datos');
    await context.setOffline(true);assert.equal(await page.evaluate(()=>getSyncSummary().label),'Sin Internet');
    await context.setOffline(false);assert.notEqual(await page.evaluate(()=>getSyncSummary().label),'Al día');
    await page.evaluate(()=>Object.values(mockSnapshots).forEach(s=>s.next({metadata:{fromCache:false},docChanges:()=>[]})));

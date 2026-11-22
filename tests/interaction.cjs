@@ -82,6 +82,8 @@ const artifacts=path.resolve(__dirname,'../work/test-results');fs.mkdirSync(arti
    });assert.deepEqual(result,{busy:true,sales:1,parent:1,child:12,total:32,restored:true,queued:true});
   });
   await page.evaluate(async()=>{STATE.purchases=[];STATE.staff=[];STATE.shifts=[];STATE.auditLogs=[];STATE.stockMovements=[];STATE.sales=STATE.sales.slice(0,3);saveLocalBackup();await ensureXLSXLoaded(true,true);});
+  // Ambos archivos deben representar el mismo instante, incluso al cruzar un segundo.
+  await page.clock.setFixedTime(new Date());
   const exports=['exportInventoryXLSX','exportSalesXLSX','exportCombinedXLSX','exportStockHistoryXLSX','exportDailyStockXLSX'];
   const workbook=async(name,worker)=>{
    await page.evaluate(useWorker=>{if(!window.testOriginalWorker) window.testOriginalWorker=Worker;window.Worker=useWorker?testOriginalWorker:undefined;},worker);
