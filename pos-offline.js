@@ -2,12 +2,15 @@
   'use strict';
   const DB_NAME = 'TiendaSmartOffline', DB_VERSION = 3;
   const ENTITY_STORES = ['products','sales','customers','purchases','suppliers','auditLogs','stockClosures','staff','shifts','stockMovements','syncConflicts'];
-  let dbPromise, writeChain = Promise.resolve(), stateTimer, opsTimer, pendingState, pendingOps;
+  let dbPromise, activeDb=null, openAttempt=0, writeChain = Promise.resolve(), stateTimer, opsTimer, pendingState, pendingOps;
   const signatures = new Map();
   const clone = value => typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value));
   function openDb(){
     if(dbPromise) return dbPromise;
+    const attempt=++openAttempt;
     dbPromise = new Promise((resolve,reject)=>{
+      let failed=false;
+      const fail=error=>{failed=true;if(attempt===openAttempt) dbPromise=null;reject(error);};
       const request = indexedDB.open(DB_NAME,DB_VERSION);
       request.onupgradeneeded = ()=>{
         const db=request.result;
@@ -16,13 +19,26 @@
       };
       request.onsuccess=()=>{
         const db=request.result;
-        db.onversionchange=()=>{db.close(); dbPromise=null; signatures.clear();};
+        if(failed||attempt!==openAttempt){db.close();return;}
+        activeDb=db;
+        db.onclose=()=>{if(activeDb===db){activeDb=null;dbPromise=null;}};
+        db.onversionchange=()=>{db.close();if(activeDb===db){activeDb=null;dbPromise=null;signatures.clear();}};
         resolve(db);
       };
-      request.onerror=()=>{dbPromise=null;reject(request.error||new Error('IndexedDB no disponible'));};
-      request.onblocked=()=>reject(new Error('Cierra las otras pestañas para actualizar IndexedDB'));
+      request.onerror=()=>fail(request.error||new Error('IndexedDB no disponible'));
+      request.onblocked=()=>fail(Object.assign(new Error('Cierra las otras pestañas de TiendaSmart para habilitar el guardado'),{name:'StorageBlockedError'}));
     });
-    return dbPromise;
+    const pending=dbPromise;
+    pending.catch(()=>{if(dbPromise===pending) dbPromise=null;});
+    return pending;
+  }
+  function resetConnection(){
+    try{activeDb?.close();}catch(_){}activeDb=null;dbPromise=null;
+    // Las firmas siguen representando la última transacción confirmada.
+  }
+  function notifyStorageFailure(error){
+    console.warn('Guardado local pendiente',error);
+    window.dispatchEvent(new CustomEvent('tienda-storage-error',{detail:error}));
   }
   function requestResult(request){return new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
   function transactionDone(tx){return new Promise((resolve,reject)=>{
@@ -93,11 +109,16 @@
       }catch(error){tx.abort();await done.catch(()=>{});throw error;}
       await done;next.forEach((value,key)=>signatures.set(key,value));return true;
     };
-    const result=writeChain.then(run);writeChain=result.catch(()=>{});return result;
+    const result=writeChain.then(async()=>{
+      try{return await run();}catch(error){
+        if(!['InvalidStateError','TransactionInactiveError'].includes(error?.name)) throw error;
+        resetConnection();return run();
+      }
+    });writeChain=result.catch(()=>{});return result;
   }
   function scheduleStateSave(state,delay=180){
     pendingState=state;clearTimeout(stateTimer);
-    stateTimer=setTimeout(()=>flushState().catch(error=>console.warn('IndexedDB state save failed',error)),delay);
+    stateTimer=setTimeout(()=>flushState().catch(notifyStorageFailure),delay);
   }
   async function flushState(state){
     clearTimeout(stateTimer);const value=state||pendingState;pendingState=null;
@@ -105,7 +126,7 @@
   }
   function schedulePendingSave(ops,delay=100){
     pendingOps=ops;clearTimeout(opsTimer);
-    opsTimer=setTimeout(()=>{const value=pendingOps;pendingOps=null;commit(null,value).catch(error=>console.warn('IndexedDB queue save failed',error));},delay);
+    opsTimer=setTimeout(()=>{const value=pendingOps;pendingOps=null;commit(null,value).catch(notifyStorageFailure);},delay);
   }
   function cancelScheduled(){
     clearTimeout(stateTimer);clearTimeout(opsTimer);pendingState=null;pendingOps=null;

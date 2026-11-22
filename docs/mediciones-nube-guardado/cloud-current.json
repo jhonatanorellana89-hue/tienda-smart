@@ -1,0 +1,22 @@
+{
+  "label": "cloud-current",
+  "browser": "156.0.8078.79",
+  "synthetic": true,
+  "collectionDelayMs": 200,
+  "legacyDelayMs": 2000,
+  "runs": [
+    {
+      "run": "first",
+      "untilListenersMs": 203.79999999981374,
+      "reads": 8,
+      "listeners": 11
+    },
+    {
+      "run": "reopen",
+      "untilListenersMs": 0.39999999944120646,
+      "reads": 0,
+      "listeners": 11
+    }
+  ],
+  "errors": []
+}

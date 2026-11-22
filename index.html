@@ -1842,11 +1842,12 @@
       <div class="rounded-xl border p-2"><div class="small-muted">Con error</div><strong id="sync-center-errors">0</strong></div>
     </div>
     <div class="grid grid-cols-2 gap-2 mt-3">
+      <button id="btn-local-save-retry" type="button" onclick="retryLocalSave()" class="btn-primary hidden">Reintentar guardado</button>
       <button id="btn-sync-now" type="button" onclick="syncNow()" class="btn-primary">Enviar pendientes</button>
       <button type="button" onclick="downloadDataBackup()" class="px-3 py-2 rounded-xl border bg-white font-semibold">Exportar respaldo JSON</button>
     </div>
     <div class="mt-3">
-      <label class="small-muted" for="sync-queue-filter">Operaciones guardadas en este equipo</label>
+      <label id="sync-queue-heading" class="small-muted" for="sync-queue-filter">Operaciones guardadas en este equipo</label>
       <select id="sync-queue-filter" class="input-pro mt-1" onchange="syncQueuePage=0;renderSyncOperations()"><option value="all">Todas las pendientes</option><option value="errors">Sólo con error</option><option value="waiting">En espera o enviando</option></select>
       <div id="sync-queue-list" class="mt-2 space-y-2 max-h-64 overflow-auto"></div>
       <button id="btn-sync-retry-errors" type="button" onclick="syncNow(true)" class="hidden px-3 py-2 border rounded-xl mt-2 text-sm">Reintentar operaciones con error</button>
@@ -1857,7 +1858,7 @@
       <p class="small-muted mt-2">Estos registros requieren revisión. Sincronizar no elige automáticamente cantidades ni corrige diferencias.</p>
       <div id="sync-conflicts-list" class="small-muted mt-2 max-h-64 overflow-auto"></div>
     </div>
-    <p class="small-muted mt-3">Las ventas pueden continuar mientras se sincroniza. Conserva los datos del navegador y exporta un respaldo antes de cambiar de equipo.</p>
+    <p id="sync-storage-note" class="small-muted mt-3">Las ventas pueden continuar mientras se sincroniza. Conserva los datos del navegador y exporta un respaldo antes de cambiar de equipo.</p>
     <details class="mt-3"><summary class="small-muted">Opciones avanzadas</summary><p class="small-muted mt-2">Si faltan cambios de otro equipo, puedes volver a leer los datos de la nube. Se conserva la cola local.</p><button id="btn-sync-refresh" type="button" onclick="requireStockAccess(forceSync)" class="px-3 py-2 border rounded-xl mt-2 text-sm">Actualizar datos desde la nube</button></details>
   </div>
 </div>
@@ -2080,10 +2081,13 @@ async function ensureXLSXLoaded(showError = true,forceMain=false){
 
 
 async function ensureFirebaseLoaded(){
-  if(window.firebase?.firestore) return true;
+  if(window.firebase?.firestore&&window.firebase?.auth) return true;
   if(!await loadExternalScript('./libs/firebase-app-9.22.2-compat.js',()=>!!window.firebase?.initializeApp)) return false;
-  if(!await loadExternalScript('./libs/firebase-auth-9.22.2-compat.js',()=>!!window.firebase?.auth)) return false;
-  return loadExternalScript('./libs/firebase-firestore-9.22.2-compat.js',()=>!!window.firebase?.firestore);
+  const [authReady,storeReady]=await Promise.all([
+    loadExternalScript('./libs/firebase-auth-9.22.2-compat.js',()=>!!window.firebase?.auth),
+    loadExternalScript('./libs/firebase-firestore-9.22.2-compat.js',()=>!!window.firebase?.firestore)
+  ]);
+  return authReady&&storeReady;
 }
 
 /* Simple escape for safety in HTML rendering */
@@ -2239,6 +2243,7 @@ ensureStateShape();
 
 /* Persist helpers */
 let mergedStateBackupTimer = 0;
+let localSaveIssue=null,localSaveRetryTimer=0,localSaveRetryAt=0,localSaveFailures=0,localSaveNoticeAt=0,localSaveRecoveryPromise=null;
 function scheduleMergedStateBackup(){
   stateRevision += 1; invalidateProductIndexes();
   clearTimeout(mergedStateBackupTimer);
@@ -2272,12 +2277,49 @@ function writeLegacyBackup(receipts=syncReceipts){
   // Un solo setItem es atómico: nunca queda una venta sin su cola por falta de cuota.
   localStorage.setItem('tienda_critical_fallback_v1',JSON.stringify({state:STATE,ops:pendingOps,syncReceipts:receipts}));
 }
+function describeLocalSaveError(error){
+  const names=[error?.name,error?.primaryName,error?.fallbackName].join(' ');
+  if(/QuotaExceeded/i.test(names)) return 'No hay espacio disponible para guardar. Descarga un respaldo y libera espacio del dispositivo, sin borrar los datos de esta app.';
+  if(/StorageBlocked/i.test(names)) return 'Cierra las otras pestañas de TiendaSmart y pulsa Reintentar guardado.';
+  if(/SecurityError|NotAllowedError/i.test(names)) return 'El navegador bloqueó el almacenamiento. Mantén esta ventana abierta y descarga un respaldo.';
+  return 'El guardado se interrumpió y se volverá a intentar. Mantén la app abierta; puedes descargar un respaldo desde Sincronización.';
+}
+function clearLocalSaveIssue(){
+  const hadIssue=!!localSaveIssue;localSaveIssue=null;localSaveFailures=0;localSaveRetryAt=0;
+  clearTimeout(localSaveRetryTimer);localSaveRetryTimer=0;
+  if(hadIssue){document.querySelector('[data-local-save-toast]')?.remove();scheduleSyncIndicators();}
+}
 function reportLocalSaveError(error){
   console.error('No se confirmó el guardado local',error);
-  showToast('No se pudo confirmar el guardado local. Exporta un respaldo y revisa el espacio disponible.',6000);
+  localSaveIssue={name:String(error?.primaryName||error?.name||'Error'),message:String(error?.message||error),detail:describeLocalSaveError(error)};
+  localSaveFailures++;localSaveRetryAt=Date.now()+Math.min(30000,5000*2**Math.min(localSaveFailures-1,3));
+  if(!document.querySelector('[data-local-save-toast]')&&(localSaveNoticeAt===0||Date.now()-localSaveNoticeAt>=30000)){
+    localSaveNoticeAt=Date.now();showToast('Guardado local pendiente. Revisa Sincronización.',6000);
+    $('#toast-root')?.lastElementChild?.setAttribute('data-local-save-toast','1');
+  }
+  if(!localSaveRetryTimer){localSaveRetryTimer=setTimeout(()=>{localSaveRetryTimer=0;if(!criticalWriteDepth) retryLocalSave();else reportLocalSaveError(error);},Math.max(0,localSaveRetryAt-Date.now()));}
+  scheduleSyncIndicators();
 }
+function retryLocalSave(){
+  if(localSaveRecoveryPromise) return localSaveRecoveryPromise;
+  if(criticalWriteDepth) return Promise.resolve(false);
+  const release=markActionBusy($('#btn-local-save-retry'),'Guardando...');
+  localSaveRecoveryPromise=(async()=>{
+    try{
+      if(!localPersistenceReady){
+        // Antes de recuperar IndexedDB, conservar íntegros el estado y la cola en memoria.
+        writeLegacyBackup();await initializeLocalPersistence();
+      }
+      await persistLocalState(true);if(localSaveIssue) clearLocalSaveIssue();
+      processPendingOps();return true;
+    }catch(error){reportLocalSaveError(error);return false;}
+    finally{release();localSaveRecoveryPromise=null;scheduleSyncIndicators();}
+  })();return localSaveRecoveryPromise;
+}
+window.addEventListener('tienda-storage-error',event=>reportLocalSaveError(event.detail));
 async function persistLocalState(force=false){
   if(criticalWriteDepth&&!force) return false;
+  if(!force&&localSaveIssue&&Date.now()<localSaveRetryAt) return false;
   clearTimeout(mergedStateBackupTimer);mergedStateBackupTimer=0;
   if(!force && savedRevision===stateRevision) return true;
   const revision=stateRevision;
@@ -2286,10 +2328,13 @@ async function persistLocalState(force=false){
     await POSStorage.commit(STATE,pendingOps);
     localStorage.removeItem('tienda_critical_fallback_v1');
   }catch(error){
-    // No se informa éxito si tampoco es posible completar el respaldo alternativo.
-    writeLegacyBackup();
+    // Conservar ambos errores permite distinguir espacio, bloqueo y cierre de conexión.
+    try{writeLegacyBackup();}catch(fallbackError){
+      const failure=new Error(String(error.message||error)+' · Respaldo: '+String(fallbackError.message||fallbackError));
+      failure.name=fallbackError.name||'Error';failure.primaryName=error.name;failure.fallbackName=fallbackError.name;throw failure;
+    }
   }
-  savedRevision=revision;return true;
+  savedRevision=revision;clearLocalSaveIssue();return true;
 }
 function savePending(){
   if(criticalWriteDepth) return;
@@ -2543,6 +2588,7 @@ function initFirebase(){
     if(!window.firebase) { console.warn('Firebase SDK not loaded'); return; }
     if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
+    try{db.settings({experimentalAutoDetectLongPolling:true,useFetchStreams:false});}catch(error){console.warn('Transporte de nube: configuración existente conservada',error);}
   }catch(e){ console.error('initFirebase', e); db = null; }
 }
 
@@ -2555,12 +2601,66 @@ const MIGRATION_KEY = 'tienda_migration_v1';
 let syncInProgress = false, cloudBootstrapPromise=null, firestoreStartPromise=null, syncGeneration=0;
 let syncIndicatorTimer=0, syncActionInProgress=false, syncRefreshInProgress=false, syncQueuePage=0, syncConflictPage=0, pendingFlushPromise=null, activeSyncOperationId=null;
 const syncCollectionStates={};
+const CLOUD_ROUTE_KEY='tienda_cloud_route_v1',CLOUD_CONNECT_TIMEOUT=6000,CLOUD_RESPONSE_TIMEOUT=10000;
+let cloudRouteReady=false,cloudWritesReady=false,cloudMigrationVerified=false,cloudPreparationPromise=null;
+let cloudConnectionError='',cloudPreparationError='',cloudConnectionSlow=false,cloudRetryTimer=0,cloudResponseTimer=0,cloudRetryAttempt=0,cloudResumeAt=0,cloudNetworkRestartAt=0,cloudNetworkRestartPromise=null;
+function cloudDeadline(task,ms=CLOUD_CONNECT_TIMEOUT){
+  let timer;return Promise.race([task,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Object.assign(new Error('La nube tarda en responder; se reintentará automáticamente'),{code:'deadline-exceeded'})),ms);})]).finally(()=>clearTimeout(timer));
+}
+function retryableCloudError(error){return !/permission-denied|unauthenticated|invalid-argument|failed-precondition/.test(String(error?.code||''));}
+function scheduleCloudReconnect(delay=null){
+  if(cloudRetryTimer||!navigator.onLine||!isCloudAllowed()) return;
+  const wait=delay??Math.min(30000,2000*2**Math.min(cloudRetryAttempt++,4));
+  cloudRetryTimer=setTimeout(()=>{cloudRetryTimer=0;resumeCloudConnection(true);},wait);
+}
+function watchCloudResponse(){
+  if(cloudResponseTimer||Object.values(syncCollectionStates).some(item=>item.serverConfirmed)) return;
+  cloudResponseTimer=setTimeout(()=>{
+    cloudResponseTimer=0;
+    if(!navigator.onLine||!isCloudAllowed()||Object.values(syncCollectionStates).some(item=>item.serverConfirmed)) return;
+    cloudConnectionSlow=true;scheduleSyncIndicators();scheduleCloudReconnect();
+  },CLOUD_RESPONSE_TIMEOUT);
+}
+function noteCloudResponse(){
+  cloudConnectionError='';cloudConnectionSlow=false;cloudRetryAttempt=0;clearTimeout(cloudResponseTimer);cloudResponseTimer=0;
+  if(!cloudPreparationError&&!Object.values(syncCollectionStates).some(item=>item.state==='error')){clearTimeout(cloudRetryTimer);cloudRetryTimer=0;}
+}
+function prepareCloudData(){
+  if(cloudWritesReady) return Promise.resolve(true);
+  if(cloudPreparationPromise) return cloudPreparationPromise;
+  const generation=syncGeneration;
+  cloudPreparationPromise=Promise.resolve().then(()=>cloudMigrationVerified?undefined:migrateOldDataToSubcollections()).then(()=>{
+    if(generation!==syncGeneration||!isCloudAllowed()) return false;
+    cloudWritesReady=true;cloudPreparationError='';processPendingOps();return true;
+  }).catch(error=>{
+    if(generation===syncGeneration){cloudPreparationError=String(error.message||error);if(retryableCloudError(error)) scheduleCloudReconnect();scheduleSyncIndicators();}
+    return false;
+  }).finally(()=>{cloudPreparationPromise=null;if(generation!==syncGeneration&&isCloudAllowed()) scheduleCloudReconnect(0);});
+  return cloudPreparationPromise;
+}
+function resumeCloudConnection(force=false){
+  if(!navigator.onLine||!isCloudAllowed()) return;
+  if(!force&&Date.now()-cloudResumeAt<1500) return;
+  cloudResumeAt=Date.now();
+  const recover=error=>{cloudConnectionError=String(error.message||error);scheduleCloudReconnect();scheduleSyncIndicators();};
+  if(cloudConnectionSlow&&db?.disableNetwork&&db?.enableNetwork&&!cloudNetworkRestartPromise&&Date.now()-cloudNetworkRestartAt>=30000){
+    cloudNetworkRestartAt=Date.now();
+    // Reiniciar sólo el transporte conserva la cola de Firestore y los mismos IDs.
+    cloudNetworkRestartPromise=Promise.resolve().then(()=>db.disableNetwork()).then(()=>{
+      if(navigator.onLine&&isCloudAllowed()) return db.enableNetwork();
+    }).catch(recover).finally(()=>{cloudNetworkRestartPromise=null;});
+  }else if(!cloudNetworkRestartPromise){
+    try{Promise.resolve(db?.enableNetwork?.()).catch(recover);}catch(error){recover(error);}
+  }
+  return bootstrapCloudSync(false);
+}
 function scheduleSyncIndicators(){
   if(syncIndicatorTimer) return;
   syncIndicatorTimer=setTimeout(()=>{syncIndicatorTimer=0;updateOnline(cloudOn);},50);
 }
 function stopCloudListeners(){
-  syncGeneration++;
+  syncGeneration++;cloudWritesReady=false;cloudConnectionError='';cloudPreparationError='';cloudConnectionSlow=false;cloudRetryAttempt=0;
+  clearTimeout(cloudRetryTimer);cloudRetryTimer=0;clearTimeout(cloudResponseTimer);cloudResponseTimer=0;
   Object.keys(syncCollectionStates).forEach(key=>delete syncCollectionStates[key]);
   Object.entries(unsubscribers).forEach(([key,stop])=>{try{stop?.();}catch(_){}unsubscribers[key]=null;});
 }
@@ -2596,29 +2696,55 @@ function subcolRef(name){
 }
 
 let collectionResolutionPromise=null;
+function rememberSyncError(message){
+  try{localStorage.setItem(LAST_SYNC_ERROR_KEY,message);}catch(error){console.warn('No se pudo guardar el indicador de error',error);}
+}
+function rememberCloudMigration(value){
+  cloudMigrationVerified=true;
+  try{if(!localStorage.getItem(MIGRATION_KEY)||value==='done') localStorage.setItem(MIGRATION_KEY,value);}catch(error){console.warn('No se pudo recordar la comprobación de nube',error);}
+}
+function rememberCloudRoute(col,skipMigration=false){
+  activeDbCol=col;cloudRouteReady=true;
+  if(skipMigration) rememberCloudMigration('skipped_verified');
+  try{
+    localStorage.setItem(CLOUD_ROUTE_KEY,JSON.stringify({projectId:firebaseConfig.projectId,col,doc:DB.doc,legacyDoc:DB.legacyDoc,primary:DB.col,fallback:DB.colFallback,migrationVerified:skipMigration}));
+  }catch(error){console.warn('No se pudo recordar la ruta de nube',error);}
+}
 function resolveDbCollectionName(){
+  if(cloudRouteReady) return Promise.resolve(activeDbCol);
   if(!collectionResolutionPromise) collectionResolutionPromise=resolveDbCollectionNameOnce().catch(error=>{collectionResolutionPromise=null;throw error;});
   return collectionResolutionPromise;
 }
+function probeCloudCollection(col){
+  const base=db.collection(col).doc(DB.doc);
+  const reads=[...['products','customers','sales'].map(key=>()=>base.collection(SUBCOLS[key]).limit(1).get({source:'server'})),()=>db.collection(col).doc(DB.legacyDoc).get({source:'server'})];
+  // Cualquier dato confirma la ruta; una ruta vacía requiere todas las respuestas.
+  return new Promise(resolve=>{
+    let remaining=reads.length,firstError=null,found=false;
+    reads.forEach((read,index)=>Promise.resolve().then(read).then(snapshot=>{
+      const hasData=index===3?snapshot.exists:!snapshot.empty;
+      if(hasData){found=true;resolve({col,hasData:true,skipMigration:index!==3});}
+    },error=>{firstError=firstError||error;}).finally(()=>{
+      if(--remaining===0&&!found) resolve({col,hasData:false,complete:!firstError,error:firstError,skipMigration:!firstError});
+    }));
+  });
+}
 async function resolveDbCollectionNameOnce(){
-  if(!db) return;
-  const candidates = Array.from(new Set([DB.col, DB.colFallback].filter(Boolean)));
-  for(const col of candidates){
-    try{
-      const base = db.collection(col).doc(DB.doc);
-      const [pSnap, cSnap, sSnap] = await Promise.all([
-        base.collection(SUBCOLS.products).limit(1).get(),
-        base.collection(SUBCOLS.customers).limit(1).get(),
-        base.collection(SUBCOLS.sales).limit(1).get()
-      ]);
-      const legacySnap = await db.collection(col).doc(DB.legacyDoc).get();
-      if(!pSnap.empty || !cSnap.empty || !sSnap.empty || legacySnap.exists){
-        activeDbCol = col;
-        return;
-      }
-    }catch(_){}
+  if(!db) throw new Error('El servicio de nube todavía no está disponible');
+  const candidates=Array.from(new Set([DB.col,DB.colFallback].filter(Boolean)));
+  try{
+    const saved=JSON.parse(localStorage.getItem(CLOUD_ROUTE_KEY)||'null');
+    if(saved&&saved.projectId===firebaseConfig.projectId&&saved.doc===DB.doc&&saved.legacyDoc===DB.legacyDoc&&saved.primary===DB.col&&saved.fallback===DB.colFallback&&candidates.includes(saved.col)){
+      activeDbCol=saved.col;cloudRouteReady=true;cloudMigrationVerified=saved.migrationVerified===true;return saved.col;
+    }
+  }catch(_){}
+  const probes=candidates.map(col=>probeCloudCollection(col));
+  for(const probe of probes){
+    const result=await probe;
+    if(result.hasData){rememberCloudRoute(result.col,result.skipMigration);return result.col;}
+    if(!result.complete) throw result.error||new Error('No se pudo verificar la ruta de la nube');
   }
-  activeDbCol = DB.col;
+  rememberCloudRoute(DB.col,true);return DB.col;
 }
 
 async function upsertProduct(product){
@@ -2716,37 +2842,40 @@ async function fetchSubcollectionDocs(name){
 }
 
 async function migrateOldDataToSubcollections(){
-  if(!db) return;
-  if(localStorage.getItem(MIGRATION_KEY)) return;
+  if(!db) throw new Error('Servicio de nube no disponible');
+  if(cloudMigrationVerified||localStorage.getItem(MIGRATION_KEY)) return;
+  const generation=syncGeneration,allowed=()=>generation===syncGeneration&&isCloudAllowed();
 
   const legacyRef = db.collection(activeDbCol || DB.col).doc(DB.legacyDoc);
   let legacySnap = null;
-  try{ legacySnap = await legacyRef.get(); }catch(e){ console.warn('legacy read err', e); return; }
-  if(!legacySnap || !legacySnap.exists) return;
+  try{ legacySnap = await legacyRef.get({source:'server'}); }catch(e){ console.warn('legacy read err', e); throw e; }
+  if(!allowed()) return;
+  if(!legacySnap || !legacySnap.exists){rememberCloudMigration('no_legacy');return;}
 
   // Avoid migrating if target subcollections already have data
   try{
     const [p1, c1, s1] = await Promise.all([
-      subcolRef(SUBCOLS.products).limit(1).get(),
-      subcolRef(SUBCOLS.customers).limit(1).get(),
-      subcolRef(SUBCOLS.sales).limit(1).get(),
+      subcolRef(SUBCOLS.products).limit(1).get({source:'server'}),
+      subcolRef(SUBCOLS.customers).limit(1).get({source:'server'}),
+      subcolRef(SUBCOLS.sales).limit(1).get({source:'server'}),
     ]);
     if((p1 && !p1.empty) || (c1 && !c1.empty) || (s1 && !s1.empty)){
-      localStorage.setItem(MIGRATION_KEY, 'skipped_existing');
+      rememberCloudMigration('skipped_existing');
       return;
     }
-  }catch(e){ console.warn('pre-migration check err', e); }
+  }catch(e){ console.warn('pre-migration check err', e); throw e; }
 
   const raw = legacySnap.data() || {};
   const normalized = normalizeRemoteData(raw);
   const { products, customers, sales } = normalized;
-  if((products||[]).length === 0 && (customers||[]).length === 0 && (sales||[]).length === 0) return;
+  if((products||[]).length === 0 && (customers||[]).length === 0 && (sales||[]).length === 0){rememberCloudMigration('empty_legacy');return;}
 
   const batchWrite = async (name, items) => {
     if(!items || items.length === 0) return;
     let batch = db.batch();
     let count = 0;
     for(const item of items){
+      if(!allowed()) return;
       const id = item.id || uid();
       const ref = subcolRef(name).doc(id);
       const payload = { ...item, id, migratedAt: new Date().toISOString() };
@@ -2765,12 +2894,14 @@ async function migrateOldDataToSubcollections(){
     await batchWrite(SUBCOLS.products, products || []);
     await batchWrite(SUBCOLS.customers, customers || []);
     await batchWrite(SUBCOLS.sales, sales || []);
+    if(!allowed()) return;
     await parentDocRef().set({ migration: { legacyDocId: DB.legacyDoc, migratedAt: new Date().toISOString() } }, { merge: true });
-    localStorage.setItem(MIGRATION_KEY, 'done');
+    rememberCloudMigration('done');
     showToast('Migración a subcolecciones completada');
   }catch(e){
     console.error('migration err', e);
-    showToast('Error en migración, revisa consola');
+    showToast('No se completó la preparación de nube; los cambios siguen en este equipo');
+    throw e;
   }
 }
 
@@ -2820,15 +2951,15 @@ function mergeFromSubcollection(name,docs){
 }
 
 async function startFirestoreSync(){
-  if(!db || !isCloudAllowed()) return false;
+  if(!db || !cloudRouteReady || !isCloudAllowed()) return false;
   if(firestoreStartPromise) return firestoreStartPromise;
   const generation=syncGeneration;
   firestoreStartPromise=(async()=>{
-    await migrateOldDataToSubcollections();
+    prepareCloudData();
     if(generation!==syncGeneration||!isCloudAllowed()) return false;
     Object.entries(SUBCOLS).forEach(([key,name])=>{
       if(unsubscribers[key]) return;
-      syncCollectionStates[key]={state:'connecting',error:''};
+      syncCollectionStates[key]={state:'connecting',error:'',serverConfirmed:false};
       let pending=new Map(),timer=0,stopped=false,fromCache=true;
       const flush=()=>{
         timer=0;if(stopped||generation!==syncGeneration||!isCloudAllowed()) return;
@@ -2843,7 +2974,7 @@ async function startFirestoreSync(){
           if(key==='purchases'&&isModalVisible('modal-purchase-history')) renderPurchaseHistoryList();
         }
         scheduleSyncIndicators();
-        syncCollectionStates[key]={state:pending.size?'loading':fromCache?'cache':'ready',error:''};
+        syncCollectionStates[key]={state:pending.size?'loading':fromCache?'cache':'ready',error:'',serverConfirmed:!fromCache};
         if(pending.size) timer=setTimeout(flush,0);
       };
       const stop=subcolRef(name).onSnapshot({includeMetadataChanges:true},snapshot=>{
@@ -2856,17 +2987,18 @@ async function startFirestoreSync(){
           if(change.type==='removed') return;
           const row=change.doc.data();if(row) pending.set(String(row.id||change.doc.id),{...row,id:row.id||change.doc.id});
         });
-        syncCollectionStates[key]={state:pending.size?'loading':fromCache?'cache':'ready',error:''};
+        syncCollectionStates[key]={state:pending.size?'loading':fromCache?'cache':'ready',error:'',serverConfirmed:!fromCache};
         if(pending.size&&!timer) timer=setTimeout(flush,0);
-        cloudOn=true;scheduleSyncIndicators();processPendingOps();
+        cloudOn=true;if(!fromCache) noteCloudResponse();else watchCloudResponse();scheduleSyncIndicators();processPendingOps();
       },error=>{
         console.warn(name+' onSnapshot: datos locales conservados',error);
-        syncCollectionStates[key]={state:'error',error:String(error.message||error)};
-        localStorage.setItem(LAST_SYNC_ERROR_KEY,String(error.message||error));
+        syncCollectionStates[key]={state:'error',error:String(error.message||error),serverConfirmed:false};
+        rememberSyncError(String(error.message||error));
         stopped=true;clearTimeout(timer);pending.clear();unsubscribers[key]=null;updateOnline(false);
+        if(retryableCloudError(error)) scheduleCloudReconnect();
       });
       unsubscribers[key]=()=>{stopped=true;clearTimeout(timer);pending.clear();stop();};
-    });return true;
+    });watchCloudResponse();return true;
   })();
   try{return await firestoreStartPromise;}finally{firestoreStartPromise=null;}
 }
@@ -2874,37 +3006,47 @@ async function startFirestoreSync(){
 async function bootstrapCloudSync(showFeedback=false,startQueue=true){
   if(!isCloudAllowed()||!navigator.onLine){updateOnline(false);if(showFeedback) showToast('Trabajando en modo local');return false;}
   if(cloudBootstrapPromise) return cloudBootstrapPromise;
+  const generation=syncGeneration;
   cloudBootstrapPromise=(async()=>{
     try{
-      if(!await ensureFirebaseLoaded()) throw new Error('No se pudo cargar el servicio de sincronización. Los cambios siguen guardados en este equipo.');
-      initFirebase();if(!db) return false;
-      await resolveDbCollectionName();if(!isCloudAllowed()) return false;
+      if(!await cloudDeadline(ensureFirebaseLoaded())) throw new Error('No se pudo cargar el servicio de sincronización. Los cambios siguen guardados en este equipo.');
+      if(generation!==syncGeneration||!isCloudAllowed()) return false;
+      initFirebase();if(!db) throw new Error('No se pudo iniciar el servicio de nube');
+      await cloudDeadline(resolveDbCollectionName());if(generation!==syncGeneration||!isCloudAllowed()) return false;
+      cloudRouteReady=true;cloudConnectionError='';
       const started=await startFirestoreSync();
-      if(started){if(startQueue) processPendingOps();if(showFeedback) showToast('Sincronización iniciada');}
+      if(started){if(startQueue) processPendingOps();if(showFeedback) showToast('Conectando y actualizando datos de la nube');}
       return started;
-    }catch(error){console.error('bootstrapCloudSync',error);localStorage.setItem(LAST_SYNC_ERROR_KEY,String(error.message||error));updateOnline(false);return false;}
+    }catch(error){
+      if(generation!==syncGeneration||!isCloudAllowed()) return false;
+      console.warn('Conexión de nube pendiente',error);cloudConnectionError=String(error.message||error);cloudConnectionSlow=error.code==='deadline-exceeded';
+      rememberSyncError(cloudConnectionError);if(retryableCloudError(error)) scheduleCloudReconnect();updateOnline(false);return false;
+    }
   })();
-  try{return await cloudBootstrapPromise;}finally{cloudBootstrapPromise=null;}
+  try{return await cloudBootstrapPromise;}finally{cloudBootstrapPromise=null;if(generation!==syncGeneration&&isCloudAllowed()) scheduleCloudReconnect(0);}
 }
 
 let connectivityEventsBound = false;
 function bindConnectivityEvents(){
   if(connectivityEventsBound) return;
   connectivityEventsBound = true;
-  const markUnverified=()=>Object.values(syncCollectionStates).forEach(item=>{if(item.state!=='error') item.state='cache';});
+  const markUnverified=()=>Object.values(syncCollectionStates).forEach(item=>{if(item.state!=='error'){item.state='cache';item.serverConfirmed=false;}});
   window.addEventListener('online', async ()=>{
     markUnverified();updateOnline(false);
     if(isCloudAllowed()){
       showToast('Internet detectado, sincronizando...');
-      await bootstrapCloudSync(false);
+      await resumeCloudConnection(true);
     }else updateOnline(false);
     await ensureLucideLoaded();
     safeCreateIcons();
   });
   window.addEventListener('offline', ()=>{
-    markUnverified();updateOnline(false);
+    markUnverified();clearTimeout(cloudRetryTimer);cloudRetryTimer=0;clearTimeout(cloudResponseTimer);cloudResponseTimer=0;updateOnline(false);
     showToast('Sin internet: guardando en local');
   });
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden) resumeCloudConnection();});
+  window.addEventListener('pageshow',()=>resumeCloudConnection());
+  window.addEventListener('focus',()=>resumeCloudConnection());
 }
 
 /* =========
@@ -2951,7 +3093,7 @@ function processPendingOps(){
   return pendingFlushPromise;
 }
 async function flushPendingOperations(){
-  if(!db||!navigator.onLine||!isCloudAllowed()||!pendingOps.length||syncInProgress||criticalWriteDepth) return;
+  if(!db||!cloudRouteReady||!cloudWritesReady||!navigator.onLine||!isCloudAllowed()||!pendingOps.length||syncInProgress||criticalWriteDepth) return;
   syncInProgress=true;scheduleSyncIndicators();
   try{
     await persistLocalState(true);
@@ -2991,12 +3133,12 @@ async function flushPendingOperations(){
         keys.forEach(key=>blockedEntities.add(key));
         op.retries=(op.retries||0)+1;op.status='error';op.lastError=String(error.message||error);op.lastErrorCode=String(error.code||'');
         op.nextAttemptAt=new Date(Date.now()+Math.min(300000,Math.max(5000,2**Math.min(op.retries,8)*1000))).toISOString();
-        localStorage.setItem(LAST_SYNC_ERROR_KEY,op.lastError);savePending();
+        rememberSyncError(op.lastError);savePending();
         if(/network|unavailable|offline/i.test(op.lastErrorCode+' '+op.lastError)) break;
       }
       scheduleSyncIndicators();
     }
-  }catch(error){console.error('processPendingOps',error);localStorage.setItem(LAST_SYNC_ERROR_KEY,String(error.message||error));}
+  }catch(error){console.error('processPendingOps',error);if(error.primaryName||error.fallbackName) reportLocalSaveError(error);rememberSyncError(String(error.message||error));}
   finally{syncInProgress=false;activeSyncOperationId=null;scheduleSyncIndicators();}
 }
 
@@ -3019,7 +3161,7 @@ async function setWorkMode(mode){
   }else{
     updateOnline(false);
     showToast('Modo automático activado');
-    if(navigator.onLine) await bootstrapCloudSync(true);
+    if(navigator.onLine) await resumeCloudConnection(true);
   }
   renderSyncCenter();
 }
@@ -3028,12 +3170,14 @@ function renderSyncCenter(){
   const summary=getSyncSummary(),mode=getWorkMode();
   const setText=(id,text)=>{const el=document.getElementById(id);if(el&&el.textContent!==String(text)) el.textContent=String(text);};
   const badge=$('#pending-count');if(badge){badge.textContent=String(summary.total);badge.classList.toggle('hidden',summary.total===0);}
+  setText('sync-storage-note',localSaveIssue?'Hay cambios sin confirmar. Mantén la app abierta y exporta un respaldo JSON antes de recargar.':'Las ventas pueden continuar mientras se sincroniza. Conserva los datos del navegador y exporta un respaldo antes de cambiar de equipo.');
+  setText('sync-queue-heading',localSaveIssue?'Operaciones pendientes de confirmar':'Operaciones guardadas en este equipo');
   setText('sync-center-status',summary.label);setText('sync-center-detail',summary.detail);
   setText('sync-center-pending',summary.total);setText('sync-center-waiting',summary.waiting);
   setText('sync-center-sending',summary.sending);setText('sync-center-errors',summary.errors);
   const last=syncReceipts[0]?.confirmedAt;
   setText('sync-center-last',last?formatSyncTime(last):'Todavía no hay confirmaciones');
-  const error=Object.values(syncCollectionStates).find(item=>item.error)?.error||localStorage.getItem(LAST_SYNC_ERROR_KEY)||'';
+  const error=localSaveIssue?localSaveIssue.name+': '+localSaveIssue.message:Object.values(syncCollectionStates).find(item=>item.error)?.error||localStorage.getItem(LAST_SYNC_ERROR_KEY)||'';
   $('#sync-center-error-row')?.classList.toggle('hidden',!error);setText('sync-center-error',error);
   $('#sync-mode-auto')?.classList.toggle('bg-emerald-50',mode==='auto');$('#sync-mode-auto')?.classList.toggle('border-emerald-500',mode==='auto');
   $('#sync-mode-local')?.classList.toggle('bg-amber-50',mode==='local');$('#sync-mode-local')?.classList.toggle('border-amber-500',mode==='local');
@@ -3041,6 +3185,8 @@ function renderSyncCenter(){
     const button=document.getElementById(id);if(button) button.disabled=mode==='local'||!navigator.onLine||syncActionInProgress||syncRefreshInProgress||syncInProgress;
   }
   $('#btn-sync-retry-errors')?.classList.toggle('hidden',summary.errors===0);
+  $('#btn-local-save-retry')?.classList.toggle('hidden',!localSaveIssue);
+  if($('#btn-local-save-retry')) $('#btn-local-save-retry').disabled=criticalWriteDepth>0||!!localSaveRecoveryPromise;
   if(isModalVisible('modal-sync-center')){renderSyncOperations();renderSyncReceipts();renderSyncConflicts();}
 }
 const SYNC_TYPE_LABELS={sale:'Venta',product:'Producto',customer:'Cliente',purchaseBundle:'Compra',purchase:'Compra',supplier:'Proveedor',audit:'Auditoría',stockMovement:'Movimiento de stock',stockClosure:'Cierre de stock',staff:'Personal',shift:'Turno',syncConflict:'Conflicto'};
@@ -3054,17 +3200,24 @@ function formatSyncTime(value){
 function getSyncSummary(){
   const total=pendingOps.length,sending=syncInProgress?pendingOps.filter(op=>op.status==='processing'&&op.id===activeSyncOperationId).length:0,errors=pendingOps.filter(op=>op.status==='error').length;
   const waiting=total-sending-errors,states=Object.values(syncCollectionStates);
-  const ready=cloudOn&&Object.keys(SUBCOLS).every(key=>syncCollectionStates[key]?.state==='ready');
+  const ready=cloudOn&&cloudWritesReady&&Object.keys(SUBCOLS).every(key=>syncCollectionStates[key]?.state==='ready');
+  const serverConnected=states.some(item=>item.serverConfirmed),completed=states.filter(item=>item.state==='ready').length;
   let label,detail,tone='pending';
-  if(!isCloudAllowed()){label='Solo en este equipo';detail=total?`${total} operación(es) guardada(s) aquí. Activa Automático para enviarlas.`:'Los registros se guardan en este equipo. El envío a la nube está pausado.';}
+  if(localSaveIssue){label='Guardado local pendiente';tone='error';detail=localSaveIssue.detail;}
+  else if(!isCloudAllowed()){label='Solo en este equipo';detail=total?`${total} operación(es) guardada(s) aquí. Activa Automático para enviarlas.`:'Los registros se guardan en este equipo. El envío a la nube está pausado.';}
   else if(!navigator.onLine){label='Sin Internet';detail=total?`${total} operación(es) guardada(s) aquí. Se reintentará al recuperar la conexión.`:'Puedes seguir trabajando con los datos locales.';}
   else if(syncRefreshInProgress){label='Actualizando desde la nube';detail='Revisando cambios de otros equipos. Las operaciones locales siguen guardadas.';}
   else if(errors){label='Hay operaciones por revisar';tone='error';detail=`${errors} operación(es) con error. Permanecen guardadas en la cola; revisa el detalle antes de reintentar.`;}
   else if(states.some(item=>item.state==='error')){label='Actualización incompleta';tone='error';detail='No se pudieron actualizar todos los datos de la nube. Puedes seguir trabajando con los datos locales.';}
+  else if(cloudPreparationError){label='Preparación de nube pendiente';tone='error';detail=cloudPreparationError+' Los cambios permanecen guardados en la cola.';}
+  else if(cloudConnectionError){label=cloudConnectionSlow?'Reconectando a la nube':'No se pudo completar la conexión';tone='error';detail=cloudConnectionError+' Tus registros y operaciones siguen guardados en este equipo.';}
   else if(syncInProgress&&!activeSyncOperationId){label='Preparando envío';detail='Comprobando el guardado local antes de enviar las operaciones.';}
   else if(sending||syncInProgress){label='Enviando operaciones';detail=`${sending} en envío · ${waiting} en espera. Se retiran de la cola sólo al recibir confirmación.`;}
   else if(total){label='Cambios pendientes de envío';detail=`${total} operación(es) guardada(s) en este equipo y todavía pendientes de confirmación.`;}
-  else if(states.some(item=>item.state==='loading')){label='Actualizando datos';detail='Se están incorporando cambios recibidos de la nube. Los controles locales siguen disponibles.';}
+  else if(cloudRouteReady&&!cloudWritesReady){label=serverConnected?'Conectado · Preparando datos':'Preparando datos de la nube';detail='Comprobando los datos anteriores antes de enviar nuevas operaciones.';}
+  else if(serverConnected&&!ready){label='Conectado · Actualizando datos';detail=`La nube ya respondió. Información actualizada: ${completed} de ${Object.keys(SUBCOLS).length}. Puedes seguir trabajando.`;}
+  else if(states.some(item=>item.state==='loading')){label='Cargando datos guardados';detail='Preparando los datos disponibles mientras se comprueba la nube.';}
+  else if(cloudConnectionSlow){label='Reconectando a la nube';detail='La nube tarda en responder. Se reintentará automáticamente; puedes seguir trabajando.';}
   else if(!ready){label='Esperando respuesta de la nube';detail=states.some(item=>item.state==='cache')?'Se muestran datos guardados. Falta verificar la conexión con la nube.':'Comprobando la conexión. Puedes seguir trabajando con tus datos locales.';}
   else if((STATE.syncConflicts||[]).some(item=>item.status!=='RESOLVED')){label='Revisión pendiente';detail='Los envíos están confirmados, pero hay conflictos de stock o turno por revisar. No se corrigen automáticamente.';}
   else{label='Al día';tone='ready';detail='No hay operaciones pendientes y los datos de la nube se han actualizado.';}
@@ -3136,7 +3289,7 @@ async function syncNow(onlyErrors=false,operationId=null){
     pendingOps.forEach(op=>{if((!operationId||op.id===operationId)&&(!onlyErrors||op.status==='error')) op.nextAttemptAt=null;});
     savePending();
     const ready=await bootstrapCloudSync(true,false);
-    if(ready||db){
+    if(ready){
       await processPendingOps();
     }
   }catch(error){showToast('No se pudo completar el envío. Las operaciones siguen en la cola.',4000);console.warn('Sincronización manual',error);}
@@ -8710,9 +8863,9 @@ async function loadPersonnelForLoginFromCloud(showFeedback=false){
   personnelLoadPromise=(async()=>{
     try{
       if(!await ensureFirebaseLoaded()) return false;
-      initFirebase();if(!db) return false;await resolveDbCollectionName();
+      initFirebase();if(!db) return false;await cloudDeadline(resolveDbCollectionName());
       if(!isCloudAllowed()) return false;
-      const [staff,shifts]=await Promise.all([fetchSubcollectionDocs(SUBCOLS.staff),fetchSubcollectionDocs(SUBCOLS.shifts)]);
+      const [staff,shifts]=await cloudDeadline(Promise.all([fetchSubcollectionDocs(SUBCOLS.staff),fetchSubcollectionDocs(SUBCOLS.shifts)]));
       if(!isCloudAllowed()) return false;
       mergeFromSubcollection(SUBCOLS.staff,staff);mergeFromSubcollection(SUBCOLS.shifts,shifts);personnelLoadedAt=Date.now();
       if(showFeedback&&staff.length) showToast('Usuarios del personal actualizados');
@@ -8886,13 +9039,13 @@ async function forceSync(){
   if(syncRefreshInProgress) return;
   syncRefreshInProgress=true;renderSyncCenter();
   try{
-  if(!db){
+  if(!cloudRouteReady||!cloudWritesReady){
     const ready = await bootstrapCloudSync(true);
     if(!ready) return alert('Cloud no inicializado');
   }
   if(!confirm('Forzar sincronización desde subcolecciones?')) return;
   try{
-    await migrateOldDataToSubcollections();
+    if(!await prepareCloudData()) return;
     const [products, customers, sales, stockClosures, staff, shifts, purchases, suppliers, auditLogs, stockMovements, syncConflicts] = await Promise.all([
       fetchSubcollectionDocs(SUBCOLS.products),
       fetchSubcollectionDocs(SUBCOLS.customers),
@@ -8921,7 +9074,7 @@ let pwaRegistrationPromise=null,appStarted=false;
 function registerPWA(){
   if(pwaRegistrationPromise) return pwaRegistrationPromise;
   if(!('serviceWorker' in navigator)||!/^https?:$/.test(location.protocol)) return Promise.resolve(false);
-  pwaRegistrationPromise=navigator.serviceWorker.register('./service-worker.js?v=20261122-click-v7',{scope:'./',updateViaCache:'none'})
+  pwaRegistrationPromise=navigator.serviceWorker.register('./service-worker.js?v=20261122-cloud-v8',{scope:'./',updateViaCache:'none'})
     .then(()=>true).catch(error=>{console.warn('Service worker',error);pwaRegistrationPromise=null;return false;});
   return pwaRegistrationPromise;
 }
