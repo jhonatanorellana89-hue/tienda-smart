@@ -1652,11 +1652,13 @@
   <div class="modal-sheet">
     <div class="flex justify-between items-center mb-3">
       <h3 class="font-bold">Gestión de Ventas</h3>
-      <div class="flex gap-2">
+      <div class="flex gap-2 flex-wrap">
+        <button onclick="openSyncCenter()" class="px-3 py-2 border rounded">Ver envíos</button>
         <button onclick="exportSalesXLSX()" class="px-3 py-2 border rounded">Exportar Ventas</button>
         <button onclick="closeModal('modal-gestion')" class="px-3 py-2 border rounded">Cerrar</button>
       </div>
     </div>
+    <div id="gestion-sales-status" class="small-muted mb-3" aria-live="polite"></div>
     <div id="gestion-list" style="max-height:60vh;overflow:auto"></div>
   </div>
 </div>
@@ -1912,9 +1914,17 @@ const uid = ()=> (window.crypto?.randomUUID ?window.crypto.randomUUID():('id-'+D
 const money = v => Number(v||0).toFixed(2);
 const spanishCollator = new Intl.Collator('es',{sensitivity:'base'});
 const todayYMD = ()=> { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+function saleDateValue(value){
+  if(value&&typeof value==='object'){
+    if(typeof value.toDate==='function') return value.toDate();
+    const seconds=value.seconds??value._seconds,nanos=value.nanoseconds??value._nanoseconds??0;
+    if(Number.isFinite(seconds)) return new Date(seconds*1000+nanos/1000000);
+  }
+  return new Date(value);
+}
 const isSameLocalDay = (dateStr, ref = new Date()) => {
   if(!dateStr) return false;
-  const d = new Date(dateStr);
+  const d = saleDateValue(dateStr);
   if(Number.isNaN(d.getTime())) return false;
   return d.getFullYear() === ref.getFullYear() &&
          d.getMonth() === ref.getMonth() &&
@@ -2601,6 +2611,25 @@ const MIGRATION_KEY = 'tienda_migration_v1';
 let syncInProgress = false, cloudBootstrapPromise=null, firestoreStartPromise=null, syncGeneration=0;
 let syncIndicatorTimer=0, syncActionInProgress=false, syncRefreshInProgress=false, syncQueuePage=0, syncConflictPage=0, pendingFlushPromise=null, activeSyncOperationId=null;
 const syncCollectionStates={};
+let recentSalesStop=null,salesArchiveTimer=0,recentSalesServerReady=false;
+function startRecentSalesSync(generation,startArchive){
+  if(recentSalesStop) return true;
+  const ref=subcolRef(SUBCOLS.sales);if(typeof ref.orderBy!=='function') return false;
+  try{
+    recentSalesStop=ref.orderBy('date','desc').limit(80).onSnapshot({includeMetadataChanges:true},snapshot=>{
+      if(generation!==syncGeneration||!isCloudAllowed()) return;
+      const rows=snapshot.docChanges().filter(change=>change.type!=='removed').map(change=>{const row=change.doc.data();return {...row,id:row.id||change.doc.id};});
+      recentSalesServerReady=snapshot.metadata?.fromCache===false;if(recentSalesServerReady) cloudOn=true;
+      if(mergeFromSubcollection('sales',rows)) scheduleRenderAll(0);
+      if(snapshot.metadata?.fromCache===false){noteCloudResponse();clearTimeout(salesArchiveTimer);salesArchiveTimer=0;startArchive();}
+    },error=>{
+      console.warn('Ventas recientes: continuando con historial completo',error);recentSalesStop=null;recentSalesServerReady=false;
+      clearTimeout(salesArchiveTimer);salesArchiveTimer=0;if(generation===syncGeneration&&isCloudAllowed()) startArchive();
+    });
+    salesArchiveTimer=setTimeout(()=>{salesArchiveTimer=0;if(generation===syncGeneration&&isCloudAllowed()) startArchive();},1000);
+    return true;
+  }catch(error){console.warn('Consulta rápida de ventas no disponible',error);return false;}
+}
 const CLOUD_ROUTE_KEY='tienda_cloud_route_v1',CLOUD_CONNECT_TIMEOUT=6000,CLOUD_RESPONSE_TIMEOUT=10000;
 let cloudRouteReady=false,cloudWritesReady=false,cloudMigrationVerified=false,cloudPreparationPromise=null;
 let cloudConnectionError='',cloudPreparationError='',cloudConnectionSlow=false,cloudRetryTimer=0,cloudResponseTimer=0,cloudRetryAttempt=0,cloudResumeAt=0,cloudNetworkRestartAt=0,cloudNetworkRestartPromise=null;
@@ -2614,10 +2643,10 @@ function scheduleCloudReconnect(delay=null){
   cloudRetryTimer=setTimeout(()=>{cloudRetryTimer=0;resumeCloudConnection(true);},wait);
 }
 function watchCloudResponse(){
-  if(cloudResponseTimer||Object.values(syncCollectionStates).some(item=>item.serverConfirmed)) return;
+  if(cloudResponseTimer||recentSalesServerReady||Object.values(syncCollectionStates).some(item=>item.serverConfirmed)) return;
   cloudResponseTimer=setTimeout(()=>{
     cloudResponseTimer=0;
-    if(!navigator.onLine||!isCloudAllowed()||Object.values(syncCollectionStates).some(item=>item.serverConfirmed)) return;
+    if(!navigator.onLine||!isCloudAllowed()||recentSalesServerReady||Object.values(syncCollectionStates).some(item=>item.serverConfirmed)) return;
     cloudConnectionSlow=true;scheduleSyncIndicators();scheduleCloudReconnect();
   },CLOUD_RESPONSE_TIMEOUT);
 }
@@ -2659,7 +2688,7 @@ function scheduleSyncIndicators(){
   syncIndicatorTimer=setTimeout(()=>{syncIndicatorTimer=0;updateOnline(cloudOn);},50);
 }
 function stopCloudListeners(){
-  syncGeneration++;cloudWritesReady=false;cloudConnectionError='';cloudPreparationError='';cloudConnectionSlow=false;cloudRetryAttempt=0;
+  syncGeneration++;try{recentSalesStop?.();}catch(_){}recentSalesStop=null;recentSalesServerReady=false;clearTimeout(salesArchiveTimer);salesArchiveTimer=0;cloudWritesReady=false;cloudConnectionError='';cloudPreparationError='';cloudConnectionSlow=false;cloudRetryAttempt=0;
   clearTimeout(cloudRetryTimer);cloudRetryTimer=0;clearTimeout(cloudResponseTimer);cloudResponseTimer=0;
   Object.keys(syncCollectionStates).forEach(key=>delete syncCollectionStates[key]);
   Object.entries(unsubscribers).forEach(([key,stop])=>{try{stop?.();}catch(_){}unsubscribers[key]=null;});
@@ -2920,6 +2949,7 @@ function mergeFromSubcollection(name,docs){
     if(current && protectedKeys.has(name+':'+id)) continue;
     if(current && remoteAt<localAt) continue;
     let merged={...remote,id};
+    if(name==='sales'&&merged.date&&typeof merged.date==='object'){const date=saleDateValue(merged.date);if(!Number.isNaN(date.getTime())) merged.date=date.toISOString();}
     if(name==='products'){
       const movements=new Map();
       [...(current?.movements||[]),...(remote.movements||[])].forEach(m=>movements.set(String(m.id||m.movementId||JSON.stringify(m)),m));
@@ -2942,7 +2972,7 @@ function mergeFromSubcollection(name,docs){
     }
   }
   if(!changed) return false;
-  if(salesOrderChanged){rows.sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));remoteEntityIndexes.delete(name);}
+  if(salesOrderChanged){rows.sort((a,b)=>saleDateValue(b.date||0)-saleDateValue(a.date||0));remoteEntityIndexes.delete(name);}
   else index.length=rows.length;
   if(name==='stockMovements') movementProductIndex=null;
   if(name==='products') rebuildLinkedStocks(false);
@@ -2957,7 +2987,7 @@ async function startFirestoreSync(){
   firestoreStartPromise=(async()=>{
     prepareCloudData();
     if(generation!==syncGeneration||!isCloudAllowed()) return false;
-    Object.entries(SUBCOLS).forEach(([key,name])=>{
+    const attachCollection=(key,name)=>{
       if(unsubscribers[key]) return;
       syncCollectionStates[key]={state:'connecting',error:'',serverConfirmed:false};
       let pending=new Map(),timer=0,stopped=false,fromCache=true;
@@ -2998,7 +3028,11 @@ async function startFirestoreSync(){
         if(retryableCloudError(error)) scheduleCloudReconnect();
       });
       unsubscribers[key]=()=>{stopped=true;clearTimeout(timer);pending.clear();stop();};
-    });watchCloudResponse();return true;
+    };
+    const archive=()=>{if(generation===syncGeneration&&isCloudAllowed()) attachCollection('sales',SUBCOLS.sales);};
+    const fastSales=startRecentSalesSync(generation,archive);
+    Object.entries(SUBCOLS).forEach(([key,name])=>{if(key!=='sales'||!fastSales) attachCollection(key,name);});
+    watchCloudResponse();return true;
   })();
   try{return await firestoreStartPromise;}finally{firestoreStartPromise=null;}
 }
@@ -3030,7 +3064,7 @@ let connectivityEventsBound = false;
 function bindConnectivityEvents(){
   if(connectivityEventsBound) return;
   connectivityEventsBound = true;
-  const markUnverified=()=>Object.values(syncCollectionStates).forEach(item=>{if(item.state!=='error'){item.state='cache';item.serverConfirmed=false;}});
+  const markUnverified=()=>{recentSalesServerReady=false;Object.values(syncCollectionStates).forEach(item=>{if(item.state!=='error'){item.state='cache';item.serverConfirmed=false;}});};
   window.addEventListener('online', async ()=>{
     markUnverified();updateOnline(false);
     if(isCloudAllowed()){
@@ -3086,64 +3120,138 @@ async function executePendingOperation(op){
   throw new Error(`Tipo de operación no soportado: ${op.type||'vacío'}`);
 }
 
-/* Solo se retira una operación después de que Firestore confirma la escritura. */
+const defaultExecutePendingOperation=executePendingOperation;
+const syncWriteFlights=new Map();
+let flightNoticeTimer=0,syncConfirmedInRun=0;
+const SYNC_WAVE_LIMIT=100,SYNC_FLIGHT_LIMIT=200,SYNC_ACK_WAIT=20000;
+function syncEntityKeys(op){
+  const p=op.payload||{};
+  if(op.type==='purchaseBundle') return [p.purchase?.id&&'purchase:'+p.purchase.id,p.supplier?.id&&'supplier:'+p.supplier.id,...(p.products||[]).map(row=>'product:'+row.id),...(p.auditLogs||[]).map(row=>'audit:'+row.id),...(p.stockMovements||[]).map(row=>'stockMovement:'+row.id)].filter(Boolean);
+  const keys=[op.type+':'+(p.id||op.id)];
+  if(op.type==='sale'&&p.customerId) keys.push('customer:'+p.customerId);
+  return keys;
+}
+function isSyncOperationActive(op){return (syncInProgress&&op.id===activeSyncOperationId)||syncWriteFlights.get(op)?.state==='pending';}
+function syncWriteDescriptors(op){
+  const p=op.payload||{},now=new Date().toISOString();
+  if(op.type==='purchaseBundle'){
+    const rows=[];if(p.purchase) rows.push(['purchases',p.purchase]);if(p.supplier) rows.push(['suppliers',p.supplier]);
+    for(const [key,items] of [['products',p.products],['auditLogs',p.auditLogs],['stockMovements',p.stockMovements]]) (items||[]).forEach(row=>rows.push([key,row]));
+    if(rows.length>450) throw new Error('La compra supera el límite seguro de 450 registros por envío');
+    return rows.map(([key,row])=>{if(!row?.id) throw new Error('Registro sin ID en '+key);const id=firestoreDocId(row.id);return {collection:SUBCOLS[key],id,payload:{...row,id,syncedAt:now},merge:true};});
+  }
+  const names={sale:'sales',product:'products',customer:'customers',staff:'staff',shift:'shifts',purchase:'purchases',supplier:'suppliers',audit:'auditLogs',stockMovement:'stockMovements',stockClosure:'stockClosures',syncConflict:'syncConflicts'};
+  if(!names[op.type]||!p.id) return null;
+  const generic=['purchase','supplier','audit','stockMovement','syncConflict'].includes(op.type),id=generic?firestoreDocId(p.id):p.id;
+  const payload=op.type==='stockClosure'?{...p,id,syncedAt:now}:{...p,id,updatedAt:generic?(p.updatedAt||now):now};
+  if(['product','customer','sale'].includes(op.type)&&payload.deleted&&!payload.deletedAt) payload.deletedAt=now;
+  return [{collection:SUBCOLS[names[op.type]],id,payload,merge:op.type!=='stockClosure'}];
+}
+function chooseSyncWave(blocked){
+  const previous=new Set(),candidates=[];let pendingFlights=0;
+  syncWriteFlights.forEach((flight,op)=>{if(flight.state==='pending'){pendingFlights++;syncEntityKeys(op).forEach(key=>previous.add(key));}});
+  for(const op of pendingOps){
+    const keys=syncEntityKeys(op),held=keys.some(key=>previous.has(key)||blocked.has(key));keys.forEach(key=>previous.add(key));
+    if(held||syncWriteFlights.get(op)?.state==='pending'||(op.nextAttemptAt&&new Date(op.nextAttemptAt).getTime()>Date.now())) continue;
+    candidates.push(op);
+  }
+  candidates.sort((a,b)=>(a.type==='sale'?0:1)-(b.type==='sale'?0:1)||(a.type==='sale'&&b.type==='sale'?new Date(b.ts||0)-new Date(a.ts||0):0));
+  const wave=[];let bytes=0,writes=0,room=Math.max(0,SYNC_FLIGHT_LIMIT-pendingFlights);
+  for(const op of candidates){
+    if(wave.length>=SYNC_WAVE_LIMIT) break;
+    if(!op.cloudConfirmedAt&&!room) continue;
+    let count=1;try{count=syncWriteDescriptors(op)?.length||1;}catch(_){}
+    const size=JSON.stringify(op.payload||{}).length*2;
+    if(wave.length&&(bytes+size>4000000||writes+count>450)) continue;
+    wave.push(op);bytes+=size;writes+=count;if(!op.cloudConfirmedAt) room--;
+  }
+  return wave;
+}
+function notifySyncFlight(){
+  if(flightNoticeTimer) return;
+  flightNoticeTimer=setTimeout(()=>{flightNoticeTimer=0;savePending();scheduleSyncIndicators();if(!pendingFlushPromise) processPendingOps();},0);
+}
+function launchSyncWrites(ops){
+  const fresh=ops.filter(op=>!op.cloudConfirmedAt&&!syncWriteFlights.has(op));if(!fresh.length) return;
+  fresh.forEach(op=>syncWriteFlights.set(op,{state:'pending',started:Date.now()}));
+  const settle=(op,error=null)=>{
+    const flight=syncWriteFlights.get(op);if(!flight) return;
+    flight.state=error?'rejected':'fulfilled';flight.error=error;
+    if(!error&&pendingOps.includes(op)) op.cloudConfirmedAt=new Date().toISOString();
+    if(!pendingOps.includes(op)) syncWriteFlights.delete(op);
+    notifySyncFlight();
+  };
+  const single=async op=>{try{if(!await executePendingOperation(op)) throw new Error('La nube no confirmó la escritura');settle(op);}catch(error){settle(op,error);}};
+  const singles=async()=>{let cursor=0;await Promise.all(Array.from({length:Math.min(4,fresh.length)},async()=>{while(cursor<fresh.length) await single(fresh[cursor++]);}));};
+  const task=(async()=>{
+    if(fresh.length>1&&typeof db?.batch==='function'&&executePendingOperation===defaultExecutePendingOperation){
+      try{
+        const rows=fresh.map(syncWriteDescriptors);if(rows.some(row=>!row)) return singles();
+        const batch=db.batch();rows.flat().forEach(row=>batch.set(subcolRef(row.collection).doc(row.id),row.payload,{merge:row.merge}));
+        await batch.commit();fresh.forEach(op=>settle(op));return;
+      }catch(error){
+        if(/network|unavailable|offline|deadline-exceeded|resource-exhausted/i.test(String(error.code||'')+' '+error.message)){fresh.forEach(op=>settle(op,error));return;}
+        // Aislar un registro rechazado evita bloquear ventas independientes.
+        return singles();
+      }
+    }
+    return singles();
+  })();
+  fresh.forEach(op=>{const flight=syncWriteFlights.get(op);if(flight) flight.promise=task;});
+}
+async function acknowledgeSyncWave(ops){
+  const valid=ops.filter(op=>pendingOps.includes(op)&&op.cloudConfirmedAt);if(!valid.length) return;
+  const receipts=[...valid.map(op=>({id:op.id,type:op.type,reference:syncOperationReference(op),confirmedAt:op.cloudConfirmedAt})),...syncReceipts];
+  const unique=new Map();receipts.sort((a,b)=>new Date(b.confirmedAt)-new Date(a.confirmedAt)).forEach(row=>{if(!unique.has(row.id)) unique.set(row.id,row);});
+  const log=[...unique.values()].slice(0,20),removed=new Set(valid),positions=valid.map(op=>({op,index:pendingOps.indexOf(op)}));
+  let cursor=0;for(const op of pendingOps) if(!removed.has(op)) pendingOps[cursor++]=op;pendingOps.length=cursor;
+  try{
+    if(localPersistenceReady){
+      if(POSStorage.acknowledgePendingOps) await POSStorage.acknowledgePendingOps(valid.map(op=>op.id),log);
+      else await POSStorage.savePendingOps(pendingOps,log);
+    }else writeLegacyBackup(log);
+  }catch(error){
+    positions.sort((a,b)=>a.index-b.index).forEach(({op,index})=>{if(!pendingOps.some(row=>row.id===op.id)) pendingOps.splice(Math.min(index,pendingOps.length),0,op);op.status='error';op.lastError=String(error.message||error);op.nextAttemptAt=new Date(Date.now()+5000).toISOString();});reportLocalSaveError(error);throw error;
+  }
+  syncReceipts=log;syncConfirmedInRun+=valid.length;valid.forEach(op=>syncWriteFlights.delete(op));
+  try{localStorage.setItem(LAST_SYNC_KEY,log[0].confirmedAt);localStorage.removeItem(LAST_SYNC_ERROR_KEY);}catch(error){console.warn('Indicador de sincronización no guardado',error);}
+  if(valid.some(op=>!op.silent)) showToast(valid.length===1?'Operación confirmada en la nube':valid.length+' operaciones confirmadas en la nube');
+}
 function processPendingOps(){
   if(pendingFlushPromise) return pendingFlushPromise;
-  pendingFlushPromise=flushPendingOperations().finally(()=>{pendingFlushPromise=null;});
-  return pendingFlushPromise;
+  pendingFlushPromise=flushPendingOperations().finally(()=>{pendingFlushPromise=null;});return pendingFlushPromise;
 }
 async function flushPendingOperations(){
   if(!db||!cloudRouteReady||!cloudWritesReady||!navigator.onLine||!isCloudAllowed()||!pendingOps.length||syncInProgress||criticalWriteDepth) return;
-  syncInProgress=true;scheduleSyncIndicators();
+  syncInProgress=true;syncConfirmedInRun=0;scheduleSyncIndicators();
   try{
-    await persistLocalState(true);
-    const blockedEntities=new Set();
-    const entityKeys=op=>op.type==='purchaseBundle'
-      ?['purchase:'+op.payload?.purchase?.id,...(op.payload?.products||[]).map(p=>'product:'+p.id)]
-      :[op.type+':'+(op.payload?.id||op.id)];
-    for(const op of [...pendingOps]){
-      if(criticalWriteDepth||!navigator.onLine||!isCloudAllowed()) break;
-      if(!pendingOps.includes(op)) continue;
-      const keys=entityKeys(op);
-      if(keys.some(key=>blockedEntities.has(key))) continue;
-      if(op.nextAttemptAt&&new Date(op.nextAttemptAt).getTime()>Date.now()){keys.forEach(key=>blockedEntities.add(key));continue;}
-      try{
-        op.status='processing';activeSyncOperationId=op.id;op.lastAttemptAt=new Date().toISOString();scheduleSyncIndicators();
-        // Una recepción de documentos nunca confirma la escritura de esta operación.
-        if(!op.cloudConfirmedAt){
-          const confirmed=await executePendingOperation(op);
-          if(!confirmed) throw new Error('La nube no confirmó la escritura');
-          op.cloudConfirmedAt=new Date().toISOString();
+    await persistLocalState(true);const blocked=new Set();
+    while(pendingOps.length&&!criticalWriteDepth&&navigator.onLine&&isCloudAllowed()){
+      const wave=chooseSyncWave(blocked);if(!wave.length) break;
+      wave.forEach(op=>{op.status='processing';op.lastAttemptAt=new Date().toISOString();});activeSyncOperationId=wave[0].id;scheduleSyncIndicators();
+      launchSyncWrites(wave);
+      const tasks=[...new Set(wave.map(op=>syncWriteFlights.get(op)?.promise).filter(Boolean))];
+      if(tasks.length){let timer;const completed=await Promise.race([Promise.all(tasks).then(()=>true),new Promise(resolve=>timer=setTimeout(()=>resolve(false),SYNC_ACK_WAIT))]);clearTimeout(timer);if(!completed){cloudConnectionSlow=true;resumeCloudConnection(true);}}
+      const confirmed=[];let networkError=false;
+      for(const op of wave){
+        if(!pendingOps.includes(op)) continue;
+        const flight=syncWriteFlights.get(op);
+        if(op.cloudConfirmedAt){confirmed.push(op);continue;}
+        if(flight?.state==='rejected'){
+          const error=flight.error;syncWriteFlights.delete(op);syncEntityKeys(op).forEach(key=>blocked.add(key));
+          op.retries=(op.retries||0)+1;op.status='error';op.lastError=String(error.message||error);op.lastErrorCode=String(error.code||'');
+          op.nextAttemptAt=new Date(Date.now()+Math.min(300000,Math.max(5000,2**Math.min(op.retries,8)*1000))).toISOString();rememberSyncError(op.lastError);savePending();
+          if(/network|unavailable|offline|deadline-exceeded|resource-exhausted/i.test(op.lastErrorCode+' '+op.lastError)) networkError=true;
         }
-        const receipt={id:op.id,type:op.type,reference:syncOperationReference(op),confirmedAt:op.cloudConfirmedAt};
-        const receipts=[receipt,...syncReceipts.filter(item=>item.id!==receipt.id)].sort((a,b)=>new Date(b.confirmedAt)-new Date(a.confirmedAt)).slice(0,20);
-        const index=pendingOps.indexOf(op);if(index>=0) pendingOps.splice(index,1);
-        try{
-          // La retirada y su recibo local forman una sola transacción.
-          if(localPersistenceReady) await POSStorage.savePendingOps(pendingOps,receipts);
-          else writeLegacyBackup(receipts);
-        }catch(error){
-          if(!pendingOps.includes(op)) pendingOps.splice(Math.min(Math.max(0,index),pendingOps.length),0,op);
-          throw error;
-        }
-        syncReceipts=receipts;
-        try{localStorage.setItem(LAST_SYNC_KEY,receipts[0].confirmedAt);localStorage.removeItem(LAST_SYNC_ERROR_KEY);}catch(error){console.warn('No se pudo actualizar el indicador secundario',error);}
-        if(!op.silent) showToast('Operación confirmada en la nube');
-      }catch(error){
-        keys.forEach(key=>blockedEntities.add(key));
-        op.retries=(op.retries||0)+1;op.status='error';op.lastError=String(error.message||error);op.lastErrorCode=String(error.code||'');
-        op.nextAttemptAt=new Date(Date.now()+Math.min(300000,Math.max(5000,2**Math.min(op.retries,8)*1000))).toISOString();
-        rememberSyncError(op.lastError);savePending();
-        if(/network|unavailable|offline/i.test(op.lastErrorCode+' '+op.lastError)) break;
       }
-      scheduleSyncIndicators();
+      await acknowledgeSyncWave(confirmed);scheduleSyncIndicators();
+      if(networkError) break;
+      await new Promise(resolve=>setTimeout(resolve,0));
     }
   }catch(error){console.error('processPendingOps',error);if(error.primaryName||error.fallbackName) reportLocalSaveError(error);rememberSyncError(String(error.message||error));}
   finally{syncInProgress=false;activeSyncOperationId=null;scheduleSyncIndicators();}
 }
-
-/* Try periodic flush when online */
-setInterval(()=>{ if(cloudOn) processPendingOps(); }, 15000);
+setInterval(()=>{if(isCloudAllowed()&&navigator.onLine&&pendingOps.length) processPendingOps();},5000);
 
 /* =========
    ONLINE UI
@@ -3188,6 +3296,7 @@ function renderSyncCenter(){
   $('#btn-local-save-retry')?.classList.toggle('hidden',!localSaveIssue);
   if($('#btn-local-save-retry')) $('#btn-local-save-retry').disabled=criticalWriteDepth>0||!!localSaveRecoveryPromise;
   if(isModalVisible('modal-sync-center')){renderSyncOperations();renderSyncReceipts();renderSyncConflicts();}
+  if(isModalVisible('modal-gestion')){const pending=pendingOps.filter(op=>op.type==='sale'&&!op.cloudConfirmedAt).length;$('#gestion-sales-status').textContent=STATE.sales.filter(s=>!s.deleted).length+' ventas en este equipo · '+pending+' pendientes de confirmación en la nube'+(pending?' · Mantén la app abierta para completar el envío.':'');}
 }
 const SYNC_TYPE_LABELS={sale:'Venta',product:'Producto',customer:'Cliente',purchaseBundle:'Compra',purchase:'Compra',supplier:'Proveedor',audit:'Auditoría',stockMovement:'Movimiento de stock',stockClosure:'Cierre de stock',staff:'Personal',shift:'Turno',syncConflict:'Conflicto'};
 function syncOperationReference(op){
@@ -3198,10 +3307,10 @@ function formatSyncTime(value){
   const date=new Date(value);return Number.isNaN(date.getTime())?'Fecha no disponible':date.toLocaleString('es-PE');
 }
 function getSyncSummary(){
-  const total=pendingOps.length,sending=syncInProgress?pendingOps.filter(op=>op.status==='processing'&&op.id===activeSyncOperationId).length:0,errors=pendingOps.filter(op=>op.status==='error').length;
+  const total=pendingOps.length,sending=pendingOps.filter(op=>op.status==='processing'&&isSyncOperationActive(op)).length,errors=pendingOps.filter(op=>op.status==='error').length;
   const waiting=total-sending-errors,states=Object.values(syncCollectionStates);
   const ready=cloudOn&&cloudWritesReady&&Object.keys(SUBCOLS).every(key=>syncCollectionStates[key]?.state==='ready');
-  const serverConnected=states.some(item=>item.serverConfirmed),completed=states.filter(item=>item.state==='ready').length;
+  const serverConnected=recentSalesServerReady||states.some(item=>item.serverConfirmed),completed=states.filter(item=>item.state==='ready').length;
   let label,detail,tone='pending';
   if(localSaveIssue){label='Guardado local pendiente';tone='error';detail=localSaveIssue.detail;}
   else if(!isCloudAllowed()){label='Solo en este equipo';detail=total?`${total} operación(es) guardada(s) aquí. Activa Automático para enviarlas.`:'Los registros se guardan en este equipo. El envío a la nube está pausado.';}
@@ -3212,7 +3321,7 @@ function getSyncSummary(){
   else if(cloudPreparationError){label='Preparación de nube pendiente';tone='error';detail=cloudPreparationError+' Los cambios permanecen guardados en la cola.';}
   else if(cloudConnectionError){label=cloudConnectionSlow?'Reconectando a la nube':'No se pudo completar la conexión';tone='error';detail=cloudConnectionError+' Tus registros y operaciones siguen guardados en este equipo.';}
   else if(syncInProgress&&!activeSyncOperationId){label='Preparando envío';detail='Comprobando el guardado local antes de enviar las operaciones.';}
-  else if(sending||syncInProgress){label='Enviando operaciones';detail=`${sending} en envío · ${waiting} en espera. Se retiran de la cola sólo al recibir confirmación.`;}
+  else if(sending||syncInProgress){label='Enviando operaciones';detail=`${sending} en envío · ${waiting} en espera · ${syncConfirmedInRun} confirmadas en este envío. Se retiran sólo al recibir confirmación.`;}
   else if(total){label='Cambios pendientes de envío';detail=`${total} operación(es) guardada(s) en este equipo y todavía pendientes de confirmación.`;}
   else if(cloudRouteReady&&!cloudWritesReady){label=serverConnected?'Conectado · Preparando datos':'Preparando datos de la nube';detail='Comprobando los datos anteriores antes de enviar nuevas operaciones.';}
   else if(serverConnected&&!ready){label='Conectado · Actualizando datos';detail=`La nube ya respondió. Información actualizada: ${completed} de ${Object.keys(SUBCOLS).length}. Puedes seguir trabajando.`;}
@@ -3236,7 +3345,7 @@ function renderSyncOperations(){
   rows.slice(syncQueuePage*size,(syncQueuePage+1)*size).forEach(op=>{
     const row=createSyncText('div','','rounded-xl border bg-white p-3 space-y-1');row.dataset.syncOpId=op.id;
     row.appendChild(createSyncText('div',`${SYNC_TYPE_LABELS[op.type]||'Operación'} · ${syncOperationReference(op)}`,'font-semibold break-all'));
-    const status=op.cloudConfirmedAt?'Confirmada en nube; recibo local pendiente':op.status==='processing'&&syncInProgress&&op.id===activeSyncOperationId?'Enviando; esperando confirmación':op.status==='error'?'Error; guardada para reintento':'En espera de envío';
+    const status=op.cloudConfirmedAt?'Confirmada en nube; recibo local pendiente':op.status==='processing'&&isSyncOperationActive(op)?'Enviando; esperando confirmación':op.status==='error'?'Error; guardada para reintento':'En espera de envío';
     row.appendChild(createSyncText('div',status,op.status==='error'?'text-red-700 text-sm':'small-muted'));
     row.appendChild(createSyncText('div',`Registrada: ${formatSyncTime(op.ts)} · Intentos fallidos: ${Number(op.retries||0)}`,'small-muted'));
     if(op.lastAttemptAt) row.appendChild(createSyncText('div',`Último intento: ${formatSyncTime(op.lastAttemptAt)}`,'small-muted'));
@@ -3975,7 +4084,7 @@ function appendGestionAuditSheet(wb, from = '', to = ''){
 }
 
 function localYmdFromDate(value){
-  const d = new Date(value || 0);
+  const d = saleDateValue(value || 0);
   if(Number.isNaN(d.getTime())) return '';
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
@@ -4133,7 +4242,10 @@ function appendListPagination(container,page,total,size,onChange){
 }
 function renderGestionList(){
   const container=$('#gestion-list');if(!container) return;
-  const all=(STATE.sales||[]).filter(s=>!s.deleted),size=80;
+  const index=getSalesIndex();
+  const all=index.visible||(index.visible=(STATE.sales||[]).filter(s=>!s.deleted).slice().sort((a,b)=>saleDateValue(b.date||0)-saleDateValue(a.date||0))),size=40;
+  const pendingSales=pendingOps.filter(op=>op.type==='sale'&&!op.cloudConfirmedAt);
+  $('#gestion-sales-status').textContent=all.length+' ventas en este equipo · '+pendingSales.length+' pendientes de confirmación en la nube'+(pendingSales.length?' · Mantén la app abierta para completar el envío.':'');
   gestionPage=Math.min(gestionPage,Math.max(0,Math.ceil(all.length/size)-1));
   const rows=all.slice(gestionPage*size,(gestionPage+1)*size),fragment=document.createDocumentFragment();
   if(!rows.length){container.innerHTML='<div class="small-muted">No hay ventas registradas</div>';return;}
@@ -4142,7 +4254,7 @@ function renderGestionList(){
   const body=table.querySelector('tbody');
   rows.forEach(s=>{
     const row=document.createElement('tr');
-    row.innerHTML=`<td>${new Date(s.date).toLocaleString()}</td><td>${escapeHtml(s.id)}</td><td>${escapeHtml(s.responsible||s.meta?.responsible||s.createdBy||'SIN RESPONSABLE')}</td><td>${escapeHtml(s.customerName||s.customer||'-')}</td><td>${escapeHtml(s.paymentType||s.method||'EFECTIVO')}</td><td style="text-align:right">S/ ${money(s.total)}</td><td style="white-space:nowrap"><button class="px-2 py-1 border rounded mr-2">Editar</button><button class="px-2 py-1 border rounded">Eliminar</button></td>`;
+    row.innerHTML=`<td>${saleDateValue(s.date).toLocaleString()}</td><td>${escapeHtml(s.id)}</td><td>${escapeHtml(s.responsible||s.meta?.responsible||s.createdBy||'SIN RESPONSABLE')}</td><td>${escapeHtml(s.customerName||s.customer||'-')}</td><td>${escapeHtml(s.paymentType||s.method||'EFECTIVO')}</td><td style="text-align:right">S/ ${money(s.total)}</td><td style="white-space:nowrap"><button class="px-2 py-1 border rounded mr-2">Editar</button><button class="px-2 py-1 border rounded">Eliminar</button></td>`;
     const buttons=row.querySelectorAll('button');buttons[0].onclick=()=>openEditSale(s.id);buttons[1].onclick=()=>deleteSaleConfirm(s.id);body.appendChild(row);
   });fragment.appendChild(table);
   appendListPagination(fragment,gestionPage,all.length,size,page=>{gestionPage=page;renderGestionList();});
@@ -4630,7 +4742,7 @@ function salesInRange(from,to){
   const s = new Date(from + 'T00:00:00').getTime(), e = new Date(to + 'T23:59:59.999').getTime();
   return (STATE.sales||[]).filter(sale => {
     if(sale.deleted) return false;
-    const t = new Date(sale.date).getTime();
+    const t = saleDateValue(sale.date).getTime();
     return t >= s && t <= e;
   });
 }
@@ -4666,7 +4778,7 @@ function renderReportSummary(from,to){
   reportSalesPage=Math.min(reportSalesPage,Math.max(0,Math.ceil(sales.length/80)-1));
   const rows = sales.slice(reportSalesPage*80,(reportSalesPage+1)*80).map(s=>{
     const items = (s.items||[]).map(it => ((getProductIndexes().byId.get(it.productId)||{name:it.rawName||it.productId}).name) + ' x' + it.qty).join('; ');
-    return `<tr><td>${new Date(s.date).toLocaleString()}</td><td>${s.id}</td><td>${escapeHtml(s.responsible||s.meta?.responsible||s.createdBy||'SIN RESPONSABLE')}</td><td>${escapeHtml(s.customerName||'-')}</td><td>${escapeHtml(s.paymentType||s.method||'EFECTIVO')}</td><td style="text-align:right">S/ ${money(s.total)}</td><td>${escapeHtml(items)}</td></tr>`;
+    return `<tr><td>${saleDateValue(s.date).toLocaleString()}</td><td>${s.id}</td><td>${escapeHtml(s.responsible||s.meta?.responsible||s.createdBy||'SIN RESPONSABLE')}</td><td>${escapeHtml(s.customerName||'-')}</td><td>${escapeHtml(s.paymentType||s.method||'EFECTIVO')}</td><td style="text-align:right">S/ ${money(s.total)}</td><td>${escapeHtml(items)}</td></tr>`;
   }).join('');
   const table = `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr><th>Fecha</th><th>ID</th><th>Responsable</th><th>Cliente</th><th>Pago</th><th style="text-align:right">Total</th><th>Productos</th></tr></thead><tbody>${rows || '<tr><td colspan="7" class="small-muted">No hay ventas</td></tr>'}</tbody></table>`;
   const container=$('#report-summary');container.innerHTML=parts.join('')+table;
@@ -8948,6 +9060,7 @@ function logout(){
 
 /* Modal helpers with visualViewport handling to avoid keyboard overlapping on mobile */
 function openModal(id){
+  if(id==='modal-gestion') gestionPage=0;
   if(id==='modal-sale'&&!getActiveShiftForCurrentUser()){showToast('Abre tu turno antes de vender');openShiftModal();return;}
   const modal=document.getElementById(id);if(!modal || modal.classList.contains('visible')) return;
   const initialViewport={height:window.visualViewport?.height||innerHeight,offset:window.visualViewport?Math.max(0,innerHeight-window.visualViewport.height):0};
@@ -9074,7 +9187,7 @@ let pwaRegistrationPromise=null,appStarted=false;
 function registerPWA(){
   if(pwaRegistrationPromise) return pwaRegistrationPromise;
   if(!('serviceWorker' in navigator)||!/^https?:$/.test(location.protocol)) return Promise.resolve(false);
-  pwaRegistrationPromise=navigator.serviceWorker.register('./service-worker.js?v=20261122-cloud-v8',{scope:'./',updateViaCache:'none'})
+  pwaRegistrationPromise=navigator.serviceWorker.register('./service-worker.js?v=20261125-sales-v9',{scope:'./',updateViaCache:'none'})
     .then(()=>true).catch(error=>{console.warn('Service worker',error);pwaRegistrationPromise=null;return false;});
   return pwaRegistrationPromise;
 }

@@ -1,0 +1,23 @@
+{
+  "passed": 16,
+  "tests": [
+    "SDK real carga Auth y Firestore en paralelo y acepta el transporte de compatibilidad",
+    "primera conexión usa la primera prueba positiva sin esperar consultas colgadas",
+    "ruta alternativa espera que la principal esté verificada vacía",
+    "error de permisos en la ruta principal no cambia de base ni habilita envíos",
+    "ruta recordada evita las ocho comprobaciones al volver a abrir",
+    "ruta de otra tienda o proyecto se descarta y se verifica con el servidor",
+    "espacio agotado para indicadores no bloquea la ruta verificada ni los envíos durables",
+    "migración lenta permite conectar las once colecciones y retiene envíos hasta prepararse",
+    "respuestas parciales distinguen conectado, actualización completa y confirmaciones",
+    "fallo de preparación mantiene la cola aunque lleguen datos confirmados",
+    "resolución sin respuesta termina su espera a los seis segundos y comparte lecturas al reintentar",
+    "error temporal reintenta sólo la suscripción fallida",
+    "permiso rechazado muestra error y no genera reintentos continuos",
+    "conexión atascada con sólo caché reinicia el transporte sin duplicar suscripciones",
+    "recuperar Internet y volver a la app reactivan la red sin duplicar listeners",
+    "cambiar a solo local durante el inicio cancela conexiones y reintentos tardíos"
+  ],
+  "errors": [],
+  "externalRequests": 0
+}
