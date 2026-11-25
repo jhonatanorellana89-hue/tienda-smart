@@ -1,0 +1,20 @@
+{
+  "passed": 13,
+  "tests": [
+    "el comprobante aparece guardado en esta caja sin esperar confirmación de nube",
+    "un guardado lento muestra Guardando, evita doble cobro y no adelanta el comprobante",
+    "60 ventas, una por minuto, con 100000 históricas conservan stock, crédito, turno y respuesta local",
+    "fallar ambos almacenes conserva el comprobante anterior y no reaparece una venta revertida",
+    "orden de más de 200 ventas nuevas se conserva tras reiniciar y un guardado completo",
+    "cambios remotos guardan sólo los productos afectados, sus vinculados y movimientos",
+    "otra modificación de la misma fila durante el guardado no se da por persistida antes de tiempo",
+    "los reportes abiertos se actualizan al vender y el comprobante se ve con un filtro histórico",
+    "respaldo alternativo confirmado no resucita operaciones viejas después de recargar",
+    "Ver ventas conserva el control de acceso y el comprobante de otro usuario no se muestra",
+    "stock cero del principal no se reconstruye desde un subproducto desactualizado al cobrar",
+    "editar el precio obliga a guardar ese cambio y las ventas siguientes vuelven al recorrido incremental",
+    "la lista conserva orden por fecha y muestra la venta recién guardada aunque existan fechas futuras"
+  ],
+  "errors": [],
+  "externalRequests": 0
+}

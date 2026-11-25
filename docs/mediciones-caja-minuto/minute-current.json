@@ -1,0 +1,106 @@
+{
+  "label": "minute-current",
+  "cpu": 6,
+  "viewport": "412x915",
+  "browser": "156.0.8078.79",
+  "scenarios": [
+    {
+      "history": 10000,
+      "products": 5000,
+      "rows": [
+        {
+          "commitMs": 838.2000000001863,
+          "visibleMs": 838.2000000001863,
+          "serializations": 6,
+          "phases": {
+            "fullCommit": 569.5,
+            "renderCart": 2.1000000000931323,
+            "updateShiftUI": 1,
+            "renderDashboard": 42
+          },
+          "salesAdded": 1,
+          "stock": 9999,
+          "receipt": true
+        },
+        {
+          "commitMs": 438.5,
+          "visibleMs": 438.39999999990687,
+          "serializations": 6,
+          "phases": {
+            "fullCommit": 381.39999999990687,
+            "renderCart": 0.10000000009313226,
+            "updateShiftUI": 0,
+            "renderDashboard": 0.7999999998137355
+          },
+          "salesAdded": 1,
+          "stock": 9998,
+          "receipt": true
+        },
+        {
+          "commitMs": 495.89999999990687,
+          "visibleMs": 495.89999999990687,
+          "serializations": 6,
+          "phases": {
+            "fullCommit": 405.6999999997206,
+            "renderCart": 0.10000000009313226,
+            "updateShiftUI": 0.10000000009313226,
+            "renderDashboard": 18.90000000037253
+          },
+          "salesAdded": 1,
+          "stock": 9997,
+          "receipt": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "history": 100000,
+      "products": 5000,
+      "rows": [
+        {
+          "commitMs": 731.3999999999069,
+          "visibleMs": 731.3999999999069,
+          "serializations": 6,
+          "phases": {
+            "fullCommit": 457.29999999981374,
+            "renderCart": 5.600000000093132,
+            "updateShiftUI": 0.10000000009313226,
+            "renderDashboard": 39.5
+          },
+          "salesAdded": 1,
+          "stock": 9999,
+          "receipt": true
+        },
+        {
+          "commitMs": 398.39999999990687,
+          "visibleMs": 398.29999999981374,
+          "serializations": 6,
+          "phases": {
+            "fullCommit": 159,
+            "renderCart": 2.2999999998137355,
+            "updateShiftUI": 0,
+            "renderDashboard": 9.200000000186265
+          },
+          "salesAdded": 1,
+          "stock": 9998,
+          "receipt": true
+        },
+        {
+          "commitMs": 193.89999999990687,
+          "visibleMs": 193.89999999990687,
+          "serializations": 6,
+          "phases": {
+            "fullCommit": 141.8000000002794,
+            "renderCart": 0.10000000009313226,
+            "updateShiftUI": 0,
+            "renderDashboard": 10
+          },
+          "salesAdded": 1,
+          "stock": 9997,
+          "receipt": true
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

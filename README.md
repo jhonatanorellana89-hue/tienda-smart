@@ -21,7 +21,7 @@ Las bibliotecas siguen en `libs` y la PWA las conserva para uso sin conexión.
 
 Los demás archivos, incluidos los logotipos y bibliotecas, deben conservarse.
 En esta actualización se eliminan `libs/html2canvas-1.4.1.min.js` y
-`libs/jspdf-2.5.1.umd.min.js`. El Service Worker v9 deja de incluirlos en la caché.
+`libs/jspdf-2.5.1.umd.min.js`. El Service Worker v10 deja de incluirlos en la caché.
 No es necesario instalar Node ni ejecutar una compilación para publicar esta copia:
 el CSS ya está generado. No borrar los datos del sitio ni desinstalar la PWA.
 Antes de actualizar una caja real, exportar su respaldo JSON desde Sincronización.
@@ -60,7 +60,10 @@ sincronización y tareas largas. Conserva hasta 500 muestras en memoria; no env�
 telemetría ni guarda datos del negocio. Sin ese parámetro no instala observadores.
 El consumo de memoria sólo aparece si el navegador expone `performance.memory`.
 
-La actualización actual se documenta en `docs/VENTAS-Y-COLA-NUBE.md`.
+La actualización actual se documenta en `docs/CAJA-UNA-VENTA-POR-MINUTO.md`.
+El cobro guarda sólo las filas afectadas y muestra la última venta en la misma caja
+después de confirmar su guardado local, sin esperar la confirmación de nube.
+Las mejoras anteriores de envíos están en `docs/VENTAS-Y-COLA-NUBE.md`.
 Las ventas recientes se reciben antes de terminar el archivo y las colas grandes
 se envían por lotes, con confirmación durable de los IDs recibidos.
 Las mejoras anteriores de conexión están en `docs/CONEXION-NUBE-Y-GUARDADO.md`.

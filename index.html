@@ -710,6 +710,7 @@
   @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
   @keyframes pop{from{opacity:.7;transform:scale(.98)}to{opacity:1;transform:scale(1)}}
   .card{animation:rise .25s ease both}
+  #last-sale-receipt{animation:none}
   #inventory-list .card,#clients-list .card{animation:none;content-visibility:auto;contain-intrinsic-size:auto 58px}
 
   @media (max-width:420px){
@@ -1016,6 +1017,14 @@
       </div>
     </div>
   </header>
+
+  <section id="last-sale-receipt" class="hidden card" style="margin:16px 16px 0" role="status" aria-live="polite" aria-atomic="true">
+    <div class="flex justify-between items-center gap-2"><strong>Última venta guardada</strong><strong id="last-sale-amount" style="font-size:22px;color:#c2410c"></strong></div>
+    <div id="last-sale-items" class="mt-2"></div>
+    <div id="last-sale-info" class="small-muted mt-2" style="overflow-wrap:anywhere"></div>
+    <div id="last-sale-sync" class="small-muted mt-2"></div>
+    <div class="flex gap-2 flex-wrap mt-3"><button type="button" onclick="openModal('modal-sale')" class="btn-primary">Nueva venta</button><button type="button" onclick="requireStockAccess(()=>openModal('modal-gestion'))" class="px-3 py-2 border rounded">Ver ventas</button></div>
+  </section>
 
   <!-- Main content (home tab default) -->
   <main id="tab-home" class="px-4 pt-6">
@@ -2115,12 +2124,21 @@ let saleSubmitInProgress = false;
    Each op has shape { id, type: 'sale'|'product'|'customer', payload, ts, retries } */
 let pendingOps = [];
 let syncReceipts = [];
+let lastLocalSale=null,lastDurableStateRef=null,activeSaleWrite=null,dashboardSalesCache=null;
+const durableQueueRecords=new WeakMap();
+let fullStateSaveRequired=true;
+const dirtyEntityRows=new Map();
+function rememberEntityChanges(changes){
+  for(const [name,rows] of Object.entries(changes)){if(!rows.length) continue;if(!dirtyEntityRows.has(name)) dirtyEntityRows.set(name,new Map());rows.forEach(row=>{if(row?.id) dirtyEntityRows.get(name).set(row.id,{row});});}
+}
+function rememberDurableQueue(rows){rows.forEach(op=>{if(op&&typeof op==='object') durableQueueRecords.set(op,{id:op.id,type:op.type,payload:op.payload});});}
+function isQueueRecordDurable(op){const record=durableQueueRecords.get(op);return !!record&&record.id===op.id&&record.type===op.type&&record.payload===op.payload;}
 let localPersistenceReady = false, stateRevision = 0, savedRevision = -1, criticalWriteDepth = 0;
 let productIndex = null, salesIndex = null;
 let normalizedShapeStamp=null,purchaseSummaryCache=null,dailyDataCache=null,exportPreviewDataCache=null;
 const STATE_ARRAY_KEYS=['products','sales','customers','purchases','suppliers','auditLogs','stockClosures','staff','shifts','stockMovements','syncConflicts'];
 const normalizedRecords = new WeakSet();
-function invalidateProductIndexes(){ productIndex=null; salesIndex=null; purchaseSummaryCache=null; dailyDataCache=null; exportPreviewDataCache=null; normalizedShapeStamp=null; }
+function invalidateProductIndexes(productsOnly=false){ productIndex=null; if(!productsOnly){dashboardSalesCache=null;salesIndex=null;} purchaseSummaryCache=null; dailyDataCache=null; exportPreviewDataCache=null; normalizedShapeStamp=null; }
 function getProductIndexes(){
   const rows=STATE.products||[];
   if(productIndex?.rows===rows && productIndex.length===rows.length) return productIndex;
@@ -2148,6 +2166,13 @@ function getSalesIndex(){
   });
   return salesIndex={rows,length:rows.length,byShift,summaries:new Map()};
 }
+function getVisibleSales(){
+  const index=getSalesIndex();if(index.visible) return index.visible;
+  const rows=(STATE.sales||[]).filter(sale=>!sale.deleted),times=rows.map(sale=>saleDateValue(sale.date||0).getTime()||0);
+  const ordered=times.every((time,i)=>i===0||times[i-1]>=time);
+  index.visible=ordered?rows:rows.map((sale,i)=>({sale,time:times[i]})).sort((a,b)=>b.time-a.time).map(entry=>entry.sale);
+  return index.visible;
+}
 const PENDING_KEY = 'tienda_pending_ops_v1';
 const LOCAL_BACKUP_KEY = 'tienda_local_backup_v1';
 const LOCAL_BACKUP_PREV_KEY = 'tienda_local_backup_v1_prev';
@@ -2167,7 +2192,7 @@ function getDeviceId(){
 /* Load persisted state and pending ops */
 try { const b = (!localStorage.getItem('tienda_idb_authoritative_v1')||localStorage.getItem('tienda_critical_fallback_v1'))?localStorage.getItem(LOCAL_BACKUP_KEY):null; if(b) STATE = JSON.parse(b); } catch(e){ console.warn('local parse err', e); }
 try { const p = localStorage.getItem(PENDING_KEY); if(p) pendingOps = JSON.parse(p) || []; } catch(e){ pendingOps = []; }
-try{const fallback=JSON.parse(localStorage.getItem('tienda_critical_fallback_v1')||'null');if(fallback?.state){STATE=fallback.state;pendingOps=fallback.ops||[];syncReceipts=Array.isArray(fallback.syncReceipts)?fallback.syncReceipts:[];}}catch(error){console.warn('Respaldo alternativo inválido',error);}
+try{const fallback=JSON.parse(localStorage.getItem('tienda_critical_fallback_v1')||'null');if(fallback?.state){STATE=fallback.state;pendingOps=fallback.ops||[];syncReceipts=Array.isArray(fallback.syncReceipts)?fallback.syncReceipts:[];lastLocalSale=fallback.lastLocalSale||null;}}catch(error){console.warn('Respaldo alternativo inválido',error);}
 
 function ensureStateShape(allowCached=false){
   if(allowCached&&normalizedShapeStamp?.state===STATE&&normalizedShapeStamp.revision===stateRevision&&STATE_ARRAY_KEYS.every(key=>Array.isArray(STATE[key])&&normalizedShapeStamp.arrays[key]===STATE[key]&&normalizedShapeStamp.lengths[key]===STATE[key].length)) return;
@@ -2254,8 +2279,9 @@ ensureStateShape();
 /* Persist helpers */
 let mergedStateBackupTimer = 0;
 let localSaveIssue=null,localSaveRetryTimer=0,localSaveRetryAt=0,localSaveFailures=0,localSaveNoticeAt=0,localSaveRecoveryPromise=null;
-function scheduleMergedStateBackup(){
-  stateRevision += 1; invalidateProductIndexes();
+function scheduleMergedStateBackup(changes=null){
+  if(changes) rememberEntityChanges(changes);else fullStateSaveRequired=true;
+  stateRevision += 1; invalidateProductIndexes(!!changes&&!changes.sales);
   clearTimeout(mergedStateBackupTimer);
   mergedStateBackupTimer=setTimeout(()=>{mergedStateBackupTimer=0;persistLocalState().catch(reportLocalSaveError);},180);
 }
@@ -2272,6 +2298,7 @@ function queueUnsentAuditLogs(){
 }
 
 function saveLocalBackup(){
+  fullStateSaveRequired=true;
   stateRevision+=1;invalidateProductIndexes();
   const queued=queueUnsentAuditLogs();
   if(!localPersistenceReady && !criticalWriteDepth){
@@ -2283,9 +2310,9 @@ function saveLocalBackup(){
   }
   if(queued) savePending();
 }
-function writeLegacyBackup(receipts=syncReceipts){
+function writeLegacyBackup(receipts=syncReceipts,lastSale=lastLocalSale){
   // Un solo setItem es atómico: nunca queda una venta sin su cola por falta de cuota.
-  localStorage.setItem('tienda_critical_fallback_v1',JSON.stringify({state:STATE,ops:pendingOps,syncReceipts:receipts}));
+  localStorage.setItem('tienda_critical_fallback_v1',JSON.stringify({state:STATE,ops:pendingOps,syncReceipts:receipts,lastLocalSale:lastSale}));
 }
 function describeLocalSaveError(error){
   const names=[error?.name,error?.primaryName,error?.fallbackName].join(' ');
@@ -2327,28 +2354,46 @@ function retryLocalSave(){
   })();return localSaveRecoveryPromise;
 }
 window.addEventListener('tienda-storage-error',event=>reportLocalSaveError(event.detail));
-async function persistLocalState(force=false){
+async function persistLocalState(force=false,options={}){
   if(criticalWriteDepth&&!force) return false;
   if(!force&&localSaveIssue&&Date.now()<localSaveRetryAt) return false;
   clearTimeout(mergedStateBackupTimer);mergedStateBackupTimer=0;
-  if(!force && savedRevision===stateRevision) return true;
-  const revision=stateRevision;
+  if(!force&&savedRevision===stateRevision) return true;
+  const revision=stateRevision,persistedState=STATE;
+  const pendingChanges=new Map([...dirtyEntityRows].map(([name,rows])=>[name,new Map(rows)]));
+  const partial=localPersistenceReady&&POSStorage.supportsChangedRows&&!fullStateSaveRequired&&lastDurableStateRef===STATE&&!localStorage.getItem('tienda_critical_fallback_v1')&&pendingChanges.size>0;
+  const commitOptions={...options};
+  if(partial){
+    commitOptions.changes=Object.fromEntries([...pendingChanges].map(([name,rows])=>[name,[...rows.values()].map(entry=>entry.row)]));
+    commitOptions.operationIds=[...new Set([...(options.operationIds||[]),...pendingOps.filter(op=>!isQueueRecordDurable(op)).map(op=>op.id)])];
+  }else delete commitOptions.changes;
+  const operationIds=partial?new Set(commitOptions.operationIds):null;
+  const records=(partial?pendingOps.filter(op=>operationIds.has(op.id)):pendingOps).slice();
   try{
     if(!localPersistenceReady) throw new Error('IndexedDB no disponible');
-    await POSStorage.commit(STATE,pendingOps);
+    await POSStorage.commit(persistedState,pendingOps,undefined,commitOptions);
     localStorage.removeItem('tienda_critical_fallback_v1');
   }catch(error){
-    // Conservar ambos errores permite distinguir espacio, bloqueo y cierre de conexión.
-    try{writeLegacyBackup();}catch(fallbackError){
+    try{writeLegacyBackup(syncReceipts,options.lastSale||lastLocalSale);}catch(fallbackError){
       const failure=new Error(String(error.message||error)+' · Respaldo: '+String(fallbackError.message||fallbackError));
       failure.name=fallbackError.name||'Error';failure.primaryName=error.name;failure.fallbackName=fallbackError.name;throw failure;
     }
   }
-  savedRevision=revision;clearLocalSaveIssue();return true;
+  if(partial) pendingChanges.forEach((rows,name)=>{rows.forEach((row,id)=>{if(dirtyEntityRows.get(name)?.get(id)===row) dirtyEntityRows.get(name).delete(id);});if(dirtyEntityRows.get(name)?.size===0) dirtyEntityRows.delete(name);});
+  if(!partial&&revision===stateRevision&&persistedState===STATE){dirtyEntityRows.clear();fullStateSaveRequired=false;}
+  savedRevision=revision;lastDurableStateRef=persistedState;rememberDurableQueue(records);clearLocalSaveIssue();return true;
+}
+async function ensurePendingQueueDurable(){
+  if(savedRevision!==stateRevision||lastDurableStateRef!==STATE||localStorage.getItem('tienda_critical_fallback_v1')) return persistLocalState(true);
+  if(pendingOps.every(isQueueRecordDurable)) return;
+  const rows=pendingOps.slice();
+  try{if(localPersistenceReady) await POSStorage.savePendingOps(pendingOps);else writeLegacyBackup();}
+  catch(error){try{writeLegacyBackup();}catch(fallback){fallback.primaryName=error.name;fallback.fallbackName=fallback.name;throw fallback;}}
+  rememberDurableQueue(rows);
 }
 function savePending(){
   if(criticalWriteDepth) return;
-  if(localPersistenceReady) POSStorage.schedulePendingSave(pendingOps);
+  if(localPersistenceReady&&!localStorage.getItem('tienda_critical_fallback_v1')) POSStorage.schedulePendingSave(pendingOps);
   else writeLegacyBackup();
   scheduleSyncIndicators();
 }
@@ -2365,13 +2410,15 @@ async function initializeLocalPersistence(){
       else await POSStorage.saveState(STATE);
     }
     const opMap = new Map();
-    [...(loaded?.ops||[]),...(loaded?.queueAuthoritative&&!localStorage.getItem('tienda_critical_fallback_v1')?[]:pendingOps||[])].forEach(op=>{
+    const recoveredOps=localStorage.getItem('tienda_critical_fallback_v1')?pendingOps:(loaded?.queueAuthoritative?loaded.ops:[...(loaded?.ops||[]),...(pendingOps||[])]);
+    (recoveredOps||[]).forEach(op=>{
       if(op?.id) opMap.set(op.id,op);
     });
     pendingOps = Array.from(opMap.values()).sort((a,b)=>String(a.ts||'').localeCompare(String(b.ts||'')));
-    if(!localStorage.getItem('tienda_critical_fallback_v1')) syncReceipts=Array.isArray(loaded.receipts)?loaded.receipts:[];
+    if(!localStorage.getItem('tienda_critical_fallback_v1')){syncReceipts=Array.isArray(loaded.receipts)?loaded.receipts:[];lastLocalSale=loaded.lastSale||null;}
     localPersistenceReady=true;
-    if(localStorage.getItem('tienda_critical_fallback_v1')){await POSStorage.commit(STATE,pendingOps,syncReceipts);localStorage.removeItem('tienda_critical_fallback_v1');}
+    if(localStorage.getItem('tienda_critical_fallback_v1')){await POSStorage.commit(STATE,pendingOps,syncReceipts,{lastSale:lastLocalSale});localStorage.removeItem('tienda_critical_fallback_v1');}
+    lastDurableStateRef=STATE;rememberDurableQueue(pendingOps);
     localStorage.setItem('tienda_idb_authoritative_v1','1');
     ensureStateShape();
     scheduleMergedStateBackup();
@@ -2939,7 +2986,7 @@ function mergeFromSubcollection(name,docs){
   const rows=STATE[name]||(STATE[name]=[]);
   let index=remoteEntityIndexes.get(name);
   if(index?.rows!==rows || index.length!==rows.length){index={rows,length:rows.length,byId:new Map(rows.map((row,i)=>[String(row.id),i]))};remoteEntityIndexes.set(name,index);}
-  const protectedKeys=pendingEntityKeys();let changed=false,salesOrderChanged=false;
+  const protectedKeys=pendingEntityKeys(),storedRows=[],relatedProducts=[];let changed=false,salesOrderChanged=false;
   for(const remote of docs){
     if(!remote?.id) continue;
     const id=String(remote.id),position=index.byId.get(id),current=position===undefined?null:rows[position];
@@ -2965,18 +3012,19 @@ function mergeFromSubcollection(name,docs){
     if(current && JSON.stringify(current)===JSON.stringify(merged)) continue;
     if(name==='sales'&&(!current||current.date!==merged.date)) salesOrderChanged=true;
     if(position===undefined){index.byId.set(id,rows.length);rows.push(merged);}else rows[position]=merged;
-    changed=true;
+    changed=true;storedRows.push(merged);
     if(name==='stockMovements'){
       const product=getProductById(merged.productId);
-      if(product){product.movements=product.movements||[];if(!product.movements.some(m=>String(m.id||m.movementId||'')===id)) product.movements.push(merged);}
+      if(product){product.movements=product.movements||[];if(!product.movements.some(m=>String(m.id||m.movementId||'')===id)){product.movements.push(merged);relatedProducts.push(product);}}
     }
   }
   if(!changed) return false;
   if(salesOrderChanged){rows.sort((a,b)=>saleDateValue(b.date||0)-saleDateValue(a.date||0));remoteEntityIndexes.delete(name);}
   else index.length=rows.length;
   if(name==='stockMovements') movementProductIndex=null;
-  if(name==='products') rebuildLinkedStocks(false);
-  scheduleMergedStateBackup();window.STATE=STATE;
+  if(name==='products'){rebuildLinkedStocks(false);const ids=new Set(storedRows.flatMap(row=>getRelatedProductIdsForSync(row.id)));ids.forEach(id=>{const product=getProductById(id);if(product) relatedProducts.push(product);});}
+  const changes={[name]:storedRows};if(relatedProducts.length) changes.products=[...new Map([...storedRows.filter(()=>name==='products'),...relatedProducts].map(row=>[row.id,row])).values()];
+  scheduleMergedStateBackup(changes);window.STATE=STATE;
   return true;
 }
 
@@ -3099,6 +3147,7 @@ function addPendingOp(op){
   const existingIndex = pendingOps.findIndex(item=>item.id===op.id);
   if(existingIndex >= 0) pendingOps[existingIndex] = {...pendingOps[existingIndex],...op,cloudConfirmedAt:null};
   else pendingOps.push(op);
+  activeSaleWrite?.operationIds.add(op.id);
   savePending();
   if(!op.silent && !criticalWriteDepth) showToast(isCloudAllowed() && navigator.onLine ?'Operación guardada; esperando confirmación':'Operación guardada en cola local');
   if(db && isCloudAllowed() && navigator.onLine) processPendingOps();
@@ -3206,14 +3255,15 @@ async function acknowledgeSyncWave(ops){
   const log=[...unique.values()].slice(0,20),removed=new Set(valid),positions=valid.map(op=>({op,index:pendingOps.indexOf(op)}));
   let cursor=0;for(const op of pendingOps) if(!removed.has(op)) pendingOps[cursor++]=op;pendingOps.length=cursor;
   try{
-    if(localPersistenceReady){
+    if(localPersistenceReady&&!localStorage.getItem('tienda_critical_fallback_v1')){
       if(POSStorage.acknowledgePendingOps) await POSStorage.acknowledgePendingOps(valid.map(op=>op.id),log);
       else await POSStorage.savePendingOps(pendingOps,log);
     }else writeLegacyBackup(log);
   }catch(error){
     positions.sort((a,b)=>a.index-b.index).forEach(({op,index})=>{if(!pendingOps.some(row=>row.id===op.id)) pendingOps.splice(Math.min(index,pendingOps.length),0,op);op.status='error';op.lastError=String(error.message||error);op.nextAttemptAt=new Date(Date.now()+5000).toISOString();});reportLocalSaveError(error);throw error;
   }
-  syncReceipts=log;syncConfirmedInRun+=valid.length;valid.forEach(op=>syncWriteFlights.delete(op));
+  syncReceipts=log;syncConfirmedInRun+=valid.length;
+  if(savedRevision===stateRevision&&lastDurableStateRef===STATE&&pendingOps.every(isQueueRecordDurable)) clearLocalSaveIssue();valid.forEach(op=>syncWriteFlights.delete(op));
   try{localStorage.setItem(LAST_SYNC_KEY,log[0].confirmedAt);localStorage.removeItem(LAST_SYNC_ERROR_KEY);}catch(error){console.warn('Indicador de sincronización no guardado',error);}
   if(valid.some(op=>!op.silent)) showToast(valid.length===1?'Operación confirmada en la nube':valid.length+' operaciones confirmadas en la nube');
 }
@@ -3225,7 +3275,8 @@ async function flushPendingOperations(){
   if(!db||!cloudRouteReady||!cloudWritesReady||!navigator.onLine||!isCloudAllowed()||!pendingOps.length||syncInProgress||criticalWriteDepth) return;
   syncInProgress=true;syncConfirmedInRun=0;scheduleSyncIndicators();
   try{
-    await persistLocalState(true);const blocked=new Set();
+    await ensurePendingQueueDurable();
+    const blocked=new Set();
     while(pendingOps.length&&!criticalWriteDepth&&navigator.onLine&&isCloudAllowed()){
       const wave=chooseSyncWave(blocked);if(!wave.length) break;
       wave.forEach(op=>{op.status='processing';op.lastAttemptAt=new Date().toISOString();});activeSyncOperationId=wave[0].id;scheduleSyncIndicators();
@@ -3275,6 +3326,7 @@ async function setWorkMode(mode){
 }
 
 function renderSyncCenter(){
+  renderLocalSaleReceipt();
   const summary=getSyncSummary(),mode=getWorkMode();
   const setText=(id,text)=>{const el=document.getElementById(id);if(el&&el.textContent!==String(text)) el.textContent=String(text);};
   const badge=$('#pending-count');if(badge){badge.textContent=String(summary.total);badge.classList.toggle('hidden',summary.total===0);}
@@ -3448,6 +3500,8 @@ function scheduleRenderAll(delay = 40){
 }
 
 function renderAll(){
+  if(criticalWriteDepth&&saleSubmitInProgress){renderAllTimer=0;scheduleRenderAll(40);return;}
+  renderLocalSaleReceipt();
   if(renderAllTimer){ clearTimeout(renderAllTimer); renderAllTimer = 0; }
   if(isElementVisible('tab-home')) renderDashboard(true);
   if(isElementVisible('tab-inventory')) renderInventoryList(true);
@@ -3459,13 +3513,45 @@ function renderAll(){
   if($('#modal-stock-history')?.classList.contains('visible') && !stockHistoryCacheDirty) renderStockHistory();
 }
 
+function renderDashboardSales(){
+  const date=todayYMD(),rows=STATE.sales||[];
+  if(!dashboardSalesCache||dashboardSalesCache.date!==date||dashboardSalesCache.rows!==rows||dashboardSalesCache.length!==rows.length){
+    let count=0,total=0;const salesForDay=[];for(const sale of rows){if(!sale.deleted&&isSameLocalDay(sale.date)){salesForDay.push(sale);count++;total+=Number(sale.total||0);}}
+    dashboardSalesCache={date,rows,length:rows.length,count,total,salesForDay};
+  }
+  $('#stat-ventas').textContent='S/ '+money(dashboardSalesCache.total);$('#stat-count').textContent=dashboardSalesCache.count;
+}
+function renderLocalSaleReceipt(){
+  const box=$('#last-sale-receipt');if(!box) return;
+  const sale=lastLocalSale?.id?(STATE.sales[0]?.id===lastLocalSale.id?STATE.sales[0]:STATE.sales.find(row=>row.id===lastLocalSale.id)):null;
+  const allowed=sale&&(isAdminSession()||String(sale.staffId||'')===String(getCurrentSessionStaffId()));
+  box.classList.toggle('hidden',!sale||!!sale.deleted||!allowed);if(!sale||sale.deleted||!allowed){box.dataset.saleId='';return;}
+  const fingerprint=sale.id+'|'+sale.total+'|'+sale.paymentType+'|'+(sale.items||[]).map(item=>item.productId+':'+item.qty).join(',');
+  if(box.dataset.content!==fingerprint){
+    $('#last-sale-amount').textContent='S/ '+money(sale.total);
+    $('#last-sale-items').textContent=(sale.items||[]).map((item,index)=>String(item.qty)+' × '+(getProductById(item.productId)?.name||lastLocalSale.items?.[index]?.name||'Producto')).join(' · ');
+    $('#last-sale-info').textContent=saleDateValue(sale.date).toLocaleString('es-PE')+' · '+String(sale.paymentType||'')+' · '+sale.id;
+    box.dataset.content=fingerprint;
+  }
+  const queued=pendingOps.find(op=>op.type==='sale'&&op.payload?.id===sale.id);
+  const confirmed=queued?.cloudConfirmedAt||syncReceipts.find(receipt=>receipt.type==='sale'&&receipt.reference===sale.id)?.confirmedAt;
+  const status=confirmed?'Confirmada en la nube':queued?'Guardada aquí · Pendiente de confirmación en la nube':'Guardada en este equipo';
+  if($('#last-sale-sync').textContent!==status) $('#last-sale-sync').textContent=status;
+  box.dataset.saleId=sale.id;
+}
+function markSaleStateChanged(sale){
+  stateRevision++;normalizedShapeStamp=null;dailyDataCache=null;exportPreviewDataCache=null;
+  if(salesIndex?.rows===STATE.sales&&salesIndex.length===STATE.sales.length-1){
+    salesIndex.length=STATE.sales.length;const key=String(sale.shiftId||'');if(!salesIndex.byShift.has(key)) salesIndex.byShift.set(key,[]);salesIndex.byShift.get(key).unshift(sale);salesIndex.summaries.clear();
+    if(salesIndex.visible){const rows=salesIndex.visible,time=saleDateValue(sale.date).getTime();let lo=0,hi=rows.length;while(lo<hi){const mid=(lo+hi)>>>1;if((saleDateValue(rows[mid].date).getTime()||0)>time) lo=mid+1;else hi=mid;}rows.splice(lo,0,sale);}
+  }
+  if(dashboardSalesCache?.rows===STATE.sales&&dashboardSalesCache.length===STATE.sales.length-1&&dashboardSalesCache.date===todayYMD()){
+    dashboardSalesCache.length=STATE.sales.length;if(isSameLocalDay(sale.date)){dashboardSalesCache.salesForDay.unshift(sale);dashboardSalesCache.count++;dashboardSalesCache.total=dashboardSalesCache.salesForDay.reduce((sum,row)=>sum+Number(row.total||0),0);}
+  }else dashboardSalesCache=null;
+}
 function renderDashboard(stockPrepared = false){
-
-  const now = new Date();
-  const ventasHoy = (STATE.sales||[]).filter(s => !s.deleted && isSameLocalDay(s.date, now));
-  const total = ventasHoy.reduce((a,b)=> a + Number(b.total||0), 0);
-  $('#stat-ventas').textContent = `S/ ${money(total)}`;
-  $('#stat-count').textContent = ventasHoy.length;
+  if(saleSubmitInProgress&&criticalWriteDepth) return;
+  renderDashboardSales();renderLocalSaleReceipt();
 
   const products = (STATE.products||[]).filter(p=>p && !p.deleted);
   const outOfStock = products.filter(p => getAvailableQtyForSale(p) <= 0);
@@ -3820,10 +3906,22 @@ function captureCriticalRollback(productIds,keys){
   const arrays=new Map(keys.map(key=>[key,['customers','shifts','staff','syncConflicts'].includes(key)?STATE[key].map(row=>cloneLocalRecord(row)):STATE[key].slice()]));
   const queue=pendingOps.slice();
   return ()=>{
+    fullStateSaveRequired=true;dirtyEntityRows.clear();
     STATE.products=STATE.products.filter(p=>initialProductIds.has(p.id)).map(p=>products.get(p.id)||p);
     arrays.forEach((rows,key)=>STATE[key]=rows);pendingOps=queue;invalidateProductIndexes();
     stateRevision++;savedRevision=-1;window.STATE=STATE;window.pendingOps=pendingOps;
     scheduleRenderAll(0);
+  };
+}
+function captureSaleRollback(productIds,customerId){
+  const related=new Set(productIds.flatMap(id=>getRelatedProductIdsForSync(id)));
+  const products=[...related].map(id=>getProductById(id)).filter(Boolean).map(product=>({product,value:{...product,movements:(product.movements||[]).slice()}}));
+  const customer=customerId?findCustomerById(customerId):null,balance=customer?.balance;
+  return (saleId,operationIds)=>{
+    fullStateSaveRequired=true;dirtyEntityRows.clear();
+    products.forEach(({product,value})=>{Object.keys(product).forEach(key=>delete product[key]);Object.assign(product,value);});if(customer) customer.balance=balance;
+    if(saleId){STATE.sales=STATE.sales.filter(row=>row.id!==saleId);STATE.stockMovements=STATE.stockMovements.filter(row=>row.saleId!==saleId);}
+    pendingOps=pendingOps.filter(op=>!operationIds.has(op.id));invalidateProductIndexes();stateRevision++;savedRevision=-1;window.STATE=STATE;window.pendingOps=pendingOps;scheduleRenderAll(0);
   };
 }
 function markActionBusy(button,label){
@@ -3836,7 +3934,7 @@ async function completeSale(){
   if(saleSubmitInProgress||criticalWriteDepth) return;
   saleSubmitInProgress=true;criticalWriteDepth++;
   const releaseButton=markActionBusy(document.querySelector('#modal-sale button[onclick="completeSale()"]'),'Guardando venta...');
-  let rollback=null,committed=false;
+  let rollback=null,committed=false,saleId='',operationIds=new Set();
   try{
     window.POSStorage?.cancelScheduled();
     await window.POSStorage?.settleWrites();
@@ -3848,7 +3946,7 @@ async function completeSale(){
       return;
     }
     const responsible = activeShift.staffName || getCurrentActor();
-    rebuildLinkedStocks();
+    const roots=new Set();cart.forEach(item=>{const product=getProductById(item.id);const root=product?.parentProductId?getProductById(product.parentProductId):product;if(root&&!roots.has(root.id)){roots.add(root.id);syncChildrenFromParent(root);}});
     const demandByParent = new Map();
     for(const it of cart){
       const p = getProductById(it.id);
@@ -3885,7 +3983,8 @@ async function completeSale(){
       }
     }
 
-    rollback=captureCriticalRollback(cart.map(item=>item.id),['sales','customers','stockMovements','auditLogs']);
+    rollback=captureSaleRollback(cart.map(item=>item.id),payMethod==='A_CREDITO'?($('#pos-customer')?.value||'').trim():null);
+    activeSaleWrite={operationIds};
     // assemble sale object with customerId handling
     const sale = {
       id: 'V-' + uid(),
@@ -3902,6 +4001,7 @@ async function completeSale(){
       meta: { origin: 'pos', deviceId:getDeviceId(), device: navigator.userAgent, responsible }
     };
 
+    saleId=sale.id;
     // handle credit: must use an already registered customer
     if(payMethod === 'A_CREDITO'){
       const customerId = ($('#pos-customer')?.value || '').trim();
@@ -3923,7 +4023,7 @@ async function completeSale(){
     }
 
     // update stock locally and movements
-    const touchedProductIds = new Set();
+    const touchedProductIds = new Set(),newMovements=[];
     for(const it of sale.items){
       const res = adjustStockForSaleItem(it.productId, Number(it.qty || 0), 'OUT', sale.id, 'Venta POS');
       if(!res.ok) throw new Error(res.error || 'No se pudo descontar stock');
@@ -3938,9 +4038,10 @@ async function completeSale(){
       if(!movement) return;
       const stockMovement={...movement,id:movement.id||`SALE-MOV-${sale.id}-${id}`,movementId:movement.id||`SALE-MOV-${sale.id}-${id}`,productId:id,productName:product.name,shiftId:sale.shiftId,staffId:sale.staffId,deviceId:getDeviceId()};
       if(!(STATE.stockMovements||[]).some(item=>item.id===stockMovement.id)) STATE.stockMovements.unshift(stockMovement);
+      newMovements.unshift(stockMovement);
       addPendingOp({id:`STOCK-MOV-${stockMovement.id}`,type:'stockMovement',payload:stockMovement,silent:true});
     });
-    saveLocalBackup();
+    markSaleStateChanged(sale);
 
     // Build op and either process immediately or queue
     const op = { id:`SALE-${sale.id}`,type: 'sale', payload: sale };
@@ -3953,7 +4054,12 @@ async function completeSale(){
     } else {
       queueProductSyncFromItems(sale.items);
     }
-    await persistLocalState(true);committed=true;
+    const receipt={id:sale.id,date:sale.date,total:sale.total,items:cart.map(item=>({name:item.name,qty:item.qty}))};
+    const changes={products:[...touchedProductIds].map(getProductById).filter(Boolean),sales:[sale],stockMovements:newMovements};
+    if(sale.customerId) changes.customers=[findCustomerById(sale.customerId)];
+    rememberEntityChanges(changes);
+    await persistLocalState(true,{operationIds:[...operationIds],lastSale:receipt});committed=true;lastLocalSale=receipt;
+    renderLocalSaleReceipt();if(dashboardSalesCache) renderDashboardSales();
     // Close first so the sale feels immediate; refresh only the visible views afterwards.
     cart = [];
     closeModal('modal-sale');
@@ -3961,21 +4067,21 @@ async function completeSale(){
     if(isElementVisible('tab-home')) requestAnimationFrame(()=>setTimeout(()=>renderDashboard(true),0));
     if(isElementVisible('tab-inventory')) scheduleInventoryRender(0);
     updateShiftUI();
+    requestAnimationFrame(()=>setTimeout(()=>{if(isElementVisible('tab-reports')) updateReportsIfOpen();if(isModalVisible('modal-gestion')) renderGestionList();},0));
     if($('#pos-customer')) $('#pos-customer').value = '';
 
     if(!cloudOn || !db){
       showToast('Venta guardada offline. Se sincronizará cuando haya conexión.');
     } else {
-      processPendingOps();
       showToast('Venta registrada; esperando confirmación de nube');
     }
   }catch(e){
-    if(rollback&&!committed) rollback();
+    if(rollback&&!committed) rollback(saleId,operationIds);
     console.error('completeSale err', e);
     alert('Error registrando venta: ' + (e && e.message || ''));
   }finally{
-    releaseButton();saleSubmitInProgress=false;criticalWriteDepth--;scheduleSyncIndicators();
-    if(committed) processPendingOps();
+    activeSaleWrite=null;releaseButton();saleSubmitInProgress=false;criticalWriteDepth--;scheduleSyncIndicators();
+    if(committed) allowInterfacePaint().then(()=>processPendingOps());
   }
 }
 
@@ -4242,8 +4348,7 @@ function appendListPagination(container,page,total,size,onChange){
 }
 function renderGestionList(){
   const container=$('#gestion-list');if(!container) return;
-  const index=getSalesIndex();
-  const all=index.visible||(index.visible=(STATE.sales||[]).filter(s=>!s.deleted).slice().sort((a,b)=>saleDateValue(b.date||0)-saleDateValue(a.date||0))),size=40;
+  const all=getVisibleSales(),size=40;
   const pendingSales=pendingOps.filter(op=>op.type==='sale'&&!op.cloudConfirmedAt);
   $('#gestion-sales-status').textContent=all.length+' ventas en este equipo · '+pendingSales.length+' pendientes de confirmación en la nube'+(pendingSales.length?' · Mantén la app abierta para completar el envío.':'');
   gestionPage=Math.min(gestionPage,Math.max(0,Math.ceil(all.length/size)-1));
@@ -6442,7 +6547,7 @@ function syncParentFromChild(parentProduct){
 }
 
 function rebuildLinkedStocks(inferLegacyStock=true){
-  invalidateProductIndexes();
+  invalidateProductIndexes(true);
   const childrenByParent = new Map();
   const roots = [];
   (STATE.products||[]).forEach(product=>{
@@ -9187,7 +9292,7 @@ let pwaRegistrationPromise=null,appStarted=false;
 function registerPWA(){
   if(pwaRegistrationPromise) return pwaRegistrationPromise;
   if(!('serviceWorker' in navigator)||!/^https?:$/.test(location.protocol)) return Promise.resolve(false);
-  pwaRegistrationPromise=navigator.serviceWorker.register('./service-worker.js?v=20261125-sales-v9',{scope:'./',updateViaCache:'none'})
+  pwaRegistrationPromise=navigator.serviceWorker.register('./service-worker.js?v=20261125-minute-v10',{scope:'./',updateViaCache:'none'})
     .then(()=>true).catch(error=>{console.warn('Service worker',error);pwaRegistrationPromise=null;return false;});
   return pwaRegistrationPromise;
 }
@@ -9221,6 +9326,7 @@ async function startApp(){
   requestAnimationFrame(()=>setTimeout(()=>{
     window.TiendaPerf?.record('startup.firstLocalPaint',performance.now());
     queueLegacyCloudRecords();
+    if(queueUnsentAuditLogs()) saveLocalBackup();
     if(navigator.onLine&&isCloudAllowed()) bootstrapCloudSync(false);
   },0));
 }

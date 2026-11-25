@@ -1,0 +1,9 @@
+{
+  "passed": 1,
+  "tests": [
+    "actualización fuerza el módulo nuevo aunque el HTTP anterior siga fresco; recarga offline usa esa versión"
+  ],
+  "runtimeRequests": 2,
+  "errors": [],
+  "externalRequests": 0
+}

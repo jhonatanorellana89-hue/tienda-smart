@@ -1,0 +1,19 @@
+{
+  "passed": 12,
+  "tests": [
+    "1200 operaciones se confirman por lotes y el recibo borra sólo IDs confirmados",
+    "payloads de lotes conservan exactamente las reglas de los exportadores originales de nube",
+    "venta nueva adelanta auditorías y ventas antiguas independientes",
+    "misma entidad y ventas a crédito conservan el orden antes de confirmar",
+    "un registro rechazado no retiene las ventas que sí se pueden confirmar",
+    "confirmación local fallida conserva IDs y prueba de nube, sin repetir el lote al reintentar",
+    "escritura sin respuesta no se reenvía y permite avanzar otra venta independiente",
+    "cambiar el contenido de un ID mientras se envía conserva la nueva operación",
+    "ventas recientes se muestran antes de terminar el archivo y no se borran al salir del límite",
+    "una venta confirmada se visualiza en otro equipo antes de recibir todo el historial",
+    "fechas Timestamp de Firestore se ven y cuentan en los reportes del día",
+    "una compra de 450 escrituras conserva atomicidad y límites al convivir con ventas"
+  ],
+  "errors": [],
+  "externalRequests": 0
+}

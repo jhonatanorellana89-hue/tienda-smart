@@ -1,0 +1,32 @@
+{
+  "passed": 25,
+  "tests": [
+    "diagnóstico desactivado por defecto",
+    "50 aperturas/cierres, reaperturas y tareas canceladas",
+    "búsqueda flexible idéntica al algoritmo original",
+    "inventario acotado, paginación, actualización e índice invalidado",
+    "carrito mantiene el campo enfocado al cambiar cantidad",
+    "productos vinculados conservan cantidades y redondeos",
+    "turno inmediato y actualización conserva PIN y fondo escritos",
+    "PIN inválido no abre turno; PIN válido funciona localmente",
+    "escáner físico conserva ceros y agrega sólo una unidad por lectura",
+    "venta offline durable antes del éxito, doble envío y recarga de cola",
+    "error de ambos almacenes revierte venta y mantiene carrito",
+    "registro de producto rechaza doble envío y espera persistencia",
+    "registro de cliente no duplica saldo por doble envío",
+    "registro de personal con hash y doble envío produce un solo usuario",
+    "cola inmutable y protección de cambios locales frente a snapshots",
+    "una suscripción por colección; eventos no confirman ni borran cola",
+    "reintentos respetan espera y confirmación explícita elimina cola",
+    "un reintento antiguo no adelanta escrituras posteriores de la misma entidad",
+    "cinco ventas consecutivas mantienen stock, historial y cola",
+    "compra offline, doble envío y stock guardados en una transacción",
+    "previsualización de reportes y conteos diarios no trunca datos guardados",
+    "inicio local no espera a Firebase bloqueado",
+    "exportación Excel con carga diferida local",
+    "lector libera stream al cerrar durante inicio",
+    "diagnóstico recoge métricas sólo al habilitarlo"
+  ],
+  "errors": [],
+  "externalRequests": 0
+}
