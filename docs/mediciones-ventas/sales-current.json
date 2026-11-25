@@ -1,0 +1,12 @@
+{
+  "label": "sales-current",
+  "synthetic": true,
+  "latencyPerRequestMs": 10,
+  "browser": "156.0.8078.79",
+  "untilNewestMs": 108.80000000004657,
+  "totalMs": 353.0999999999767,
+  "requests": 10,
+  "remoteSales": 1000,
+  "queue": 0,
+  "durable": 0
+}

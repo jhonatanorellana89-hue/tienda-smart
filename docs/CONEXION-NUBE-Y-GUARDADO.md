@@ -71,8 +71,8 @@ respaldos históricos para conseguir espacio.
 ## Verificación
 
 `npm run check`: sintaxis, recursos e identificadores originales correctos.
-`npm test`: 89 comprobaciones, incluidas las 67 anteriores, 16 de conexión y
-6 de recuperación del almacenamiento. Se cubren el SDK real incluido,
+`npm test`: 90 comprobaciones, incluidas las 67 anteriores, 16 de conexión y
+6 de recuperación del almacenamiento y una de actualización de caché. Se cubren el SDK real incluido,
 rutas principal y alternativa, permisos, esperas, reconexión, migración lenta,
 IDs y recibos, cierre de IndexedDB, apertura bloqueada, errores de cuota,
 avisos repetidos, recuperación automática y permanencia del respaldo JSON.
@@ -109,3 +109,12 @@ Si el aviso de guardado sigue presente en la versión abierta, descargar primero
 el respaldo JSON desde Sincronización, antes de recargar o cerrar la app.
 Después, abrir con Internet para recibir la actualización. No borrar los datos
 del sitio ni desinstalar la PWA como método de reparación.
+
+### Entrega de recursos nuevos a la PWA
+
+Se reprodujo una segunda causa de actualización incompleta: el precache podía
+reutilizar `pos-offline.js` desde una caché HTTP todavía fresca y conservar el
+módulo anterior. La instalación ahora solicita los recursos con `cache: reload`
+y utiliza `tiendasmart-github-v8-refresh`. Una prueba con caché HTTP real verifica
+la descarga del módulo nuevo, su presencia en Cache Storage y su ejecución tras
+recargar completamente sin Internet. El esquema y los datos IndexedDB se conservan.

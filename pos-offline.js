@@ -70,6 +70,28 @@
   async function loadPendingOps(){
     const db=await openDb();return (await requestResult(db.transaction('pendingOps').objectStore('pendingOps').getAll())).sort((a,b)=>String(a.ts||'').localeCompare(String(b.ts||'')));
   }
+  function enqueueWrite(run){
+    const result=writeChain.then(async()=>{
+      try{return await run();}catch(error){
+        if(!['InvalidStateError','TransactionInactiveError'].includes(error?.name)) throw error;
+        resetConnection();return run();
+      }
+    });writeChain=result.catch(()=>{});return result;
+  }
+  function acknowledgePendingOps(ids,receipts){
+    const removed=[...ids],log=clone(receipts);
+    return enqueueWrite(async()=>{
+      const db=await openDb();let tx;
+      try{tx=db.transaction(['pendingOps','meta'],'readwrite',{durability:'strict'});}catch(_){tx=db.transaction(['pendingOps','meta'],'readwrite');}
+      const done=transactionDone(tx);
+      try{
+        const store=tx.objectStore('pendingOps');removed.forEach(id=>store.delete(id));
+        tx.objectStore('meta').put({key:'syncReceiptLogV1',value:log});
+        tx.objectStore('meta').put({key:'queueAuthoritativeV1',value:true});
+      }catch(error){tx.abort();await done.catch(()=>{});throw error;}
+      await done;const previous=signatures.get('pendingOps');removed.forEach(id=>previous?.delete(id));return true;
+    });
+  }
   // Sólo filas modificadas; estado y cola se confirman en la misma transacción.
   function commit(state,ops,receipts){
     const run=async()=>{
@@ -109,12 +131,7 @@
       }catch(error){tx.abort();await done.catch(()=>{});throw error;}
       await done;next.forEach((value,key)=>signatures.set(key,value));return true;
     };
-    const result=writeChain.then(async()=>{
-      try{return await run();}catch(error){
-        if(!['InvalidStateError','TransactionInactiveError'].includes(error?.name)) throw error;
-        resetConnection();return run();
-      }
-    });writeChain=result.catch(()=>{});return result;
+    return enqueueWrite(run);
   }
   function scheduleStateSave(state,delay=180){
     pendingState=state;clearTimeout(stateTimer);
@@ -146,6 +163,6 @@
     return {state,ops,receipts:Array.isArray(receipts)?receipts:[],authoritative,queueAuthoritative:true};
   }
   window.POSStorage={DB_NAME,DB_VERSION,open:openDb,initialize,loadState,saveState:state=>commit(state),scheduleStateSave,flushState,
-    loadPendingOps,savePendingOps:(ops,receipts)=>commit(null,ops,receipts),schedulePendingSave,setMeta,getMeta,commit,cancelScheduled,settleWrites:()=>writeChain,
+    loadPendingOps,savePendingOps:(ops,receipts)=>commit(null,ops,receipts),acknowledgePendingOps,schedulePendingSave,setMeta,getMeta,commit,cancelScheduled,settleWrites:()=>writeChain,
     createBackup:async(state,ops,extra)=>({format:'TIENDASMART_BACKUP_V2',createdAt:new Date().toISOString(),state:clone(state||{}),pendingOps:clone(ops||[]),meta:clone(extra||{})})};
 })();
