@@ -1,0 +1,124 @@
+{
+  "label": "minute-baseline",
+  "cpu": 6,
+  "viewport": "412x915",
+  "browser": "156.0.8078.79",
+  "scenarios": [
+    {
+      "history": 10000,
+      "products": 5000,
+      "rows": [
+        {
+          "commitMs": 712.3999999999069,
+          "visibleMs": 779.6000000000931,
+          "serializations": 25506,
+          "phases": {
+            "rebuildLinkedStocks": 12.599999999627471,
+            "captureCriticalRollback": 77.59999999962747,
+            "saveLocalBackup": 0,
+            "fullCommit": 414.8000000002794,
+            "renderCart": 1.2000000001862645,
+            "updateShiftUI": 0.20000000018626451,
+            "renderDashboard": 41.799999999813735
+          },
+          "salesAdded": 1,
+          "stock": 9999,
+          "receipt": false
+        },
+        {
+          "commitMs": 539.1000000000931,
+          "visibleMs": 582.3999999999069,
+          "serializations": 25511,
+          "phases": {
+            "rebuildLinkedStocks": 4.7000000001862645,
+            "captureCriticalRollback": 60.89999999990687,
+            "saveLocalBackup": 0.10000000009313226,
+            "fullCommit": 321.60000000009313,
+            "renderCart": 1.2999999998137355,
+            "updateShiftUI": 1.8000000002793968,
+            "renderDashboard": 27.699999999720603
+          },
+          "salesAdded": 1,
+          "stock": 9998,
+          "receipt": false
+        },
+        {
+          "commitMs": 770.8999999999069,
+          "visibleMs": 859.6999999997206,
+          "serializations": 25516,
+          "phases": {
+            "rebuildLinkedStocks": 155,
+            "captureCriticalRollback": 60.5,
+            "saveLocalBackup": 13.599999999627471,
+            "fullCommit": 399.6999999997206,
+            "renderCart": 2.7000000001862645,
+            "updateShiftUI": 1.2999999998137355,
+            "renderDashboard": 41.700000000186265
+          },
+          "salesAdded": 1,
+          "stock": 9997,
+          "receipt": false
+        }
+      ],
+      "errors": []
+    },
+    {
+      "history": 100000,
+      "products": 5000,
+      "rows": [
+        {
+          "commitMs": 2774.899999999907,
+          "visibleMs": 3027.1999999997206,
+          "serializations": 205506,
+          "phases": {
+            "rebuildLinkedStocks": 12.399999999906868,
+            "captureCriticalRollback": 109.5,
+            "saveLocalBackup": 1.900000000372529,
+            "fullCommit": 2370.4000000003725,
+            "renderCart": 1.1000000000931323,
+            "updateShiftUI": 1.3999999999068677,
+            "renderDashboard": 223.1999999997206
+          },
+          "salesAdded": 1,
+          "stock": 9999,
+          "receipt": false
+        },
+        {
+          "commitMs": 3058.600000000093,
+          "visibleMs": 3384.100000000093,
+          "serializations": 205511,
+          "phases": {
+            "rebuildLinkedStocks": 10.399999999906868,
+            "captureCriticalRollback": 214,
+            "saveLocalBackup": 1.3000000002793968,
+            "fullCommit": 2593.7000000001863,
+            "renderCart": 1.1000000000931323,
+            "updateShiftUI": 2.2999999998137355,
+            "renderDashboard": 295.39999999990687
+          },
+          "salesAdded": 1,
+          "stock": 9998,
+          "receipt": false
+        },
+        {
+          "commitMs": 2391.5,
+          "visibleMs": 2711.399999999907,
+          "serializations": 205516,
+          "phases": {
+            "rebuildLinkedStocks": 10.900000000372529,
+            "captureCriticalRollback": 89.3000000002794,
+            "saveLocalBackup": 0.10000000009313226,
+            "fullCommit": 1958.1000000000931,
+            "renderCart": 8,
+            "updateShiftUI": 0,
+            "renderDashboard": 277.70000000018626
+          },
+          "salesAdded": 1,
+          "stock": 9997,
+          "receipt": false
+        }
+      ],
+      "errors": []
+    }
+  ]
+}

@@ -2,7 +2,7 @@
   'use strict';
   const DB_NAME = 'TiendaSmartOffline', DB_VERSION = 3;
   const ENTITY_STORES = ['products','sales','customers','purchases','suppliers','auditLogs','stockClosures','staff','shifts','stockMovements','syncConflicts'];
-  let dbPromise, activeDb=null, openAttempt=0, writeChain = Promise.resolve(), stateTimer, opsTimer, pendingState, pendingOps;
+  let dbPromise, activeDb=null, openAttempt=0, entityStateInitialized=false, writeChain = Promise.resolve(), stateTimer, opsTimer, pendingState, pendingOps;
   const signatures = new Map();
   const clone = value => typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value));
   function openDb(){
@@ -13,6 +13,7 @@
       const fail=error=>{failed=true;if(attempt===openAttempt) dbPromise=null;reject(error);};
       const request = indexedDB.open(DB_NAME,DB_VERSION);
       request.onupgradeneeded = ()=>{
+        entityStateInitialized=false;
         const db=request.result;
         ['snapshots','meta'].forEach(name=>{ if(!db.objectStoreNames.contains(name)) db.createObjectStore(name,{keyPath:'key'}); });
         ['pendingOps',...ENTITY_STORES].forEach(name=>{ if(!db.objectStoreNames.contains(name)) db.createObjectStore(name,{keyPath:'id'}); });
@@ -54,11 +55,17 @@
   async function loadState(){
     const db=await openDb();const manifest=await getMeta('entityStateV1');
     if(manifest){
+      entityStateInitialized=true;
+      const heads=await getMeta('incrementalOrderHeadsV1')||{};
       const tx=db.transaction(ENTITY_STORES);const result={...manifest.extra};
       await Promise.all(ENTITY_STORES.map(async name=>{
         const rows=await requestResult(tx.objectStore(name).getAll());
         const order=new Map((manifest.order?.[name]||[]).map((id,i)=>[id,i]));
-        rows.sort((a,b)=>(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity));
+        if(heads[name]?.length){
+          const recent=new Map(heads[name].map((id,i)=>[id,i]));
+          const times=new Map(rows.map(row=>{const value=row.date||row.ts||0;const seconds=value?.seconds??value?._seconds;return [row.id,Number.isFinite(seconds)?seconds*1000:new Date(value).getTime()||0];}));
+          rows.sort((a,b)=>times.get(b.id)-times.get(a.id)||(recent.get(a.id)??Infinity)-(recent.get(b.id)??Infinity)||(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity));
+        }else rows.sort((a,b)=>(order.get(a.id)??Infinity)-(order.get(b.id)??Infinity));
         result[name]=rows;
         signatures.set(name,new Map(rows.map(row=>[row.id,JSON.stringify(row)])));
       }));
@@ -93,7 +100,41 @@
     });
   }
   // Sólo filas modificadas; estado y cola se confirman en la misma transacción.
-  function commit(state,ops,receipts){
+  function commitChangedRows(ops,options){
+    return enqueueWrite(async()=>{
+      if(!entityStateInitialized) throw new Error('Falta el guardado inicial completo');
+      const db=await openDb(),rows=new Map(),queue=new Map(),newHeads={};
+      for(const [name,changes] of Object.entries(options.changes)){
+        if(!ENTITY_STORES.includes(name)) throw new Error('Almacén no válido: '+name);
+        rows.set(name,changes.map(row=>{if(!row?.id) throw new Error('Registro sin ID');const json=JSON.stringify(row);return {id:row.id,json,value:JSON.parse(json)};}));
+        if(['sales','stockMovements','auditLogs'].includes(name)) newHeads[name]=changes.filter(row=>!signatures.get(name)?.has(row.id)).map(row=>row.id);
+      }
+      const ids=new Set(options.operationIds||[]);
+      ops.filter(op=>ids.has(op.id)).forEach(op=>{const json=JSON.stringify(op);queue.set(op.id,{json,value:JSON.parse(json)});});
+      if(queue.size!==ids.size) throw new Error('Faltan operaciones para guardar la venta');
+      let tx;const names=['meta','pendingOps',...rows.keys()];
+      try{tx=db.transaction(names,'readwrite',{durability:'strict'});}catch(_){tx=db.transaction(names,'readwrite');}
+      const done=transactionDone(tx);let requestError=null;
+      try{
+        rows.forEach((changes,name)=>changes.forEach(row=>tx.objectStore(name).put(row.value)));
+        queue.forEach(row=>tx.objectStore('pendingOps').put(row.value));
+        const meta=tx.objectStore('meta');meta.put({key:'queueAuthoritativeV1',value:true});
+        if(options.lastSale) meta.put({key:'lastLocalSaleV1',value:clone(options.lastSale)});
+        const request=meta.get('incrementalOrderHeadsV1');request.onsuccess=()=>{
+          try{
+            const current=request.result?.value||{};
+            for(const [name,ids] of Object.entries(newHeads)) if(ids.length) current[name]=[...new Set([...ids,...(current[name]||[])])].slice(0,200);
+            meta.put({key:'incrementalOrderHeadsV1',value:current});
+          }catch(error){requestError=error;tx.abort();}
+        };
+      }catch(error){tx.abort();await done.catch(()=>{});throw error;}
+      try{await done;}catch(error){throw requestError||error;}
+      rows.forEach((changes,name)=>{if(!signatures.has(name)) signatures.set(name,new Map());changes.forEach(row=>signatures.get(name).set(row.id,row.json));});
+      if(!signatures.has('pendingOps')) signatures.set('pendingOps',new Map());queue.forEach((row,id)=>signatures.get('pendingOps').set(id,row.json));return true;
+    });
+  }
+  function commit(state,ops,receipts,options={}){
+    if(options.changes) return commitChangedRows(ops,options);
     const run=async()=>{
       const db=await openDb(), changes=[], next=new Map(), order={};
       if(state) ENTITY_STORES.forEach(name=>{
@@ -125,11 +166,13 @@
         if(state){
           const extra=Object.fromEntries(Object.entries(state).filter(([key])=>!ENTITY_STORES.includes(key)));
           tx.objectStore('meta').put({key:'entityStateV1',value:{savedAt:new Date().toISOString(),order,extra:clone(extra)}});
+          tx.objectStore('meta').put({key:'incrementalOrderHeadsV1',value:{}});
         }
+        if(options.lastSale) tx.objectStore('meta').put({key:'lastLocalSaleV1',value:clone(options.lastSale)});
         if(ops) tx.objectStore('meta').put({key:'queueAuthoritativeV1',value:true});
         if(Array.isArray(receipts)) tx.objectStore('meta').put({key:'syncReceiptLogV1',value:clone(receipts)});
       }catch(error){tx.abort();await done.catch(()=>{});throw error;}
-      await done;next.forEach((value,key)=>signatures.set(key,value));return true;
+      await done;if(state) entityStateInitialized=true;next.forEach((value,key)=>signatures.set(key,value));return true;
     };
     return enqueueWrite(run);
   }
@@ -159,10 +202,10 @@
       const all=new Map([...ops,...(legacyOps||[])].filter(op=>op?.id).map(op=>[op.id,op]));
       ops=[...all.values()];await commit(null,ops);
     }else signatures.set('pendingOps',new Map(ops.map(op=>[op.id,JSON.stringify(op)])));
-    const receipts=await getMeta('syncReceiptLogV1');
-    return {state,ops,receipts:Array.isArray(receipts)?receipts:[],authoritative,queueAuthoritative:true};
+    const receipts=await getMeta('syncReceiptLogV1'),lastSale=await getMeta('lastLocalSaleV1');
+    return {state,ops,receipts:Array.isArray(receipts)?receipts:[],lastSale,authoritative,queueAuthoritative:true};
   }
-  window.POSStorage={DB_NAME,DB_VERSION,open:openDb,initialize,loadState,saveState:state=>commit(state),scheduleStateSave,flushState,
+  window.POSStorage={DB_NAME,DB_VERSION,supportsChangedRows:true,open:openDb,initialize,loadState,saveState:state=>commit(state),scheduleStateSave,flushState,
     loadPendingOps,savePendingOps:(ops,receipts)=>commit(null,ops,receipts),acknowledgePendingOps,schedulePendingSave,setMeta,getMeta,commit,cancelScheduled,settleWrites:()=>writeChain,
     createBackup:async(state,ops,extra)=>({format:'TIENDASMART_BACKUP_V2',createdAt:new Date().toISOString(),state:clone(state||{}),pendingOps:clone(ops||[]),meta:clone(extra||{})})};
 })();

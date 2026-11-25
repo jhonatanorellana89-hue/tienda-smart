@@ -1,0 +1,21 @@
+{
+  "passed": 14,
+  "tests": [
+    "productos vendidos mantienen resultados originales, vinculados, eliminados y redondeos",
+    "facturas y resúmenes conservan totales y subproductos del algoritmo original",
+    "ediciones guardadas y reemplazos invalidan vistas; factura seleccionada conserva sus líneas",
+    "Exportar abre inmediatamente y cancela el cálculo al cerrar",
+    "vista previa paginada permite recorrer todos los productos vendidos",
+    "filas progresivas cancelan tareas; conteos tardíos y caja se conservan al reabrir",
+    "personal paginado conserva todos los usuarios y su turno abierto",
+    "venta vinculada responde Guardando, evita doble cobro y persiste stock exacto",
+    "exportInventoryXLSX: Excel en segundo plano coincide con el exportador compatible",
+    "exportSalesXLSX: Excel en segundo plano coincide con el exportador compatible",
+    "exportCombinedXLSX: Excel en segundo plano coincide con el exportador compatible",
+    "exportStockHistoryXLSX: Excel en segundo plano coincide con el exportador compatible",
+    "exportDailyStockXLSX: Excel en segundo plano coincide con el exportador compatible",
+    "doble clic en Excel genera un solo archivo y restaura el botón"
+  ],
+  "errors": [],
+  "externalRequests": 0
+}
